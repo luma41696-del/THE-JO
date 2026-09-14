@@ -9,6 +9,7 @@ import { LocaleProvider } from "@/components/providers/LocaleProvider";
 import { AdminGate } from "@/components/admin/AdminGate";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { getAdminOrders } from "@/lib/admin/data";
+import { requireAdminSession } from "@/lib/firebase/session";
 
 /**
  * Admin shell.
@@ -55,7 +56,10 @@ export const metadata: Metadata = {
   referrer: "no-referrer",
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  await requireAdminSession();
   // Resolved once here so the shell can tell the operator when a screen is
   // showing generated data rather than their real Firestore orders.
   const { live } = await getAdminOrders();

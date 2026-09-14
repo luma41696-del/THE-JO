@@ -26,6 +26,11 @@ until its Firebase provider is configured and
 deployment. Production checkout currently accepts cash on delivery only.
 Online payment methods require a working payment integration before enabling.
 
+`npm run test:firebase-runtime` checks Firebase Admin loading under a CommonJS
+loader and verifies RSA signatures. A scoped `jose` override preserves
+compatibility with Vercel's runtime while the upstream CommonJS import issue is
+unresolved.
+
 ## Admin access
 
 Store accounts are separate from accounts used to manage Firebase or Vercel.
@@ -40,3 +45,8 @@ npm run grant-admin -- owner@example.com
 
 The user must sign in again after a grant, then open `/admin`. Passwords are
 chosen by the account owner; do not save them in this repository.
+
+Admin pages verify an HttpOnly Firebase session cookie and the account's current
+role before reading private records. Sign-in exchanges the ID token through
+`/api/auth/session`; sign-out clears that cookie. API mutations continue to
+verify the Firebase bearer token independently.

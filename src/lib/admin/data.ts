@@ -1,8 +1,11 @@
-import { cache } from "react";
-import { collection, getDocs, limit as fsLimit, orderBy, query } from "firebase/firestore";
+import "server-only";
 
-import { getDb } from "@/lib/firebase/client";
-import { orderConverter } from "@/lib/firebase/converters";
+import { cache } from "react";
+import { Timestamp } from "firebase-admin/firestore";
+
+import { getAdminDb } from "@/lib/firebase/admin";
+import { requireAdminSession } from "@/lib/firebase/session";
+import { demoProducts, demoCategories, demoOffers, demoBanners } from "@/data/demo";
 import {
   demoCustomers,
   demoInvoices,
@@ -10,47 +13,64 @@ import {
   demoTickets,
   type CustomerSummary,
 } from "@/data/demo-operations";
-import type { Invoice, Order, SupportTicket } from "@/types";
+import type { Banner, Category, Invoice, Offer, Order, Product, SupportTicket } from "@/types";
 
 /**
  * Admin data access.
  *
- * Mirrors `src/lib/catalog.ts`: read Firestore, fall back to generated
- * operations data on an empty result, an error, or a timeout. The admin is the
- * screen most often opened before any real data exists, so an empty database
- * has to produce a usable dashboard rather than a wall of zeros and a spinner.
- *
- * Everything is wrapped in React's `cache()`, so a dashboard that asks for the
- * order list in six different widgets issues one read.
+ * Every read checks the verified server session before using Admin SDK.
+ * A client component is never the boundary for private server-rendered data.
+ * React cache deduplicates reads within one request, never across accounts.
  */
 
 const READ_TIMEOUT_MS = 5000;
-const ALLOW_DEMO = process.env.NEXT_PUBLIC_DISABLE_DEMO_FALLBACK !== "true";
+const ALLOW_DEMO = process.env.NODE_ENV !== "production" &&
+  process.env.NEXT_PUBLIC_DISABLE_DEMO_FALLBACK !== "true";
 
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(`admin read timed out after ${ms}ms`)), ms),
-    ),
-  ]);
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`admin read timed out after ${ms}ms`)), ms);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
-async function readOrFallback<T>(
-  label: string,
-  read: () => Promise<T[]>,
+/** Admin timestamps must become plain values before reaching Client Components. */
+function serialise<T>(input: unknown): T {
+  if (input instanceof Timestamp) return input.toMillis() as T;
+  if (input instanceof Date) return input.getTime() as T;
+  if (Array.isArray(input)) return input.map((value) => serialise(value)) as T;
+  if (input && typeof input === "object") {
+    return Object.fromEntries(Object.entries(input).map(([key, value]) => [key, serialise(value)])) as T;
+  }
+  return input as T;
+}
+
+async function readCollection<T>(
+  name: string,
+  orderField: string,
+  maxRows: number,
   fallback: () => T[],
 ): Promise<{ rows: T[]; live: boolean }> {
+  // Keep authorization outside the catch so redirects cannot become demo data.
+  const session = await requireAdminSession();
+  if (!session) return { rows: ALLOW_DEMO ? fallback() : [], live: false };
   try {
-    const rows = await withTimeout(read(), READ_TIMEOUT_MS);
-    if (rows.length > 0) return { rows, live: true };
+    const snapshot = await withTimeout(
+      getAdminDb().collection(name).orderBy(orderField, "desc").limit(maxRows).get(),
+      READ_TIMEOUT_MS,
+    );
+    const rows = snapshot.docs.map((doc) => serialise<T>({ ...doc.data(), id: doc.id }));
+    return { rows, live: true };
   } catch (error) {
-    if (process.env.NODE_ENV !== "production") {
-      console.warn(
-        `[THE JO admin] read "${label}" failed — serving generated operations data.`,
-        error instanceof Error ? error.message : error,
-      );
-    }
+    if (!ALLOW_DEMO) throw error;
+    console.warn(`[THE JO admin] read "${name}" failed — serving generated data.`);
   }
   return { rows: ALLOW_DEMO ? fallback() : [], live: false };
 }
@@ -58,20 +78,7 @@ async function readOrFallback<T>(
 /* -------------------------------------------------------------------------- */
 
 export const getAdminOrders = cache(async (): Promise<{ rows: Order[]; live: boolean }> =>
-  readOrFallback(
-    "orders",
-    async () => {
-      const snap = await getDocs(
-        query(
-          collection(getDb(), "orders").withConverter(orderConverter),
-          orderBy("createdAt", "desc"),
-          fsLimit(1000),
-        ),
-      );
-      return snap.docs.map((d) => d.data());
-    },
-    () => demoOrders,
-  ),
+  readCollection("orders", "createdAt", 1000, () => demoOrders),
 );
 
 export const getAdminOrderByReference = cache(async (reference: string) => {
@@ -82,16 +89,7 @@ export const getAdminOrderByReference = cache(async (reference: string) => {
 /* -------------------------------------------------------------------------- */
 
 export const getAdminInvoices = cache(async (): Promise<{ rows: Invoice[]; live: boolean }> =>
-  readOrFallback(
-    "invoices",
-    async () => {
-      const snap = await getDocs(
-        query(collection(getDb(), "invoices"), orderBy("issuedAt", "desc"), fsLimit(1000)),
-      );
-      return snap.docs.map((d) => ({ ...(d.data() as Omit<Invoice, "id">), id: d.id }));
-    },
-    () => demoInvoices,
-  ),
+  readCollection("invoices", "issuedAt", 1000, () => demoInvoices),
 );
 
 export const getAdminInvoiceByNumber = cache(async (number: string) => {
@@ -102,16 +100,7 @@ export const getAdminInvoiceByNumber = cache(async (number: string) => {
 /* -------------------------------------------------------------------------- */
 
 export const getAdminTickets = cache(async (): Promise<{ rows: SupportTicket[]; live: boolean }> =>
-  readOrFallback(
-    "supportTickets",
-    async () => {
-      const snap = await getDocs(
-        query(collection(getDb(), "supportTickets"), orderBy("updatedAt", "desc"), fsLimit(500)),
-      );
-      return snap.docs.map((d) => ({ ...(d.data() as Omit<SupportTicket, "id">), id: d.id }));
-    },
-    () => demoTickets,
-  ),
+  readCollection("supportTickets", "updatedAt", 500, () => demoTickets),
 );
 
 export const getAdminTicketByReference = cache(async (reference: string) => {
@@ -130,7 +119,7 @@ export const getAdminTicketByReference = cache(async (reference: string) => {
  */
 export const getAdminCustomers = cache(async (): Promise<CustomerSummary[]> => {
   const { rows, live } = await getAdminOrders();
-  if (!live) return demoCustomers;
+  if (!live) return ALLOW_DEMO ? demoCustomers : [];
 
   const acc = new Map<string, CustomerSummary>();
 
@@ -162,6 +151,20 @@ export const getAdminCustomers = cache(async (): Promise<CustomerSummary[]> => {
 });
 
 export type { CustomerSummary };
+
+// Admin views include drafts, archived products and expired campaigns.
+export const getAdminProducts = cache(async (): Promise<Product[]> =>
+  (await readCollection("products", "publishedAt", 1000, () => demoProducts)).rows,
+);
+export const getAdminCategories = cache(async (): Promise<Category[]> =>
+  (await readCollection("categories", "order", 1000, () => demoCategories)).rows.sort((a, b) => a.order - b.order),
+);
+export const getAdminOffers = cache(async (): Promise<Offer[]> =>
+  (await readCollection("offers", "startsAt", 1000, () => demoOffers)).rows,
+);
+export const getAdminBanners = cache(async (): Promise<Banner[]> =>
+  (await readCollection("banners", "priority", 1000, () => demoBanners)).rows,
+);
 
 /**
  * "Now" for the admin.

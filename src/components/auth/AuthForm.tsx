@@ -8,6 +8,8 @@ import { motion, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { EASE } from "@/lib/motion";
 import { AuthError, requestPasswordReset, signIn, signInWithGoogle, signUp } from "@/lib/firebase/auth";
+import { syncAdminSession } from "@/lib/firebase/session-client";
+import type { User } from "firebase/auth";
 import { Button } from "@/components/ui/Button";
 import { AnimatedLogo } from "@/components/brand/AnimatedLogo";
 import { JoWave } from "@/components/brand/JoWave";
@@ -47,6 +49,23 @@ export function AuthForm({ mode, locale = "en" }: { mode: "signin" | "signup"; l
 
   const isSignup = mode === "signup";
 
+  async function finishSignIn(user: User) {
+    const adminDestination = next === "/admin" || next.startsWith("/admin/");
+    try {
+      const admin = await syncAdminSession(user);
+      if (adminDestination && !admin) {
+        throw new AuthError(
+          rtl ? "هذا الحساب لا يملك صلاحية الإدارة." : "This account does not have admin access.",
+          "app/admin-access",
+        );
+      }
+    } catch (error) {
+      if (adminDestination) throw error;
+    }
+    router.push(next);
+    router.refresh();
+  }
+
   function handleError(error: unknown) {
     if (error instanceof AuthError) {
       setErrors(error.field ? { [error.field]: error.message } : { form: error.message });
@@ -61,13 +80,10 @@ export function AuthForm({ mode, locale = "en" }: { mode: "signin" | "signup"; l
     setLoading(true);
 
     try {
-      if (isSignup) {
-        await signUp(name, email, password, locale);
-      } else {
-        await signIn(email, password);
-      }
-      router.push(next);
-      router.refresh();
+      const user = isSignup
+        ? await signUp(name, email, password, locale)
+        : await signIn(email, password);
+      await finishSignIn(user);
     } catch (error) {
       handleError(error);
     } finally {
@@ -79,9 +95,8 @@ export function AuthForm({ mode, locale = "en" }: { mode: "signin" | "signup"; l
     setErrors({});
     setLoading(true);
     try {
-      await signInWithGoogle(locale);
-      router.push(next);
-      router.refresh();
+      const user = await signInWithGoogle(locale);
+      await finishSignIn(user);
     } catch (error) {
       handleError(error);
     } finally {

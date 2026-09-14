@@ -1,9 +1,9 @@
 import { ProductsBoard } from "@/components/admin/ProductsBoard";
-import { getAllProducts, getCategories } from "@/lib/catalog";
+import { getAdminProducts, getAdminCategories } from "@/lib/admin/data";
 
 export const metadata = { title: "Products" };
 
 export default async function AdminProductsPage() {
-  const [products, categories] = await Promise.all([getAllProducts(), getCategories()]);
+  const [products, categories] = await Promise.all([getAdminProducts(), getAdminCategories()]);
   return <ProductsBoard products={products} categories={categories} />;
 }

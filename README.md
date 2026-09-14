@@ -1,5 +1,8 @@
 # THE JO | ذاجو
 
+Live site: [the-jo-shop.vercel.app](https://the-jo-shop.vercel.app/ar).
+Deployment and administrator access: [DEPLOYMENT.md](DEPLOYMENT.md).
+
 A premium fashion storefront — **bilingual (English / العربية)**, priced in
 Jordanian dinar. Next.js 15 (App Router), TypeScript, Tailwind CSS v4, Firebase,
 Motion and Lottie.

@@ -1,10 +1,11 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { onAuthStateChanged, type User } from "firebase/auth";
+import { onIdTokenChanged, type User } from "firebase/auth";
 
 import { getFirebaseAuth, initAnalytics, initAppCheck } from "@/lib/firebase/client";
 import { ensureProfile, fetchProfile } from "@/lib/firebase/auth";
+import { syncAdminSession } from "@/lib/firebase/session-client";
 import { useWishlist } from "@/lib/store/wishlist";
 import type { UserProfile } from "@/types";
 
@@ -46,8 +47,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(getFirebaseAuth(), async (nextUser) => {
+    const unsubscribe = onIdTokenChanged(getFirebaseAuth(), async (nextUser) => {
       setUser(nextUser);
+      // Refreshes renew the server cookie too. Customer auth remains available
+      // if the admin endpoint is offline; explicit admin navigation waits for it.
+      void syncAdminSession(nextUser).catch(() => {});
 
       if (!nextUser) {
         setProfile(null);

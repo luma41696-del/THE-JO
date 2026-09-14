@@ -14,6 +14,7 @@ import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from "firebase/firest
 
 import { getDb, getFirebaseAuth } from "./client";
 import { userConverter } from "./converters";
+import { syncAdminSession } from "./session-client";
 import type { Locale, UserProfile } from "@/types";
 
 /**
@@ -198,6 +199,8 @@ export async function requestPasswordReset(email: string) {
 }
 
 export async function signOut() {
+  // Clear the HttpOnly cookie before changing client identity or navigating.
+  await syncAdminSession(null);
   await fbSignOut(getFirebaseAuth());
 }
 
