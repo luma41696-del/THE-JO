@@ -1,0 +1,336 @@
+@import "tailwindcss";
+
+/* ===========================================================================
+   THE JO | ذاجو — design tokens
+   Everything visual resolves to a token here. Components never hard-code a
+   hex value, a radius, or an easing curve.
+   ========================================================================= */
+
+@theme {
+  /* --- Core palette ------------------------------------------------------
+     Violet is the brand signature, lifted straight from the logo artwork.
+     The neutrals are deliberately *warm* — bone rather than white — because a
+     pure #FFF ground makes fashion product photography look clinical. */
+  --color-violet: #703bec;
+  --color-violet-deep: #4b21b0;
+  --color-violet-bright: #8b5cf6;
+  --color-violet-mist: #f0eaff;
+  --color-violet-veil: #faf7ff;
+
+  --color-ink: #0b0b0f;
+  --color-ink-soft: #1a1a22;
+  --color-ink-muted: #4a4a55;
+  --color-smoke: #6b6b76;
+  --color-mist: #9d9da8;
+
+  --color-paper: #faf8f4;
+  --color-paper-raised: #ffffff;
+  --color-paper-sunken: #f2efe9;
+  --color-line: #e6e2da;
+  --color-line-strong: #d5d0c5;
+
+  /* Supporting accents — used sparingly, never as surfaces. */
+  --color-sand: #e9dfd2;
+  --color-clay: #c8a68a;
+  --color-coral: #ff4f3d; /* sale / urgency only */
+  --color-mint: #14a07a; /* in stock / success only */
+
+  /* --- Typography --------------------------------------------------------
+     Four roles, two scripts.
+
+     `display` lists Quadrillion first and Baloo second. Quadrillion carries no
+     Arabic glyphs, so the browser's own per-glyph fallback does the bilingual
+     work for free: Latin headings set in the logo face, Arabic headings set in
+     Baloo, from one token and with no conditional CSS.
+
+     `ui` is Baloo in both scripts — buttons, badges and chips read as one
+     family whichever language the shopper is in, which is what stops a
+     bilingual interface feeling like two different products. */
+  --font-display: var(--font-quadrillion), var(--font-baloo), "Poppins", ui-rounded, system-ui, sans-serif;
+  --font-ui: var(--font-baloo), var(--font-quadrillion), ui-rounded, system-ui, sans-serif;
+  --font-editorial: var(--font-instrument), "Times New Roman", serif;
+  --font-sans: var(--font-inter), var(--font-baloo), ui-sans-serif, system-ui, sans-serif;
+  --font-arabic: var(--font-baloo), "Segoe UI", Tahoma, sans-serif;
+
+  --text-hero: clamp(2.75rem, 8vw, 7rem);
+  --text-hero--line-height: 0.92;
+  --text-hero--letter-spacing: -0.04em;
+  --text-display: clamp(2rem, 4.5vw, 3.75rem);
+  --text-display--line-height: 1.02;
+  --text-display--letter-spacing: -0.03em;
+  --text-eyebrow: 0.6875rem;
+  --text-eyebrow--line-height: 1;
+  --text-eyebrow--letter-spacing: 0.22em;
+
+  /* --- Radii ------------------------------------------------------------
+     Generous and soft, echoing the pebble silhouette of the mark. */
+  --radius-xs: 0.5rem;
+  --radius-sm: 0.75rem;
+  --radius-md: 1.125rem;
+  --radius-lg: 1.75rem;
+  --radius-xl: 2.25rem;
+  --radius-2xl: 3rem;
+  --radius-pill: 999px;
+
+  /* --- Elevation --------------------------------------------------------
+     Wide, low-opacity, warm-tinted. Never a hard grey drop shadow. */
+  --shadow-lift: 0 1px 2px rgb(11 11 15 / 0.04), 0 8px 24px -12px rgb(11 11 15 / 0.12);
+  --shadow-float: 0 2px 6px rgb(11 11 15 / 0.04), 0 18px 48px -20px rgb(11 11 15 / 0.18);
+  --shadow-hover: 0 4px 10px rgb(11 11 15 / 0.05), 0 32px 64px -28px rgb(11 11 15 / 0.26);
+  --shadow-violet: 0 12px 40px -12px rgb(112 59 236 / 0.45);
+
+  /* --- Motion -----------------------------------------------------------
+     Three curves, used everywhere. `jo` is the house curve: a confident
+     settle with no bounce. `silk` is for opacity/colour. `spring` for play. */
+  --ease-jo: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-silk: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --animate-wave: wave 9s var(--ease-silk) infinite;
+  --animate-drift: drift 14s var(--ease-silk) infinite;
+  --animate-shimmer: shimmer 2.2s linear infinite;
+  --animate-ripple: ripple 2.8s var(--ease-jo) infinite;
+
+  /* --- Layout ------------------------------------------------------------ */
+  --spacing-gutter: 1.25rem;
+  --container-shell: 88rem;
+}
+
+@keyframes wave {
+  0%,
+  100% {
+    border-radius: 58% 42% 47% 53% / 52% 48% 52% 48%;
+    transform: rotate(0deg);
+  }
+  33% {
+    border-radius: 44% 56% 62% 38% / 45% 60% 40% 55%;
+    transform: rotate(4deg);
+  }
+  66% {
+    border-radius: 62% 38% 40% 60% / 58% 42% 58% 42%;
+    transform: rotate(-3deg);
+  }
+}
+
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(2%, -3%, 0) scale(1.06);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.55;
+  }
+  80% {
+    opacity: 0;
+  }
+  100% {
+    transform: scale(2.1);
+    opacity: 0;
+  }
+}
+
+/* ===========================================================================
+   Base
+
+   Font families are injected by `next/font` in `app/layout.tsx`, which sets
+   --font-quadrillion, --font-inter, --font-instrument and --font-plex-arabic
+   on <html>. Declaring @font-face here as well would duplicate the download,
+   so the fonts are defined in exactly one place: the layout.
+   ========================================================================= */
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  * {
+    border-color: var(--color-line);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow-x: clip;
+  }
+
+  /* Arabic copy gets Baloo and slightly looser leading automatically. Inter
+     has no Arabic coverage, so in RTL the body face is swapped rather than
+     relying on fallback — otherwise line-height and metrics come from Inter
+     and the Arabic sits badly in its box. */
+  [dir="rtl"] body,
+  [lang="ar"],
+  .font-ar {
+    font-family: var(--font-arabic);
+    line-height: 1.75;
+  }
+
+  /* Arabic display text is set in Baloo ExtraBold: the Latin display face
+     reaches for weight through a condensed geometry Arabic does not have, so
+     matching presence means reaching for weight instead. */
+  [dir="rtl"] h1,
+  [dir="rtl"] h2,
+  [dir="rtl"] h3 {
+    font-weight: 800;
+    letter-spacing: 0;
+  }
+
+  /* Arabic numerals stay Latin-digit: prices, totals and order references are
+     read against invoices and card statements that use them. */
+  [dir="rtl"] .tabular,
+  [dir="rtl"] [data-numeric] {
+    font-feature-settings: "tnum";
+  }
+
+  ::selection {
+    background: var(--color-violet);
+    color: #fff;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-violet);
+    outline-offset: 3px;
+    border-radius: var(--radius-xs);
+  }
+
+  /* Hide the OS pointer only when our canvas cursor is actually mounted and
+     the device has a real pointer. Touch and keyboard users keep defaults. */
+  @media (hover: hover) and (pointer: fine) {
+    html[data-jo-cursor="on"],
+    html[data-jo-cursor="on"] * {
+      cursor: none !important;
+    }
+  }
+
+  /* One global honour of the OS setting. Motion becomes instant, never
+     broken: elements still reach their final state. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+    html[data-jo-cursor="on"],
+    html[data-jo-cursor="on"] * {
+      cursor: auto !important;
+    }
+  }
+}
+
+/* ===========================================================================
+   Component-level primitives
+   ========================================================================= */
+@layer components {
+  /* Frosted panel — the floating control-surface language of the site. */
+  .jo-glass {
+    background: color-mix(in oklab, var(--color-paper-raised) 72%, transparent);
+    backdrop-filter: blur(20px) saturate(1.6);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    border: 1px solid color-mix(in oklab, #fff 60%, var(--color-line));
+  }
+
+  .jo-glass-dark {
+    background: color-mix(in oklab, var(--color-ink) 62%, transparent);
+    backdrop-filter: blur(20px) saturate(1.4);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    border: 1px solid rgb(255 255 255 / 0.1);
+  }
+
+  /* The organic pebble silhouette, as a CSS shape for imagery. */
+  .jo-blob {
+    border-radius: 58% 42% 47% 53% / 52% 48% 52% 48%;
+  }
+
+  .jo-blob-alt {
+    border-radius: 44% 56% 62% 38% / 45% 60% 40% 55%;
+  }
+
+  /* Skeleton / loading shimmer used by every async surface. */
+  .jo-shimmer {
+    background: linear-gradient(
+      100deg,
+      var(--color-paper-sunken) 30%,
+      color-mix(in oklab, var(--color-violet-mist) 60%, var(--color-paper-sunken)) 50%,
+      var(--color-paper-sunken) 70%
+    );
+    background-size: 200% 100%;
+    animation: var(--animate-shimmer);
+  }
+
+  /* Editorial underline that draws in on hover. */
+  .jo-underline {
+    background-image: linear-gradient(currentColor, currentColor);
+    background-size: 0% 1px;
+    background-position: 0 100%;
+    background-repeat: no-repeat;
+    transition: background-size 0.45s var(--ease-jo);
+  }
+  .jo-underline:hover {
+    background-size: 100% 1px;
+  }
+  [dir="rtl"] .jo-underline {
+    background-position: 100% 100%;
+  }
+}
+
+@layer utilities {
+  .jo-container {
+    width: 100%;
+    max-width: var(--container-shell);
+    margin-inline: auto;
+    padding-inline: var(--spacing-gutter);
+  }
+
+  @media (min-width: 768px) {
+    .jo-container {
+      padding-inline: 2.5rem;
+    }
+  }
+
+  .jo-edge-fade {
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 6%,
+      #000 94%,
+      transparent
+    );
+  }
+
+  /* Numerals that do not jitter while a price or countdown animates. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .jo-no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .jo-no-scrollbar {
+    scrollbar-width: none;
+  }
+}

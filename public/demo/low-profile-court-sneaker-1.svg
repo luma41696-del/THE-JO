@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 520" width="400" height="520" role="img">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0.6" y2="1">
+      <stop offset="0" stop-color="#F3EFE8"/><stop offset="1" stop-color="#E4DBCD"/>
+    </linearGradient>
+    <radialGradient id="v" cx="0.5" cy="0.32" r="0.75">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="400" height="520" fill="url(#g)"/>
+  <ellipse cx="200" cy="170" rx="230" ry="200" fill="url(#v)"/>
+  <g opacity="0.07" transform="translate(286 402) scale(0.95)">
+    <path d="M 58.24 11.86 C 44.96 14.03, 32.72 22.03, 19.51 37.17 C 10.57 47.42, 8 53.4, 9.91 59.57 C 10.78 62.41, 12.02 64.09, 17.91 70.5 C 23.78 76.86, 25.9 81.23, 27.18 89.53 C 28.44 97.69, 32.76 102.23, 41.3 104.37 C 58.7 108.73, 76.43 104.99, 86.54 94.83 C 89.8 91.55, 105.97 68.87, 108.21 64.43 C 111.54 57.83, 112 53.79, 109.9 49.53 C 108.51 46.72, 105.25 43.41, 99.47 38.96 C 92.52 33.59, 88.61 29.02, 85.11 22.13 C 82.54 17.09, 78.37 13.76, 72.74 12.27 C 69.81 11.49, 61.88 11.27, 58.24 11.86" fill="#0B0B0F"/>
+  </g>
+  <ellipse cx="200" cy="474" rx="118" ry="16" fill="#0B0B0F" opacity="0.09"/>
+  <g transform="rotate(-2.4 200 280)">
+    <path d="M84 248h58c8 0 15 4 19 11l30 50c5 8 13 13 22 15l86 18c25 5 43 27 43 53v33c0 10-8 18-18 18H84c-10 0-18-8-18-18V266c0-10 8-18 18-18zm0 132h288" fill="#0B0B0F" opacity="0.92" stroke="#0B0B0F" stroke-width="6" stroke-linecap="round" fill-opacity="0.92"/>
+  </g>
+</svg>

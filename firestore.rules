@@ -1,0 +1,190 @@
+rules_version = '2';
+
+// ============================================================================
+// THE JO | ذاجو — Firestore Security Rules
+//
+// The governing principle: the catalogue is public to read and impossible to
+// write from a client; anything about a person is readable only by that person;
+// and anything involving money is writable only by the Admin SDK, which these
+// rules do not apply to at all.
+//
+// Deploy with:  firebase deploy --only firestore:rules
+// Test with:    firebase emulators:exec --only firestore "npm run test:rules"
+// ============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* ---------------------------------------------------------------- */
+    /*  Helpers                                                          */
+    /* ---------------------------------------------------------------- */
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // `role` is a custom claim set by a Cloud Function with the Admin SDK.
+    // It is signed by Firebase, so a client cannot forge or self-assign it.
+    // Note this reads the *token*, never a Firestore document — reading a
+    // document here would let a user who can write that document escalate.
+    function hasRole(role) {
+      return isSignedIn() && request.auth.token.role == role;
+    }
+
+    function isStaff() {
+      return hasRole('staff') || hasRole('admin');
+    }
+
+    // App Check proves the request came from your real app rather than a
+    // script holding the public config. Enforce once App Check is configured;
+    // until then this returns true so development is not blocked.
+    function appCheckOk() {
+      return true;
+      // Swap to:  return request.app != null;
+    }
+
+    // Only the listed fields changed, and nothing else.
+    function onlyChanges(allowed) {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(allowed);
+    }
+
+    /* ---------------------------------------------------------------- */
+    /*  Catalogue — world readable, staff writable                       */
+    /* ---------------------------------------------------------------- */
+
+    match /products/{productId} {
+      // Drafts and archived pieces stay invisible to shoppers.
+      allow read: if appCheckOk() && (resource.data.status == 'active' || isStaff());
+      allow create, update, delete: if isStaff() && appCheckOk();
+
+      // Per-variant stock. Same rule: readable, never client-writable —
+      // decrements happen inside the checkout transaction on the server.
+      match /variants/{sku} {
+        allow read: if appCheckOk();
+        allow write: if isStaff() && appCheckOk();
+      }
+    }
+
+    match /categories/{categoryId} {
+      allow read: if appCheckOk();
+      allow write: if isStaff() && appCheckOk();
+    }
+
+    match /collections/{collectionId} {
+      allow read: if appCheckOk();
+      allow write: if isStaff() && appCheckOk();
+    }
+
+    match /banners/{bannerId} {
+      allow read: if appCheckOk() && (resource.data.active == true || isStaff());
+      allow write: if isStaff() && appCheckOk();
+    }
+
+    match /offers/{offerId} {
+      // Offers are readable so the cart can validate a code and show its terms.
+      // The discount is still recomputed server-side at checkout — a client
+      // that reads an offer cannot apply one.
+      allow read: if appCheckOk() && (resource.data.active == true || isStaff());
+      allow write: if isStaff() && appCheckOk();
+    }
+
+    match /testimonials/{id} {
+      allow read: if appCheckOk() && resource.data.verified == true;
+      allow write: if isStaff() && appCheckOk();
+    }
+
+    /* ---------------------------------------------------------------- */
+    /*  Customers                                                        */
+    /* ---------------------------------------------------------------- */
+
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isStaff();
+
+      // A user may create their own profile, but never with a role attached.
+      allow create: if isOwner(uid)
+                    && appCheckOk()
+                    && !request.resource.data.keys().hasAny(['role']);
+
+      // Fields a customer may change about themselves. `role`, `createdAt` and
+      // anything else are immutable from the client by omission — this is a
+      // whitelist, so a new sensitive field added later is denied by default.
+      allow update: if isOwner(uid)
+                    && appCheckOk()
+                    && onlyChanges([
+                         'displayName', 'photoURL', 'phone', 'locale', 'currency',
+                         'addresses', 'fitProfile', 'wishlist', 'marketingOptIn',
+                         'email', 'updatedAt'
+                       ]);
+
+      // Account deletion runs server-side so orders and their audit trail are
+      // retained for accounting while personal data is scrubbed.
+      allow delete: if false;
+
+      // Saved fitting-room looks are private to their owner.
+      match /outfits/{outfitId} {
+        allow read, write: if isOwner(uid) && appCheckOk();
+      }
+    }
+
+    /* ---------------------------------------------------------------- */
+    /*  Carts — server-synced, owner-scoped                              */
+    /* ---------------------------------------------------------------- */
+
+    match /carts/{uid} {
+      allow read, write: if isOwner(uid) && appCheckOk();
+    }
+
+    /* ---------------------------------------------------------------- */
+    /*  Orders — read your own, write none                               */
+    /* ---------------------------------------------------------------- */
+
+    match /orders/{orderId} {
+      allow read: if (isSignedIn() && resource.data.uid == request.auth.uid) || isStaff();
+
+      // No client may create an order. `/api/checkout` uses the Admin SDK,
+      // which bypasses these rules entirely — that asymmetry is the point:
+      // it is the only way to guarantee the price charged is the price we set.
+      allow create: if false;
+
+      // Only staff move an order through fulfilment, and never backwards into
+      // a paid state from the client.
+      allow update: if isStaff() && appCheckOk();
+      allow delete: if false;
+    }
+
+    /* ---------------------------------------------------------------- */
+    /*  Newsletter                                                       */
+    /* ---------------------------------------------------------------- */
+
+    match /subscribers/{email} {
+      // Written by the server route only. Readable by staff for exports.
+      allow read: if isStaff();
+      allow write: if false;
+    }
+
+    /* ---------------------------------------------------------------- */
+    /*  Audit log — append-only, staff-readable                          */
+    /* ---------------------------------------------------------------- */
+
+    match /auditLog/{entryId} {
+      allow read: if hasRole('admin');
+      allow write: if false; // written by Cloud Functions triggers only
+    }
+
+    /* ---------------------------------------------------------------- */
+    /*  Default deny                                                     */
+    /*                                                                   */
+    /*  Anything not matched above is denied. Keep this last, and never  */
+    /*  replace it with a permissive catch-all "for now".                */
+    /* ---------------------------------------------------------------- */
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
