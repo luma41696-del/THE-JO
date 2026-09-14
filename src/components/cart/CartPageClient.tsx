@@ -8,13 +8,21 @@ import { AnimatePresence, motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { EASE, transition } from "@/lib/motion";
 import { formatDeliveryWindow, formatPrice, t } from "@/lib/format";
-import { priceCart } from "@/lib/pricing";
+import { priceCart, subtotalOf } from "@/lib/pricing";
+import { classesInCart, quoteShipping } from "@/lib/shipping";
 import { useCart, useCartHydrated } from "@/lib/store/cart";
 import { Button } from "@/components/ui/Button";
 import { ProductRail } from "@/components/product/ProductRail";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { BrandWave } from "@/components/brand/BrandWave";
-import type { Locale, Offer, Product, ShippingMethod } from "@/types";
+import { CrossSellShelf } from "@/components/cart/CrossSellShelf";
+import type {
+  Locale,
+  Offer,
+  Product,
+  ShippingClass,
+  ShippingMethod,
+} from "@/types";
 
 /**
  * Full cart page.
@@ -28,13 +36,18 @@ import type { Locale, Offer, Product, ShippingMethod } from "@/types";
 
 export function CartPageClient({
   shippingMethods,
+  shippingClasses = [],
   offers,
   suggestions,
+  crossSell = { edges: {}, targets: [] },
   locale = "en",
 }: {
   shippingMethods: ShippingMethod[];
+  shippingClasses?: ShippingClass[];
   offers: Offer[];
   suggestions: Product[];
+  /** Cross-sell edges plus the products those edges point at. */
+  crossSell?: { edges: Record<string, string[]>; targets: Product[] };
   locale?: Locale;
 }) {
   const router = useLocalizedRouter();
@@ -43,6 +56,29 @@ export function CartPageClient({
   const items = useCart((s) => s.items);
   const setQuantity = useCart((s) => s.setQuantity);
   const remove = useCart((s) => s.remove);
+
+  /*
+   * Walk the bag, follow each line's cross-sell edges, and keep the first
+   * unique target for each. Order follows the bag rather than the catalogue,
+   * so the suggestion tied to what was added most recently comes first — that
+   * is the item still in the customer's head.
+   */
+  const crossSellProducts = useMemo(() => {
+    const inBag = new Set(items.map((i) => i.productId));
+    const seen = new Set<string>();
+    const out: Product[] = [];
+
+    for (const item of items) {
+      for (const id of crossSell.edges[item.productId] ?? []) {
+        if (inBag.has(id) || seen.has(id)) continue;
+        const target = crossSell.targets.find((p) => p.id === id);
+        if (!target) continue;
+        seen.add(id);
+        out.push(target);
+      }
+    }
+    return out;
+  }, [items, crossSell]);
   const hydrated = useCartHydrated();
 
   const [methodId, setMethodId] = useState(shippingMethods[0]?.id ?? "standard");
@@ -54,10 +90,34 @@ export function CartPageClient({
 
   useEffect(() => setMounted(true), []);
 
-  const method = shippingMethods.find((m) => m.id === methodId) ?? null;
+  /*
+   * Quote every method against this basket, then drop the ones its contents
+   * forbid. Hiding an unusable option beats showing one that fails at the
+   * door — but the reason is surfaced below the list rather than swallowed,
+   * so "where did same-day go?" has an answer on screen.
+   */
+  const quotes = useMemo(
+    () => shippingMethods.map((m) => quoteShipping(m, items, shippingClasses, subtotalOf(items))),
+    [shippingMethods, items, shippingClasses],
+  );
+  const usableQuotes = useMemo(() => quotes.filter((q) => !q.unavailableReason), [quotes]);
+  const blockedQuotes = useMemo(() => quotes.filter((q) => q.unavailableReason), [quotes]);
+  const blockingClasses = useMemo(
+    () =>
+      classesInCart(items, shippingClasses).filter((c) =>
+        blockedQuotes.some((q) => c.excludedSpeeds.includes(q.method.speed)),
+      ),
+    [items, shippingClasses, blockedQuotes],
+  );
+
+  const method =
+    usableQuotes.find((q) => q.method.id === methodId)?.method ??
+    usableQuotes[0]?.method ??
+    null;
+
   const totals = useMemo(
-    () => priceCart({ items, shippingMethod: method, offer: appliedOffer }),
-    [items, method, appliedOffer],
+    () => priceCart({ items, shippingMethod: method, shippingClasses, offer: appliedOffer }),
+    [items, method, shippingClasses, appliedOffer],
   );
 
   async function applyCode() {
@@ -85,7 +145,7 @@ export function CartPageClient({
 
   if (!mounted || !hydrated) {
     return (
-      <div className="ns-container grid gap-10 pb-24 lg:grid-cols-[1.6fr_1fr]">
+      <div className="ns-container grid min-w-0 gap-10 pb-24 lg:grid-cols-[1.6fr_1fr] [&>*]:min-w-0">
         <div className="space-y-6">
           {[0, 1, 2].map((i) => (
             <div key={i} className="flex gap-5">
@@ -136,7 +196,10 @@ export function CartPageClient({
 
   return (
     <>
-      <div className="ns-container grid gap-10 pb-20 lg:grid-cols-[1.6fr_1fr] lg:gap-16">
+      {/* `min-w-0` on both columns: a grid item defaults to
+          `min-width: auto`, so the widest thing inside — here the checkout
+          button — would otherwise set the track width and widen the page. */}
+      <div className="ns-container grid min-w-0 gap-10 pb-20 lg:grid-cols-[1.6fr_1fr] lg:gap-16 [&>*]:min-w-0">
         {/* Lines */}
         <div>
           <ul className="divide-line divide-y border-y border-[var(--color-line)]">
@@ -176,10 +239,32 @@ export function CartPageClient({
                           >
                             {t(item.title, locale)}
                           </Link>
-                          <p className="text-smoke mt-1 text-[0.8125rem]">
-                            {t(item.colorName, locale)} · {rtl ? "مقاس" : "Size"} {item.sizeLabel}
+                          {/* A simple product has neither, and an empty
+                              " · Size " reads as a rendering bug. */}
+                          {(item.sizeLabel || t(item.colorName, locale)) && (
+                            <p className="text-smoke mt-1 text-[0.8125rem]">
+                              {[
+                                t(item.colorName, locale),
+                                item.sizeLabel && `${rtl ? "مقاس" : "Size"} ${item.sizeLabel}`,
+                              ]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </p>
+                          )}
+                          {/*
+                            Each identifier is atomic. The page-wide
+                            `overflow-wrap: break-word` that stops long strings
+                            widening the layout will happily split a 13-digit
+                            GTIN across two lines, and half a barcode read back
+                            to support is worse than a line that wraps early.
+                            They wrap *between* the two, never inside either.
+                          */}
+                          <p className="text-mist mt-1 flex flex-wrap gap-x-2 text-[0.75rem] tabular-nums">
+                            <span className="whitespace-nowrap">SKU {item.sku}</span>
+                            {item.gtin && (
+                              <span className="whitespace-nowrap">· GTIN {item.gtin}</span>
+                            )}
                           </p>
-                          <p className="text-mist mt-1 text-[0.75rem]">SKU {item.sku}</p>
                         </div>
 
                         <span className="text-ink shrink-0 text-[0.9375rem] font-medium tabular-nums">
@@ -187,25 +272,43 @@ export function CartPageClient({
                         </span>
                       </div>
 
-                      <div className="mt-auto flex items-center justify-between gap-4 pt-4">
-                        <div className="border-line inline-flex items-center rounded-pill border">
-                          <StepButton
-                            onClick={() => setQuantity(item.key, item.quantity - 1)}
-                            disabled={item.quantity <= 1}
-                            label={rtl ? "إنقاص" : "Decrease"}
-                          >
-                            −
-                          </StepButton>
-                          <span className="text-ink w-9 text-center text-[0.875rem] tabular-nums">
-                            {item.quantity}
-                          </span>
-                          <StepButton
-                            onClick={() => setQuantity(item.key, item.quantity + 1)}
-                            disabled={item.quantity >= item.maxQuantity}
-                            label={rtl ? "زيادة" : "Increase"}
-                          >
-                            +
-                          </StepButton>
+                      <div className="mt-auto flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pt-4">
+                        <div className="flex flex-col gap-1">
+                          <div className="border-line inline-flex items-center rounded-pill border">
+                            <StepButton
+                              onClick={() => setQuantity(item.key, item.quantity - 1)}
+                              disabled={item.quantity <= 1}
+                              label={rtl ? "إنقاص" : "Decrease"}
+                            >
+                              −
+                            </StepButton>
+                            <span className="text-ink w-9 text-center text-[0.875rem] tabular-nums">
+                              {item.quantity}
+                            </span>
+                            <StepButton
+                              onClick={() => setQuantity(item.key, item.quantity + 1)}
+                              disabled={item.quantity >= item.maxQuantity}
+                              label={rtl ? "زيادة" : "Increase"}
+                            >
+                              +
+                            </StepButton>
+                          </div>
+
+                          {item.quantity >= item.maxQuantity && (
+                            <p className="text-mist text-[0.6875rem]" aria-live="polite">
+                              {item.maxReason === "per-order"
+                                ? item.maxQuantity === 1
+                                  ? rtl
+                                    ? "قطعة واحدة لكل طلب"
+                                    : "Limit 1 per order"
+                                  : rtl
+                                    ? `بحد أقصى ${item.maxQuantity} لكل طلب`
+                                    : `Limit ${item.maxQuantity} per order`
+                                : rtl
+                                  ? `بقي ${item.maxQuantity} في المخزون`
+                                  : `Only ${item.maxQuantity} in stock`}
+                            </p>
+                          )}
                         </div>
 
                         <button
@@ -234,6 +337,18 @@ export function CartPageClient({
             </span>
             {rtl ? "متابعة التسوّق" : "Continue shopping"}
           </Link>
+
+          {/* Complements, under the lines rather than beside the total: the
+              summary column is where the customer goes to leave, and putting
+              a new decision in front of the checkout button costs orders. */}
+          {hydrated && crossSellProducts.length > 0 && (
+            <CrossSellShelf
+              products={crossSellProducts}
+              inBag={items.map((i) => i.productId)}
+              locale={locale}
+              className="mt-8"
+            />
+          )}
         </div>
 
         {/* Summary */}
@@ -249,8 +364,8 @@ export function CartPageClient({
                 {rtl ? "الشحن" : "Delivery"}
               </legend>
               <div className="space-y-2">
-                {shippingMethods.map((option) => {
-                  const free = option.freeAbove !== undefined && totals.subtotal >= option.freeAbove;
+                {usableQuotes.map((quote) => {
+                  const option = quote.method;
                   return (
                     <label
                       key={option.id}
@@ -275,22 +390,50 @@ export function CartPageClient({
                             {t(option.name, locale)}
                           </span>
                           <span className="text-ink text-[0.8125rem] tabular-nums">
-                            {free || option.price === 0
+                            {quote.total === 0
                               ? rtl
                                 ? "مجاني"
                                 : "Free"
-                              : formatPrice(option.price, totals.currency, locale)}
+                              : formatPrice(quote.total, totals.currency, locale)}
                           </span>
                         </span>
                         <span className="text-smoke mt-0.5 block text-[0.75rem]">
                           {formatDeliveryWindow(option.minDays, option.maxDays, locale)}
                           {option.description ? ` · ${t(option.description, locale)}` : ""}
                         </span>
+                        {/* Name the surcharge rather than folding it silently
+                            into the price — an unexplained number at checkout
+                            is where carts get abandoned. */}
+                        {quote.surcharge > 0 && !quote.freeApplied && (
+                          <span className="text-mist mt-0.5 block text-[0.75rem]">
+                            {rtl ? "يشمل رسوم مناولة " : "Includes "}
+                            {formatPrice(quote.surcharge, totals.currency, locale)}
+                            {rtl ? "" : " handling"}
+                          </span>
+                        )}
                       </span>
                     </label>
                   );
                 })}
               </div>
+
+              {/* A missing option is a question. Answer it here rather than
+                  leaving the customer to wonder whether the site is broken. */}
+              {blockedQuotes.length > 0 && blockingClasses.length > 0 && (
+                <p className="text-mist mt-3 text-[0.75rem]">
+                  {rtl
+                    ? `${blockedQuotes
+                        .map((q) => t(q.method.name, locale))
+                        .join(" و")} غير متاح لأن حقيبتك تحتوي على صنف ${blockingClasses
+                        .map((c) => t(c.name, locale))
+                        .join(" و")}.`
+                    : `${blockedQuotes
+                        .map((q) => t(q.method.name, locale))
+                        .join(" and ")} is unavailable because your bag contains a ${blockingClasses
+                        .map((c) => t(c.name, locale).toLowerCase())
+                        .join(" and ")} item.`}
+                </p>
+              )}
             </fieldset>
 
             {/* Promo code */}

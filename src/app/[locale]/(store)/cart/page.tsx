@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
 
-import { getActiveOffers, getShippingMethods, getTrendingProducts } from "@/lib/catalog";
+import {
+  getActiveOffers,
+  getCrossSellIndex,
+  getShippingClasses,
+  getShippingMethods,
+  getTrendingProducts,
+} from "@/lib/catalog";
 import { CartPageClient } from "@/components/cart/CartPageClient";
 import { PageIntro } from "@/components/ui/PageIntro";
 import { isLocale } from "@/lib/i18n/config";
@@ -22,10 +28,12 @@ export default async function CartPage({ params }: { params: Promise<{ locale: s
   const locale: Locale = isLocale(raw) ? raw : "en";
   const t = getDictionary(locale);
 
-  const [shippingMethods, offers, suggestions] = await Promise.all([
+  const [shippingMethods, shippingClasses, offers, suggestions, crossSell] = await Promise.all([
     getShippingMethods(),
+    getShippingClasses(),
     getActiveOffers(),
     getTrendingProducts(8),
+    getCrossSellIndex(),
   ]);
 
   return (
@@ -33,8 +41,10 @@ export default async function CartPage({ params }: { params: Promise<{ locale: s
       <PageIntro locale={locale} eyebrow={t.cart.checkout} title={t.cart.yourBag} />
       <CartPageClient
         shippingMethods={shippingMethods}
+        shippingClasses={shippingClasses}
         offers={offers}
         suggestions={suggestions}
+        crossSell={crossSell}
         locale={locale}
       />
     </>

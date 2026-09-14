@@ -96,9 +96,16 @@ export function StatTile({
       </p>
 
       <div className="mt-2.5 flex items-end justify-between gap-3">
+        {/*
+          `whitespace-nowrap` matters more than the size here: the page-wide
+          `overflow-wrap: break-word` will happily split "JOD 43,435.160"
+          across two lines mid-figure, and a broken number is not a number.
+          It steps down a size on small screens instead, and the sparkline
+          beside it yields the space rather than the value.
+        */}
         <motion.p
           className={cn(
-            "font-display text-2xl font-semibold tabular-nums",
+            "font-display text-xl font-semibold whitespace-nowrap tabular-nums sm:text-2xl",
             emphasis ? "text-white" : "text-ink",
           )}
           initial={{ opacity: 0, y: 6 }}
@@ -108,7 +115,9 @@ export function StatTile({
           {value}
         </motion.p>
         {spark && spark.length > 1 && (
-          <div className="shrink-0 opacity-90">
+          // Hidden on the narrowest tiles: a sparkline compressed to 60px
+          // reads as noise, and the figure it decorates is the point.
+          <div className="hidden min-w-0 shrink opacity-90 min-[380px]:block">
             <Sparkline values={spark} tone={emphasis ? "mint" : "brand"} />
           </div>
         )}

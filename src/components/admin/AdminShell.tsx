@@ -224,7 +224,9 @@ export function AdminShell({
         )}
       </AnimatePresence>
 
-      <main className="lg:ps-64">
+      {/* `data-admin-surface` is the hook for the min-width reset in
+          globals.css — see the rule there for why it exists. */}
+      <main data-admin-surface className="lg:ps-64">
         <motion.div
           key={pathname}
           initial={{ opacity: 0, y: 8 }}

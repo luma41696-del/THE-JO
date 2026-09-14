@@ -1,6 +1,6 @@
 import {
   getBanners,
-  getCategories,
+  getCategoryTree,
   getDiscountedProducts,
   getFeaturedProducts,
   getNewArrivals,
@@ -66,7 +66,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
     getFeaturedProducts(8),
     getTrendingProducts(10),
     getDiscountedProducts(4),
-    getCategories(),
+    getCategoryTree(),
     getTestimonials(),
   ]);
 

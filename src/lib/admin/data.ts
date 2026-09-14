@@ -5,7 +5,14 @@ import { Timestamp } from "firebase-admin/firestore";
 
 import { getAdminDb } from "@/lib/firebase/admin";
 import { requireAdminSession } from "@/lib/firebase/session";
-import { demoProducts, demoCategories, demoOffers, demoBanners } from "@/data/demo";
+import {
+  demoProducts,
+  demoCategories,
+  demoOffers,
+  demoBanners,
+  demoShippingClasses,
+} from "@/data/demo";
+import { buildCategoryTree } from "@/lib/categories";
 import {
   demoCustomers,
   demoInvoices,
@@ -13,7 +20,17 @@ import {
   demoTickets,
   type CustomerSummary,
 } from "@/data/demo-operations";
-import type { Banner, Category, Invoice, Offer, Order, Product, SupportTicket } from "@/types";
+import type {
+  Banner,
+  Category,
+  CategoryNode,
+  Invoice,
+  Offer,
+  Order,
+  Product,
+  ShippingClass,
+  SupportTicket,
+} from "@/types";
 
 /**
  * Admin data access.
@@ -156,8 +173,28 @@ export type { CustomerSummary };
 export const getAdminProducts = cache(async (): Promise<Product[]> =>
   (await readCollection("products", "publishedAt", 1000, () => demoProducts)).rows,
 );
-export const getAdminCategories = cache(async (): Promise<Category[]> =>
-  (await readCollection("categories", "order", 1000, () => demoCategories)).rows.sort((a, b) => a.order - b.order),
+/**
+ * Categories in *tree* order — every department immediately followed by its
+ * own subcategories — rather than flat by `order`, which interleaves the two
+ * levels and makes the picker unreadable.
+ */
+export const getAdminCategories = cache(async (): Promise<Category[]> => {
+  const { rows } = await readCollection("categories", "order", 1000, () => demoCategories);
+
+  const byOrder = (a: Category, b: Category) => a.order - b.order || a.id.localeCompare(b.id);
+  const flatten = (nodes: CategoryNode[]): Category[] =>
+    nodes.flatMap((node) => {
+      const { children, ...self } = node;
+      return [self as Category, ...flatten(children)];
+    });
+
+  return flatten(buildCategoryTree([...rows].sort(byOrder)));
+});
+
+export const getAdminShippingClasses = cache(async (): Promise<ShippingClass[]> =>
+  (await readCollection("shippingClasses", "order", 100, () => demoShippingClasses)).rows.sort(
+    (a, b) => a.order - b.order,
+  ),
 );
 export const getAdminOffers = cache(async (): Promise<Offer[]> =>
   (await readCollection("offers", "startsAt", 1000, () => demoOffers)).rows,

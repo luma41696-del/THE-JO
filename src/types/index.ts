@@ -68,6 +68,17 @@ export interface ProductVariant {
   stock: number;
   /** Overrides the parent price when this permutation is priced differently. */
   priceOverride?: number;
+  /**
+   * GTIN-8/12/13/14 for *this* permutation.
+   *
+   * It belongs on the variant, not the product: a GTIN identifies one trade
+   * item, and a medium navy coat and a large navy coat are two trade items.
+   * Google Merchant Center and every marketplace reject a feed that reuses one
+   * GTIN across sizes, so a product-level GTIN would be actively wrong for a
+   * variable product. `Product.gtin` exists only for simple products, which
+   * genuinely are a single trade item.
+   */
+  gtin?: string;
   barcode?: string;
 }
 
@@ -79,10 +90,28 @@ export type ProductBadge =
   | "exclusive"
   | "restocked";
 
+/**
+ * How a product is *bought*, which decides how it is rendered and priced.
+ *
+ *  - `simple`   — one trade item. No choices to make: no swatches, no size
+ *                grid, no variants. Stock, SKU and GTIN live on the product.
+ *  - `variable` — a family of trade items. The customer picks a colour and a
+ *                size, and that selection resolves to one `ProductVariant`
+ *                carrying its own SKU, GTIN, stock and optional price.
+ *
+ * The distinction is not cosmetic: a simple product must never render a
+ * disabled size grid, and a variable product must never be added to the cart
+ * without a resolved variant.
+ */
+export type ProductType = "simple" | "variable";
+
 export interface Product {
   id: string;
   /** URL key. Lowercase, hyphenated, immutable once published. */
   slug: string;
+
+  /** Drives option rendering, stock resolution and cart validation. */
+  type: ProductType;
   title: Localized;
   subtitle?: Localized;
   description: Localized;
@@ -90,10 +119,29 @@ export interface Product {
   details?: { label: Localized; value: Localized }[];
 
   categoryId: string;
-  /** Denormalised ancestry, so a listing can filter without extra reads. */
+  /**
+   * Denormalised ancestry, root first, ending in `categoryId` itself:
+   * `["outerwear", "outerwear-coats"]`. A listing filtered on a parent can
+   * then match every descendant with one array-contains, instead of reading
+   * the category tree first and querying for each child.
+   *
+   * Written by `categoryPathFor()` — never typed by hand.
+   */
   categoryPath: string[];
   collectionIds: string[];
   tags: string[];
+
+  /**
+   * Merchandising links, by product id.
+   *
+   * `upsell` is "instead of this" — a better version of what the customer is
+   * already looking at, shown on the product page. `crossSell` is "along with
+   * this" — something that completes it, shown in the bag once they have
+   * committed. Mixing the two up is the classic mistake: a cross-sell on the
+   * product page competes with the thing you are trying to sell.
+   */
+  upsellIds: string[];
+  crossSellIds: string[];
 
   /** Minor units are avoided: prices are decimal in the store currency. */
   price: number;
@@ -101,9 +149,41 @@ export interface Product {
   currency: CurrencyCode;
 
   images: ProductImage[];
+
+  /**
+   * Empty on a simple product. Populated on a variable one, where every
+   * colour × size permutation that is actually sold appears in `variants`.
+   */
   colors: ProductColor[];
   sizes: ProductSize[];
   sizeSystem: SizeSystem;
+  /** Variable products only. One row per sellable permutation. */
+  variants?: ProductVariant[];
+
+  /**
+   * Simple products only — the product *is* the trade item, so it carries the
+   * identifiers directly. On a variable product the SKU is the parent code
+   * (useful for reporting) and `gtin` is left unset; the variant carries it.
+   */
+  sku: string;
+  gtin?: string;
+
+  /**
+   * Which shipping class this product belongs to. A class is how a rate table
+   * says "this one is bulky" or "this one cannot fly" without hard-coding a
+   * price per product. See `ShippingClass`.
+   */
+  shippingClassId?: string;
+
+  /**
+   * Hard cap on units of this product in a single order.
+   *
+   * `1` is the "sold individually" case — limited drops, one-per-customer
+   * offers. Undefined means the only limit is stock. Enforced in the cart for
+   * feedback and re-enforced server-side at checkout, because the client
+   * number is never trusted.
+   */
+  maxPerOrder?: number;
 
   /** Aggregated from variants by a Cloud Function — never written by clients. */
   inStock: boolean;
@@ -127,17 +207,42 @@ export interface Product {
   updatedAt: number;
 }
 
+/**
+ * A node in the category tree.
+ *
+ * The tree is deliberately only two levels deep in the UI (a top-level
+ * department and its subcategories). Nothing in the model forbids deeper
+ * nesting — `path` and `categoryPath` handle any depth — but a shopper
+ * navigating a third level is a shopper who is lost.
+ */
 export interface Category {
   id: string;
   slug: string;
   name: Localized;
   description?: Localized;
+  /** `null` for a top-level department. */
   parentId: string | null;
+  /**
+   * Ancestry, root first, ending in this category's own id. Denormalised for
+   * the same reason as `Product.categoryPath`: breadcrumbs and descendant
+   * queries without walking the tree.
+   */
+  path: string[];
+  /** 0 for a department, 1 for a subcategory. Derived from `path`. */
+  depth: number;
   image?: ProductImage;
   /** Manual merchandising order, ascending. */
   order: number;
+  /** Products in this category *and* every descendant. */
   productCount: number;
   featured: boolean;
+  /** Show in the primary nav's category menu. Subcategories usually do not. */
+  showInNav?: boolean;
+}
+
+/** A category with its children attached — what the nav and tiles render. */
+export interface CategoryNode extends Category {
+  children: CategoryNode[];
 }
 
 export interface Collection {
@@ -273,10 +378,16 @@ export interface CartItem {
   /** `${productId}:${colorId}:${sizeId}` — stable, so quantity merges. */
   key: string;
   productId: string;
+  /** The resolved trade item: the variant's SKU, or the product's if simple. */
   sku: string;
+  gtin?: string;
   slug: string;
   title: Localized;
   image: ProductImage;
+  /**
+   * A simple product has no options. Rather than invent a fake colour, both
+   * ids are the empty string and the UI omits the option line entirely.
+   */
   colorId: string;
   colorName: Localized;
   sizeId: string;
@@ -285,11 +396,59 @@ export interface CartItem {
   compareAtPrice?: number;
   currency: CurrencyCode;
   quantity: number;
+  /**
+   * The lower of remaining stock and the product's per-order cap — already
+   * resolved, so the quantity stepper never has to know which one bit.
+   */
   maxQuantity: number;
+  /**
+   * Why `maxQuantity` is what it is. The stepper shows "Limit 1 per order"
+   * rather than "Only 1 left" when the cap is a policy and not scarcity —
+   * telling a customer something is nearly sold out when it is not is a lie
+   * the cart should not tell.
+   */
+  maxReason?: "stock" | "per-order";
+  /** Drives shipping surcharges at checkout. */
+  shippingClassId?: string;
   addedAt: number;
 }
 
 export type ShippingSpeed = "standard" | "express" | "same-day" | "pickup";
+
+/**
+ * A shipping class groups products that cost the same to move.
+ *
+ * Without classes, a rate is either one flat price — which loses money on a
+ * coat and overcharges for a tee — or a per-product price, which nobody
+ * maintains. A class is the middle: tag the product once, price the class.
+ *
+ * Surcharges stack on top of the chosen method's own price:
+ *   - `surcharge` applies **once per order** if any line carries the class.
+ *     Use it for handling that does not repeat: one oversized box.
+ *   - `perItemSurcharge` applies **per unit**. Use it for weight.
+ * When several classes are in one basket, every class contributes; the order
+ * surcharge is counted once per class, not once per line.
+ */
+export interface ShippingClass {
+  id: string;
+  name: Localized;
+  description?: Localized;
+  /** Charged once per order when at least one line carries this class. */
+  surcharge: number;
+  /** Charged for every unit of every line carrying this class. */
+  perItemSurcharge: number;
+  /**
+   * Speeds this class cannot use at all. A rolled coat does not go on a
+   * same-day bike; the method disappears rather than failing at the door.
+   */
+  excludedSpeeds: ShippingSpeed[];
+  /**
+   * When true, a basket containing this class never qualifies for the free
+   * shipping threshold — the point of the class is that it is expensive.
+   */
+  ignoresFreeThreshold: boolean;
+  order: number;
+}
 
 export interface ShippingMethod {
   id: string;
@@ -302,6 +461,28 @@ export interface ShippingMethod {
   maxDays: number;
   /** Free once the subtotal clears this threshold. */
   freeAbove?: number;
+  /**
+   * Per-class price overrides, by class id. A class listed here replaces
+   * `price` for the whole order rather than adding to it — for the cases
+   * where a carrier quotes a flat bulky rate instead of a surcharge.
+   */
+  classPriceOverrides?: Record<string, number>;
+}
+
+/** What a quote actually resolved to, so the UI can explain the number. */
+export interface ShippingQuote {
+  method: ShippingMethod;
+  /** The method's own price after any class override. */
+  base: number;
+  /** Sum of class surcharges applied. */
+  surcharge: number;
+  /** Final price. `0` when the free threshold applied. */
+  total: number;
+  freeApplied: boolean;
+  /** Class ids that contributed a surcharge, for the breakdown tooltip. */
+  classIds: string[];
+  /** Set when the method is unavailable for this basket. */
+  unavailableReason?: "class-excluded";
 }
 
 export interface CartTotals {
@@ -424,7 +605,13 @@ export interface SortOption {
 }
 
 export interface ProductFilters {
+  /**
+   * Matches against `Product.categoryPath`, so passing a parent id returns
+   * everything in its subcategories too.
+   */
   categoryIds?: string[];
+  productTypes?: ProductType[];
+  shippingClassIds?: string[];
   colorIds?: string[];
   sizeIds?: string[];
   minPrice?: number;

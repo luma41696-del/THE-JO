@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { getCategories, getFeaturedProducts } from "@/lib/catalog";
+import { getCategoryTree, getFeaturedProducts } from "@/lib/catalog";
 import { CategoryGrid } from "@/components/home/CategoryGrid";
 import { ProductRail } from "@/components/product/ProductRail";
 import { PageIntro } from "@/components/ui/PageIntro";
@@ -30,7 +30,7 @@ export default async function CategoriesPage({
   const locale: Locale = isLocale(raw) ? raw : "en";
   const t = getDictionary(locale);
 
-  const [categories, featured] = await Promise.all([getCategories(), getFeaturedProducts(8)]);
+  const [categories, featured] = await Promise.all([getCategoryTree(), getFeaturedProducts(8)]);
 
   return (
     <>

@@ -3,7 +3,10 @@ import { NextResponse } from "next/server";
 import { isAdminConfigured, verifyRequest } from "@/lib/firebase/admin";
 import { slugify } from "@/lib/utils";
 import { money } from "@/lib/pricing";
-import type { Localized, Product } from "@/types";
+import { isValidGtin } from "@/lib/product";
+import { getCategories } from "@/lib/catalog";
+import { categoryPathFor } from "@/lib/categories";
+import type { Localized, Product, ProductType } from "@/types";
 
 /**
  * Catalogue writes.
@@ -34,6 +37,14 @@ interface Body {
   totalStock?: number;
   status?: Product["status"];
   tags?: string[];
+
+  type?: ProductType;
+  sku?: string;
+  gtin?: string | null;
+  shippingClassId?: string | null;
+  maxPerOrder?: number | null;
+  upsellIds?: string[];
+  crossSellIds?: string[];
 }
 
 function bad(message: string, status = 400) {
@@ -89,13 +100,67 @@ export async function POST(request: Request) {
   const status: Product["status"] =
     body.status === "active" || body.status === "archived" ? body.status : "draft";
 
+  const type: ProductType = body.type === "simple" ? "simple" : "variable";
+
+  /*
+   * A bad GTIN is rejected rather than stored. It is the one field here whose
+   * correctness can be checked outright, and an invalid one is not a cosmetic
+   * problem: every marketplace feed rejects the product, and that rejection
+   * surfaces days later in someone else's dashboard rather than here.
+   */
+  const gtin = typeof body.gtin === "string" ? body.gtin.trim() : "";
+  if (gtin && !isValidGtin(gtin)) {
+    return bad("That GTIN's check digit does not match. Re-enter the barcode.");
+  }
+  if (gtin && type === "variable") {
+    // The parent of a variable product is not a trade item, so it has no GTIN
+    // to carry — accepting one here would put the same barcode on every size.
+    return bad("A variable product carries GTINs on its variants, not on the parent.");
+  }
+
+  const maxPerOrderRaw =
+    body.maxPerOrder === null || body.maxPerOrder === undefined
+      ? undefined
+      : Math.floor(Number(body.maxPerOrder));
+  if (maxPerOrderRaw !== undefined && (!Number.isFinite(maxPerOrderRaw) || maxPerOrderRaw < 0)) {
+    return bad("Max per order must be a whole number, or left empty.");
+  }
+  const maxPerOrder = maxPerOrderRaw && maxPerOrderRaw > 0 ? maxPerOrderRaw : undefined;
+
+  const ids = (value: unknown) =>
+    Array.isArray(value) ? [...new Set(value.map(String).filter(Boolean))].slice(0, 12) : [];
+
+  const productId = body.id ?? slug;
+  const upsellIds = ids(body.upsellIds).filter((id) => id !== productId);
+  const crossSellIds = ids(body.crossSellIds).filter((id) => id !== productId);
+
+  // A product that recommends itself is a loop the UI would render as an
+  // upgrade on its own page. Cheap to prevent, confusing to debug later.
+  if (
+    ids(body.upsellIds).includes(productId) ||
+    ids(body.crossSellIds).includes(productId)
+  ) {
+    return bad("A product cannot upsell or cross-sell itself.");
+  }
+
+  const categoryId = body.categoryId ?? "outerwear";
+
+  /*
+   * `categoryPath` is the product's ancestry, and it has to be the *real* one:
+   * a listing filtered on a department matches against this array, so a
+   * product filed under "Coats" with a path of just ["outerwear-coats"] would
+   * vanish from the Outerwear page entirely. Read the tree and resolve it.
+   */
+  const categories = await getCategories();
+  const categoryPath = categoryPathFor(categories, categoryId);
+
   const payload = {
     slug,
     title,
     subtitle: body.subtitle?.en || body.subtitle?.ar ? body.subtitle : undefined,
     description: body.description ?? { en: "", ar: "" },
-    categoryId: body.categoryId ?? "outerwear",
-    categoryPath: [body.categoryId ?? "outerwear"],
+    categoryId,
+    categoryPath,
     price: money(price, "JOD"),
     compareAtPrice: compareAt && compareAt > 0 ? money(compareAt, "JOD") : undefined,
     currency: "JOD" as const,
@@ -104,6 +169,16 @@ export async function POST(request: Request) {
     inStock: totalStock > 0,
     status,
     tags: Array.isArray(body.tags) ? body.tags.slice(0, 25).map(String) : [],
+    type,
+    sku: (typeof body.sku === "string" && body.sku.trim()) || slug.toUpperCase(),
+    gtin: gtin || undefined,
+    shippingClassId:
+      typeof body.shippingClassId === "string" && body.shippingClassId
+        ? body.shippingClassId
+        : "standard",
+    maxPerOrder,
+    upsellIds,
+    crossSellIds,
     updatedAt: new Date(),
   };
 

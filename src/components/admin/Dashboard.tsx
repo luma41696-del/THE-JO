@@ -41,12 +41,23 @@ export function Dashboard({
   orders,
   tickets,
   now,
+  categoryNames = {},
 }: {
   orders: Order[];
   tickets: SupportTicket[];
   now: number;
+  /** Department id → display name. Charts label with names, not slugs. */
+  categoryNames?: Record<string, string>;
 }) {
   const [range, setRange] = useState<RangeKey>("30d");
+
+  /*
+   * A chart axis reading "outerwear-coats" is a database dump, not a label.
+   * The id is kept as the fallback rather than hidden, so a category that has
+   * been deleted still charts its revenue instead of vanishing from a total.
+   */
+  const nameOf = (id: string) =>
+    categoryNames[id] ?? (id === "other" ? "Other" : id);
 
   const kpis = useMemo(() => computeKpis(orders, range, now), [orders, range, now]);
   const series = useMemo(() => buildTimeseries(orders, range, now), [orders, range, now]);
@@ -326,7 +337,7 @@ export function Dashboard({
 
         <Panel title="Revenue by category" description="Share of kept revenue in the window.">
           <CompositionDonut
-            data={categories.map((c) => ({ label: c.categoryId, value: c.revenue }))}
+            data={categories.map((c) => ({ label: nameOf(c.categoryId), value: c.revenue }))}
             currency={currency}
           />
         </Panel>
@@ -336,7 +347,7 @@ export function Dashboard({
         <Panel title="Units by category" description="Volume, which does not track revenue.">
           <RankedBars
             data={categories.map((c) => ({
-              label: c.categoryId,
+              label: nameOf(c.categoryId),
               value: c.units,
               note: formatPrice(c.revenue, currency),
             }))}

@@ -229,6 +229,23 @@ export function topProducts(
     .slice(0, limit);
 }
 
+/**
+ * Revenue and units by category.
+ *
+ * Rolls up to the **department**, not the leaf subcategory. Two reasons, and
+ * the second is the load-bearing one:
+ *
+ *  - "Outerwear" is the number a merchant makes decisions with. Splitting it
+ *    into Coats and Blazers answers a question nobody asked at this altitude,
+ *    and both halves look small next to categories that were never split.
+ *  - A categorical palette holds eight hues. Charting leaves produced
+ *    thirteen series, which means either cycling colours — so two categories
+ *    share one hue and the chart lies — or generating new ones, which lands
+ *    on pairs no colour-blind reader can separate. Departments keep the
+ *    series count inside the palette by construction rather than by luck.
+ *
+ * `categoryPath[0]` is the root, so the rollup is a lookup, not a tree walk.
+ */
 export function categoryBreakdown(
   orders: Order[],
   range: RangeKey,
@@ -236,7 +253,9 @@ export function categoryBreakdown(
   currency: CurrencyCode = "JOD",
 ): CategoryPerformance[] {
   const from = now - RANGES[range].days * DAY;
-  const categoryOf = new Map(demoProducts.map((p) => [p.id, p.categoryId]));
+  const categoryOf = new Map(
+    demoProducts.map((p) => [p.id, p.categoryPath[0] ?? p.categoryId]),
+  );
   const acc = new Map<string, CategoryPerformance>();
 
   for (const order of ordersInWindow(orders, from, now)) {
@@ -256,9 +275,32 @@ export function categoryBreakdown(
     }
   }
 
-  return [...acc.values()]
+  const rows = [...acc.values()]
     .map((c) => ({ ...c, revenue: money(c.revenue, currency) }))
     .sort((a, b) => b.revenue - a.revenue);
+
+  /*
+   * Hard ceiling at eight series. Departments already fit today, but a
+   * catalogue grows and nobody re-checks a chart when they add a department —
+   * so the eighth slot collapses the tail into "Other" rather than silently
+   * reusing a hue. An explicit bucket is honest; a repeated colour is not.
+   */
+  const MAX_SERIES = 8;
+  if (rows.length <= MAX_SERIES) return rows;
+
+  const head = rows.slice(0, MAX_SERIES - 1);
+  const tail = rows.slice(MAX_SERIES - 1);
+  return [
+    ...head,
+    {
+      categoryId: "other",
+      units: tail.reduce((sum, c) => sum + c.units, 0),
+      revenue: money(
+        tail.reduce((sum, c) => sum + c.revenue, 0),
+        currency,
+      ),
+    },
+  ];
 }
 
 /** How many orders sit at each stage — the fulfilment queue, as a number. */

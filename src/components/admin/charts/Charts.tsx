@@ -371,7 +371,15 @@ export function CompositionDonut({
       </div>
 
       {/* Legend doubles as the table view the relief rule requires. */}
-      <ul className="min-w-0 flex-1 space-y-2">
+      {/*
+        `basis-56` is what makes the wrap happen. A flex container decides
+        wrapping from each item's *basis*, before any shrinking: with the
+        legend asking for 14rem, a 375px card cannot fit it beside the donut,
+        so it moves to its own full-width line. Without a basis it stayed on
+        the line and shrank to 70px, where every row overflowed its own box
+        and the card pushed the page sideways.
+      */}
+      <ul className="min-w-0 flex-1 basis-56 space-y-2">
         {slices.map((s, i) => (
           <li
             key={s.label}

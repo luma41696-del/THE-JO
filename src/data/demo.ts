@@ -17,9 +17,14 @@ import type {
   Product,
   ProductColor,
   ProductSize,
+  ProductType,
+  ProductVariant,
+  ShippingClass,
   ShippingMethod,
   Testimonial,
 } from "@/types";
+import { categoryPathFor, withComputedPaths } from "@/lib/categories";
+import { gtinCheckDigit } from "@/lib/product";
 
 const DAY = 86_400_000;
 const NOW = Date.UTC(2026, 0, 15);
@@ -69,7 +74,19 @@ const ONE: ProductSize[] = [{ id: "os", label: "One size", system: "one-size" }]
 /*  Categories                                                                */
 /* -------------------------------------------------------------------------- */
 
-export const demoCategories: Category[] = [
+/**
+ * The category tree.
+ *
+ * Declared flat with `parentId`, then run through `withComputedPaths` so
+ * `path` and `depth` are derived rather than typed — a hand-written path is a
+ * hand-written bug the first time a category is reparented.
+ *
+ * `showInNav` is what keeps the nav menu honest: every department appears,
+ * subcategories appear under their parent, and nothing that would make the
+ * menu a second sitemap appears at all.
+ */
+const CATEGORY_SEEDS: Omit<Category, "path" | "depth">[] = [
+  /* ---- Outerwear ---- */
   {
     id: "outerwear",
     slug: "outerwear",
@@ -80,10 +97,41 @@ export const demoCategories: Category[] = [
     },
     parentId: null,
     order: 1,
-    productCount: 2,
+    productCount: 0,
     featured: true,
+    showInNav: true,
     image: { url: "/demo/category-outerwear.svg", alt: "Outerwear", width: 400, height: 520 },
   },
+  {
+    id: "outerwear-coats",
+    slug: "coats",
+    name: { en: "Coats", ar: "معاطف طويلة" },
+    description: {
+      en: "Full-length wool, built to be the only layer you need.",
+      ar: "صوف بطول كامل، مصمّم ليكون الطبقة الوحيدة التي تحتاجها.",
+    },
+    parentId: "outerwear",
+    order: 1,
+    productCount: 0,
+    featured: false,
+    showInNav: true,
+  },
+  {
+    id: "outerwear-blazers",
+    slug: "blazers",
+    name: { en: "Blazers", ar: "بليزر" },
+    description: {
+      en: "Tailoring that softens to you instead of fighting you.",
+      ar: "تفصيل يتشكّل على قوامك بدل أن يقاومه.",
+    },
+    parentId: "outerwear",
+    order: 2,
+    productCount: 0,
+    featured: false,
+    showInNav: true,
+  },
+
+  /* ---- Dresses ---- */
   {
     id: "dresses",
     slug: "dresses",
@@ -94,10 +142,35 @@ export const demoCategories: Category[] = [
     },
     parentId: null,
     order: 2,
-    productCount: 2,
+    productCount: 0,
     featured: true,
+    showInNav: true,
     image: { url: "/demo/category-dresses.svg", alt: "Dresses", width: 400, height: 520 },
   },
+  {
+    id: "dresses-evening",
+    slug: "evening",
+    name: { en: "Evening", ar: "سهرة" },
+    description: { en: "Silk, cut on the bias.", ar: "حرير مقصوص بشكل مائل." },
+    parentId: "dresses",
+    order: 1,
+    productCount: 0,
+    featured: false,
+    showInNav: true,
+  },
+  {
+    id: "dresses-day",
+    slug: "day",
+    name: { en: "Day", ar: "يومي" },
+    description: { en: "Knitted columns you can wear to work.", ar: "تريكو عمودي يصلح للعمل." },
+    parentId: "dresses",
+    order: 2,
+    productCount: 0,
+    featured: false,
+    showInNav: true,
+  },
+
+  /* ---- Knitwear ---- */
   {
     id: "knitwear",
     slug: "knitwear",
@@ -108,10 +181,24 @@ export const demoCategories: Category[] = [
     },
     parentId: null,
     order: 3,
-    productCount: 2,
+    productCount: 0,
     featured: true,
+    showInNav: true,
     image: { url: "/demo/category-knitwear.svg", alt: "Knitwear", width: 400, height: 520 },
   },
+  {
+    id: "knitwear-tees",
+    slug: "tees",
+    name: { en: "Tees", ar: "تي شيرت" },
+    description: { en: "Cashmere and cotton, cut as a t-shirt.", ar: "كشمير وقطن بقَصّة التي شيرت." },
+    parentId: "knitwear",
+    order: 1,
+    productCount: 0,
+    featured: false,
+    showInNav: true,
+  },
+
+  /* ---- Trousers ---- */
   {
     id: "trousers",
     slug: "trousers",
@@ -122,10 +209,35 @@ export const demoCategories: Category[] = [
     },
     parentId: null,
     order: 4,
-    productCount: 2,
+    productCount: 0,
     featured: true,
+    showInNav: true,
     image: { url: "/demo/category-trousers.svg", alt: "Trousers", width: 400, height: 520 },
   },
+  {
+    id: "trousers-wide",
+    slug: "wide-leg",
+    name: { en: "Wide leg", ar: "ساق واسعة" },
+    description: { en: "High-rise, pressed crease.", ar: "خصر عالٍ بكسرة مكوية." },
+    parentId: "trousers",
+    order: 1,
+    productCount: 0,
+    featured: false,
+    showInNav: true,
+  },
+  {
+    id: "trousers-tapered",
+    slug: "tapered",
+    name: { en: "Tapered", ar: "ضيّقة" },
+    description: { en: "Crepe, elasticated at the back.", ar: "كريب بمطاط خلفي." },
+    parentId: "trousers",
+    order: 2,
+    productCount: 0,
+    featured: false,
+    showInNav: true,
+  },
+
+  /* ---- Bags ---- */
   {
     id: "bags",
     slug: "bags",
@@ -136,10 +248,35 @@ export const demoCategories: Category[] = [
     },
     parentId: null,
     order: 5,
-    productCount: 2,
+    productCount: 0,
     featured: true,
+    showInNav: true,
     image: { url: "/demo/category-bags.svg", alt: "Bags", width: 400, height: 520 },
   },
+  {
+    id: "bags-totes",
+    slug: "totes",
+    name: { en: "Totes", ar: "حقائب كبيرة" },
+    description: { en: "Unlined, vegetable-tanned.", ar: "بلا بطانة، مدبوغ نباتياً." },
+    parentId: "bags",
+    order: 1,
+    productCount: 0,
+    featured: false,
+    showInNav: true,
+  },
+  {
+    id: "bags-shoulder",
+    slug: "shoulder",
+    name: { en: "Shoulder", ar: "حقائب كتف" },
+    description: { en: "Curved, small, worn close.", ar: "منحنية وصغيرة وقريبة من الجسم." },
+    parentId: "bags",
+    order: 2,
+    productCount: 0,
+    featured: false,
+    showInNav: true,
+  },
+
+  /* ---- Footwear ---- */
   {
     id: "footwear",
     slug: "footwear",
@@ -150,11 +287,162 @@ export const demoCategories: Category[] = [
     },
     parentId: null,
     order: 6,
-    productCount: 2,
+    productCount: 0,
     featured: true,
+    showInNav: true,
     image: { url: "/demo/category-footwear.svg", alt: "Footwear", width: 400, height: 520 },
   },
+  {
+    id: "footwear-sneakers",
+    slug: "sneakers",
+    name: { en: "Sneakers", ar: "سنيكرز" },
+    description: { en: "Court and runner, full-grain.", ar: "كلاسيكي ورياضي، جلد كامل الحبيبات." },
+    parentId: "footwear",
+    order: 1,
+    productCount: 0,
+    featured: false,
+    showInNav: true,
+  },
+
+  /* ---- Objects: where the simple products live ---- */
+  {
+    id: "objects",
+    slug: "objects",
+    name: { en: "Objects", ar: "لوازم" },
+    description: {
+      en: "The small things that keep the rest of it alive.",
+      ar: "التفاصيل الصغيرة التي تُبقي البقية حيّة.",
+    },
+    parentId: null,
+    order: 7,
+    productCount: 0,
+    featured: true,
+    showInNav: true,
+    image: { url: "/demo/category-objects.svg", alt: "Objects", width: 400, height: 520 },
+  },
+  {
+    id: "objects-care",
+    slug: "care",
+    name: { en: "Care", ar: "عناية" },
+    description: {
+      en: "Combs and balms — the difference between five seasons and fifteen.",
+      ar: "أمشاط وبلسم — الفرق بين خمسة مواسم وخمسة عشر.",
+    },
+    parentId: "objects",
+    order: 1,
+    productCount: 0,
+    featured: false,
+    showInNav: true,
+  },
 ];
+
+export const demoCategories: Category[] = withComputedPaths(CATEGORY_SEEDS);
+
+/* -------------------------------------------------------------------------- */
+/*  Shipping classes                                                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Four classes, because four is what a real catalogue needs and a fifth is
+ * what nobody maintains. Every product carries exactly one.
+ */
+export const demoShippingClasses: ShippingClass[] = [
+  {
+    id: "light",
+    name: { en: "Light", ar: "خفيف" },
+    description: {
+      en: "Fits an envelope. No surcharge, and it reaches the free threshold like anything else.",
+      ar: "يتّسع له ظرف. بلا رسوم إضافية، ويستفيد من حدّ الشحن المجاني كغيره.",
+    },
+    surcharge: 0,
+    perItemSurcharge: 0,
+    excludedSpeeds: [],
+    ignoresFreeThreshold: false,
+    order: 1,
+  },
+  {
+    id: "standard",
+    name: { en: "Standard", ar: "قياسي" },
+    description: {
+      en: "A boxed garment. Half a dinar per unit covers the packaging.",
+      ar: "قطعة في علبة. نصف دينار للوحدة يغطي التغليف.",
+    },
+    surcharge: 0,
+    perItemSurcharge: 0.5,
+    excludedSpeeds: [],
+    ignoresFreeThreshold: false,
+    order: 2,
+  },
+  {
+    id: "bulky",
+    name: { en: "Bulky", ar: "ضخم" },
+    description: {
+      en: "Coats and tailoring. One oversized box per order, and it does not go on a same-day bike.",
+      ar: "المعاطف والتفصيل. علبة كبيرة واحدة للطلب، ولا تُشحن بدرّاجة في نفس اليوم.",
+    },
+    surcharge: 4,
+    perItemSurcharge: 1,
+    excludedSpeeds: ["same-day"],
+    ignoresFreeThreshold: false,
+    order: 3,
+  },
+  {
+    id: "fragile",
+    name: { en: "Fragile", ar: "قابل للكسر" },
+    description: {
+      en: "Glass. Packed by hand, never same-day, and never free — the packing is the cost.",
+      ar: "زجاج. يُغلَّف يدوياً، لا يُشحن في نفس اليوم، ولا يكون مجانياً — التغليف هو التكلفة.",
+    },
+    surcharge: 2.5,
+    perItemSurcharge: 0,
+    excludedSpeeds: ["same-day"],
+    ignoresFreeThreshold: true,
+    order: 4,
+  },
+];
+
+/* -------------------------------------------------------------------------- */
+/*  Identifiers                                                               */
+/* -------------------------------------------------------------------------- */
+
+/** GS1 prefix for Jordan. Real codes are bought; these are structurally valid. */
+const GS1_JO = "625";
+
+/** Deterministic hash, so a rebuild never reshuffles SKUs or GTINs. */
+function hash(input: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < input.length; i += 1) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return Math.abs(h);
+}
+
+/**
+ * A structurally valid GTIN-13 derived from the trade item's own key.
+ *
+ * Deterministic on purpose: a seed re-run must not hand an existing product a
+ * new barcode, because a GTIN that changes is a GTIN that was never an
+ * identifier. The check digit is computed rather than invented, so these pass
+ * the same validation the admin form applies to a real one.
+ */
+function gtin13(key: string): string {
+  const body = (GS1_JO + String(hash(key)).padStart(9, "0").slice(0, 9)).slice(0, 12);
+  return body + String(gtinCheckDigit(body));
+}
+
+/** `NS-ATWC-INK-M` — readable in a warehouse, stable across rebuilds. */
+function skuFor(slug: string, colorId?: string, sizeId?: string): string {
+  const stem = slug
+    .split("-")
+    .map((part) => part.slice(0, 2).toUpperCase())
+    .join("")
+    .slice(0, 6);
+  const parts = ["NS", stem];
+  if (colorId) parts.push(colorId.slice(0, 4).toUpperCase());
+  if (sizeId) parts.push(sizeId.toUpperCase());
+  return parts.join("-");
+}
 
 /* -------------------------------------------------------------------------- */
 /*  Products                                                                  */
@@ -168,18 +456,33 @@ type Seed = {
   subAr: string;
   descEn: string;
   descAr: string;
+  /** A leaf category — products are filed against subcategories, not departments. */
   categoryId: string;
   price: number;
   compareAt?: number;
-  colors: string[];
-  sizes: ProductSize[];
+  /** Omitted on a simple product, which has no options at all. */
+  colors?: string[];
+  sizes?: ProductSize[];
   badges: Product["badges"];
-  fit: NonNullable<Product["fit"]>;
+  /** Garments carry fit data; objects do not. */
+  fit?: NonNullable<Product["fit"]>;
   rating: [number, number];
   collections: string[];
   tags: string[];
   daysAgo: number;
   details: { en: [string, string]; ar: [string, string] }[];
+
+  /** Defaults to `variable` — most of this catalogue is garments. */
+  type?: ProductType;
+  shippingClass?: string;
+  /** `1` is the sold-individually case. Undefined means stock is the only cap. */
+  maxPerOrder?: number;
+  /** Product ids. "Instead of this" on the product page. */
+  upsell?: string[];
+  /** Product ids. "Along with this" in the bag. */
+  crossSell?: string[];
+  /** Units per permutation for a variable product, or total for a simple one. */
+  stockPer?: number;
 };
 
 const SEEDS: Seed[] = [
@@ -193,7 +496,7 @@ const SEEDS: Seed[] = [
       "Cut from a double-faced wool that needs no lining, so the coat keeps its weight without its bulk. The shoulder is built by hand and the hem falls just past the knee — long enough to read as formal, short enough to wear over denim.",
     descAr:
       "مصنوع من صوف مزدوج الوجه لا يحتاج إلى بطانة، فيحتفظ المعطف بثقله دون ضخامة. الكتف مُشكَّل يدوياً، والطول يتجاوز الركبة قليلاً.",
-    categoryId: "outerwear",
+    categoryId: "outerwear-coats",
     price: 349,
     compareAt: 449,
     colors: ["ink", "sand", "crimson"],
@@ -209,6 +512,10 @@ const SEEDS: Seed[] = [
       { en: ["Care", "Dry clean only"], ar: ["العناية", "تنظيف جاف فقط"] },
       { en: ["Made in", "Biella, Italy"], ar: ["بلد الصنع", "بييلا، إيطاليا"] },
     ],
+    shippingClass: "bulky",
+    maxPerOrder: 1,
+    crossSell: ["cashmere-comb", "leather-balm"],
+    stockPer: 6,
   },
   {
     slug: "sculpted-shoulder-blazer",
@@ -220,7 +527,7 @@ const SEEDS: Seed[] = [
       "A half-canvassed chest lets the blazer mould to you over the first few wears instead of fighting you. Sleeve heads are set slightly forward, which is what keeps the line clean when your arms are down.",
     descAr:
       "الصدر نصف المبطّن يجعل البليزر يتشكّل على قوامك بعد أول مرات الارتداء. رؤوس الأكمام مائلة قليلاً للأمام للحفاظ على الخط نظيفاً.",
-    categoryId: "outerwear",
+    categoryId: "outerwear-blazers",
     price: 239,
     colors: ["ink", "bone", "slate"],
     sizes: ALPHA,
@@ -235,6 +542,9 @@ const SEEDS: Seed[] = [
       { en: ["Lining", "Cupro, half-lined"], ar: ["البطانة", "كوبرو، نصف مبطّن"] },
       { en: ["Care", "Dry clean"], ar: ["العناية", "تنظيف جاف"] },
     ],
+    shippingClass: "bulky",
+    upsell: ["atelier-wool-coat"],
+    crossSell: ["leather-balm"],
   },
   {
     slug: "liquid-silk-slip-dress",
@@ -246,7 +556,7 @@ const SEEDS: Seed[] = [
       "Cut on the bias so the silk moves with you rather than hanging off you. Sand-washing takes the shine down to a matte glow — the difference between evening wear and eveningwear that photographs well.",
     descAr:
       "مقصوص بشكل مائل ليتحرك الحرير معكِ لا أن ينسدل فحسب. الغسل الرملي يخفّف اللمعان إلى وهج مطفي.",
-    categoryId: "dresses",
+    categoryId: "dresses-evening",
     price: 179,
     compareAt: 225,
     colors: ["ink", "clay", "sage"],
@@ -262,6 +572,8 @@ const SEEDS: Seed[] = [
       { en: ["Care", "Hand wash cold, line dry"], ar: ["العناية", "غسل يدوي بارد"] },
       { en: ["Made in", "Como, Italy"], ar: ["بلد الصنع", "كومو، إيطاليا"] },
     ],
+    shippingClass: "standard",
+    crossSell: ["cashmere-comb"],
   },
   {
     slug: "column-knit-dress",
@@ -273,7 +585,7 @@ const SEEDS: Seed[] = [
       "Knitted in one piece with no side seams, which is why it holds a column silhouette instead of pulling at the hip. Merino regulates temperature, so it works under a coat and on its own.",
     descAr:
       "منسوج بقطعة واحدة بلا خياطات جانبية، فيحافظ على القَصّة العمودية. صوف الميرينو ينظّم الحرارة.",
-    categoryId: "dresses",
+    categoryId: "dresses-day",
     price: 139,
     colors: ["bone", "ink", "sand"],
     sizes: ALPHA,
@@ -287,6 +599,9 @@ const SEEDS: Seed[] = [
       { en: ["Composition", "100% extra-fine merino"], ar: ["التركيب", "١٠٠٪ ميرينو فائق النعومة"] },
       { en: ["Care", "Machine wash wool cycle"], ar: ["العناية", "غسالة، دورة الصوف"] },
     ],
+    shippingClass: "standard",
+    upsell: ["liquid-silk-slip-dress"],
+    crossSell: ["cashmere-comb"],
   },
   {
     slug: "featherweight-cashmere-tee",
@@ -298,7 +613,7 @@ const SEEDS: Seed[] = [
       "Fourteen-gauge cashmere, which is light enough to wear as a t-shirt and dense enough not to pill in the first season. The neckline is bound rather than ribbed so it stays flat.",
     descAr:
       "كشمير بمقياس ١٤، خفيف كالتي شيرت وكثيف بما يكفي لئلا يتكوّر في الموسم الأول. فتحة الرقبة مُحاكة لتبقى مسطحة.",
-    categoryId: "knitwear",
+    categoryId: "knitwear-tees",
     price: 89,
     colors: ["bone", "ink", "crimson", "sage"],
     sizes: ALPHA,
@@ -312,6 +627,8 @@ const SEEDS: Seed[] = [
       { en: ["Composition", "100% cashmere, 14gg"], ar: ["التركيب", "١٠٠٪ كشمير، ١٤ جيج"] },
       { en: ["Care", "Hand wash, dry flat"], ar: ["العناية", "غسل يدوي، تجفيف مسطح"] },
     ],
+    shippingClass: "light",
+    crossSell: ["cashmere-comb"],
   },
   {
     slug: "boxy-cotton-tee",
@@ -323,7 +640,7 @@ const SEEDS: Seed[] = [
       "Compact-spun Supima holds a crisp edge through the wash, so a boxy cut stays boxy instead of collapsing into a rectangle. Shoulder seam sits just past the joint.",
     descAr:
       "قطن سوبيما مضغوط الغزل يحافظ على حوافه بعد الغسل، فتبقى القَصّة الواسعة محافظة على شكلها.",
-    categoryId: "knitwear",
+    categoryId: "knitwear-tees",
     price: 35,
     compareAt: 45,
     colors: ["bone", "ink", "sand", "crimson"],
@@ -338,6 +655,8 @@ const SEEDS: Seed[] = [
       { en: ["Composition", "100% Supima cotton, 240gsm"], ar: ["التركيب", "١٠٠٪ قطن سوبيما، ٢٤٠ غم/م٢"] },
       { en: ["Care", "Machine wash 30°"], ar: ["العناية", "غسالة ٣٠°"] },
     ],
+    shippingClass: "light",
+    upsell: ["featherweight-cashmere-tee"],
   },
   {
     slug: "wide-leg-trouser",
@@ -349,7 +668,7 @@ const SEEDS: Seed[] = [
       "A permanent pressed crease runs the full length, which is what stops a wide leg from reading as sloppy. High rise sits at the natural waist; the hem is cut to break once over a heel.",
     descAr:
       "كسرة دائمة تمتد بطول الساق، وهي ما يمنع الساق الواسعة من أن تبدو غير مرتبة. الخصر العالي يستقر عند الخصر الطبيعي.",
-    categoryId: "trousers",
+    categoryId: "trousers-wide",
     price: 105,
     colors: ["ink", "sand", "slate"],
     sizes: WAIST,
@@ -364,6 +683,7 @@ const SEEDS: Seed[] = [
       { en: ["Rise", "High, 30cm"], ar: ["ارتفاع الخصر", "عالٍ، ٣٠ سم"] },
       { en: ["Care", "Dry clean"], ar: ["العناية", "تنظيف جاف"] },
     ],
+    shippingClass: "standard",
   },
   {
     slug: "tapered-crepe-trouser",
@@ -375,7 +695,7 @@ const SEEDS: Seed[] = [
       "Flat at the front, elasticated at the back — tailored from the outside, forgiving from the inside. The taper starts below the knee so it never pulls across the thigh.",
     descAr:
       "مسطح من الأمام ومطاطي من الخلف: مُفصّل من الخارج ومريح من الداخل. الاستدقاق يبدأ تحت الركبة.",
-    categoryId: "trousers",
+    categoryId: "trousers-tapered",
     price: 79,
     colors: ["ink", "sage", "clay"],
     sizes: WAIST,
@@ -389,6 +709,8 @@ const SEEDS: Seed[] = [
       { en: ["Composition", "Triacetate crepe"], ar: ["التركيب", "كريب تراي أسيتات"] },
       { en: ["Care", "Machine wash cold"], ar: ["العناية", "غسالة بماء بارد"] },
     ],
+    shippingClass: "standard",
+    upsell: ["wide-leg-trouser"],
   },
   {
     slug: "structured-leather-tote",
@@ -400,7 +722,7 @@ const SEEDS: Seed[] = [
       "Vegetable-tanned and left unlined so the leather darkens with use instead of cracking. Holds a 14-inch laptop flat; the base is a single piece with no seam to split.",
     descAr:
       "مدبوغة نباتياً وبلا بطانة، فيغمق الجلد مع الاستخدام بدل أن يتشقق. تتسع لحاسوب ١٤ بوصة.",
-    categoryId: "bags",
+    categoryId: "bags-totes",
     price: 215,
     colors: ["clay", "ink", "sand"],
     sizes: ONE,
@@ -414,6 +736,8 @@ const SEEDS: Seed[] = [
       { en: ["Material", "Vegetable-tanned calf"], ar: ["الخامة", "جلد عجل مدبوغ نباتياً"] },
       { en: ["Dimensions", "36 × 28 × 12 cm"], ar: ["الأبعاد", "٣٦ × ٢٨ × ١٢ سم"] },
     ],
+    shippingClass: "standard",
+    crossSell: ["leather-balm"],
   },
   {
     slug: "mini-crescent-bag",
@@ -425,7 +749,7 @@ const SEEDS: Seed[] = [
       "The crescent sits flush against the body rather than swinging, which is the whole point of the curve. Magnetic closure, one interior card slot, nothing else.",
     descAr:
       "الشكل الهلالي يستقر ملاصقاً للجسم بدل أن يتأرجح. إغلاق مغناطيسي وجيب بطاقة واحد، لا أكثر.",
-    categoryId: "bags",
+    categoryId: "bags-shoulder",
     price: 129,
     compareAt: 165,
     colors: ["crimson", "ink", "bone"],
@@ -440,6 +764,11 @@ const SEEDS: Seed[] = [
       { en: ["Material", "Nappa leather"], ar: ["الخامة", "جلد نابا"] },
       { en: ["Dimensions", "24 × 13 × 6 cm"], ar: ["الأبعاد", "٢٤ × ١٣ × ٦ سم"] },
     ],
+    shippingClass: "standard",
+    maxPerOrder: 2,
+    upsell: ["structured-leather-tote"],
+    crossSell: ["leather-balm"],
+    stockPer: 14,
   },
   {
     slug: "low-profile-court-sneaker",
@@ -451,7 +780,7 @@ const SEEDS: Seed[] = [
       "Full-grain uppers on a Margom sole — the low, slightly gummed profile that stays quiet under a trouser. Sized true; if you are between, take the smaller.",
     descAr:
       "جلد كامل الحبيبات على نعل مارغوم منخفض. المقاس مطابق؛ وإن كنت بين مقاسين فاختر الأصغر.",
-    categoryId: "footwear",
+    categoryId: "footwear-sneakers",
     price: 115,
     colors: ["bone", "ink"],
     sizes: SHOE,
@@ -466,6 +795,8 @@ const SEEDS: Seed[] = [
       { en: ["Sole", "Margom rubber"], ar: ["النعل", "مطاط مارغوم"] },
       { en: ["Made in", "Italy"], ar: ["بلد الصنع", "إيطاليا"] },
     ],
+    shippingClass: "standard",
+    crossSell: ["leather-balm"],
   },
   {
     slug: "suede-runner",
@@ -477,7 +808,7 @@ const SEEDS: Seed[] = [
       "Suede treated at the fibre rather than sprayed on top, so the repellency survives cleaning. A 6mm drop makes it genuinely walkable, not just styled that way.",
     descAr:
       "شمواه مُعالج من الألياف لا بالرش السطحي، فتبقى مقاومته للماء بعد التنظيف. فارق ٦ مم يجعله مريحاً للمشي فعلاً.",
-    categoryId: "footwear",
+    categoryId: "footwear-sneakers",
     price: 99,
     colors: ["sand", "slate", "crimson"],
     sizes: SHOE,
@@ -491,16 +822,115 @@ const SEEDS: Seed[] = [
       { en: ["Upper", "Hydrophobic suede"], ar: ["الوجه", "شمواه طارد للماء"] },
       { en: ["Drop", "6mm"], ar: ["الفارق", "٦ مم"] },
     ],
+    shippingClass: "standard",
+    upsell: ["low-profile-court-sneaker"],
+    crossSell: ["leather-balm"],
+  },
+
+  /* ---- Simple products: one trade item each, no options to choose ---- */
+  {
+    slug: "cashmere-comb",
+    titleEn: "Cashmere Comb",
+    titleAr: "مشط الكشمير",
+    subEn: "Brass teeth, pear wood",
+    subAr: "أسنان نحاسية وخشب كمثرى",
+    descEn:
+      "Pills are not a flaw in cashmere, they are what happens when fibres rub. Combing them off once a season is the whole maintenance routine — the brass teeth are spaced to lift a pill without pulling the knit behind it.",
+    descAr:
+      "التكوّر ليس عيباً في الكشمير، بل نتيجة احتكاك الألياف. تمشيطه مرة كل موسم هو كل ما يلزم — وأسنان النحاس متباعدة لترفع الكورة دون أن تشدّ النسيج خلفها.",
+    categoryId: "objects-care",
+    price: 15,
+    type: "simple",
+    shippingClass: "light",
+    badges: ["new"],
+    rating: [4.7, 62],
+    collections: ["essentials"],
+    tags: ["care", "cashmere", "object"],
+    daysAgo: 9,
+    stockPer: 30,
+    details: [
+      { en: ["Material", "Brass and pear wood"], ar: ["الخامة", "نحاس وخشب كمثرى"] },
+      { en: ["Use", "Once a season, on a flat surface"], ar: ["الاستخدام", "مرة كل موسم على سطح مستوٍ"] },
+      { en: ["Made in", "Sheffield, England"], ar: ["بلد الصنع", "شيفيلد، إنجلترا"] },
+    ],
+  },
+  {
+    slug: "leather-balm",
+    titleEn: "Leather Balm",
+    titleAr: "بلسم الجلد",
+    subEn: "Neutral, beeswax base",
+    subAr: "محايد بقاعدة شمع العسل",
+    descEn:
+      "Vegetable-tanned leather darkens and softens with use, and dries out without help. A thin coat twice a year keeps it supple. Neutral rather than tinted, so one jar works across every colour we sell.",
+    descAr:
+      "الجلد المدبوغ نباتياً يغمق ويلين مع الاستخدام، ويجفّ إن أُهمل. طبقة رقيقة مرتين في السنة تُبقيه ليّناً. محايد لا ملوّن، فعلبة واحدة تكفي كل الألوان التي نبيعها.",
+    categoryId: "objects-care",
+    price: 22,
+    type: "simple",
+    shippingClass: "fragile",
+    maxPerOrder: 3,
+    badges: ["new"],
+    rating: [4.8, 41],
+    collections: ["essentials"],
+    tags: ["care", "leather", "object"],
+    daysAgo: 9,
+    stockPer: 18,
+    details: [
+      { en: ["Contents", "50ml, glass jar"], ar: ["المحتوى", "٥٠ مل، عبوة زجاجية"] },
+      { en: ["Composition", "Beeswax, lanolin, neatsfoot oil"], ar: ["التركيب", "شمع عسل، لانولين، زيت"] },
+      { en: ["Use", "Thin coat, twice yearly"], ar: ["الاستخدام", "طبقة رقيقة مرتين سنوياً"] },
+    ],
   },
 ];
 
+/**
+ * Expand a seed into a product, generating the variant matrix for a variable
+ * one.
+ *
+ * Stock is deliberately uneven across the matrix rather than a flat number:
+ * a catalogue where every size of every colour has identical stock never
+ * exercises the sold-out states, and those are the states most likely to be
+ * broken.
+ */
 function buildProduct(seed: Seed): Product {
-  const colors = seed.colors.map((c) => COLORS[c]).filter((c): c is ProductColor => Boolean(c));
-  const firstSize = seed.sizes[0];
+  const type: ProductType = seed.type ?? "variable";
+  const colors =
+    type === "variable"
+      ? (seed.colors ?? []).map((c) => COLORS[c]).filter((c): c is ProductColor => Boolean(c))
+      : [];
+  const sizes = type === "variable" ? (seed.sizes ?? []) : [];
+  const firstSize = sizes[0];
+  const basePer = seed.stockPer ?? 12;
+
+  let variants: ProductVariant[] | undefined;
+  let totalStock: number;
+
+  if (type === "variable") {
+    variants = [];
+    for (const color of colors) {
+      for (const size of sizes) {
+        // A deterministic spread: some permutations sell out, the middle sizes
+        // carry more, and the same rebuild always produces the same shape.
+        const spread = hash(`${seed.slug}:${color.id}:${size.id}`) % 5;
+        const stock = spread === 0 ? 0 : Math.max(1, basePer - spread * 2);
+        variants.push({
+          sku: skuFor(seed.slug, color.id, size.id),
+          colorId: color.id,
+          sizeId: size.id,
+          stock,
+          gtin: gtin13(`${seed.slug}:${color.id}:${size.id}`),
+        });
+      }
+    }
+    totalStock = variants.reduce((sum, v) => sum + v.stock, 0);
+  } else {
+    totalStock = basePer * 4;
+  }
 
   return {
     id: seed.slug,
     slug: seed.slug,
+    type,
     title: { en: seed.titleEn, ar: seed.titleAr },
     subtitle: { en: seed.subEn, ar: seed.subAr },
     description: { en: seed.descEn, ar: seed.descAr },
@@ -509,9 +939,11 @@ function buildProduct(seed: Seed): Product {
       value: { en: d.en[1], ar: d.ar[1] },
     })),
     categoryId: seed.categoryId,
-    categoryPath: [seed.categoryId],
+    categoryPath: categoryPathFor(demoCategories, seed.categoryId),
     collectionIds: seed.collections,
     tags: seed.tags,
+    upsellIds: seed.upsell ?? [],
+    crossSellIds: seed.crossSell ?? [],
     price: seed.price,
     compareAtPrice: seed.compareAt,
     currency: "JOD",
@@ -530,10 +962,17 @@ function buildProduct(seed: Seed): Product {
       },
     ],
     colors,
-    sizes: seed.sizes,
+    sizes,
     sizeSystem: firstSize ? firstSize.system : "one-size",
-    inStock: true,
-    totalStock: seed.badges.includes("last-pieces") ? 4 : 48,
+    variants,
+    // A simple product is the trade item, so it carries the GTIN itself. A
+    // variable one leaves it unset: its variants each have their own.
+    sku: skuFor(seed.slug),
+    gtin: type === "simple" ? gtin13(seed.slug) : undefined,
+    shippingClassId: seed.shippingClass ?? "standard",
+    maxPerOrder: seed.maxPerOrder,
+    inStock: totalStock > 0,
+    totalStock,
     badges: seed.badges,
     rating: { average: seed.rating[0], count: seed.rating[1] },
     fit: seed.fit,

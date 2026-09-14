@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server";
 
-import { getActiveOffers, getAllProducts, getShippingMethods } from "@/lib/catalog";
+import {
+  getActiveOffers,
+  getAllProducts,
+  getShippingClasses,
+  getShippingMethods,
+} from "@/lib/catalog";
 import { priceCart } from "@/lib/pricing";
+import { hasOptions, resolveSelection } from "@/lib/product";
+import { classesInCart } from "@/lib/shipping";
 import { cartKey, orderReference } from "@/lib/utils";
 import { isAdminConfigured, verifyRequest } from "@/lib/firebase/admin";
 import type { CartItem, Order, OrderEvent } from "@/types";
@@ -85,9 +92,10 @@ export async function POST(request: Request) {
 
   /* --- re-price from the catalogue -------------------------------------- */
 
-  const [products, shippingMethods, offers] = await Promise.all([
+  const [products, shippingMethods, shippingClasses, offers] = await Promise.all([
     getAllProducts(),
     getShippingMethods(),
+    getShippingClasses(),
     getActiveOffers(),
   ]);
 
@@ -99,39 +107,64 @@ export async function POST(request: Request) {
       return bad(`A piece in your bag is no longer available.`);
     }
 
-    const color = product.colors.find((c) => c.id === line.colorId);
-    const size = product.sizes.find((s) => s.id === line.sizeId);
-    if (!color || !size) return bad("That colour and size combination is not available.");
+    const variable = hasOptions(product);
+    const colorId = variable ? String(line.colorId ?? "") : "";
+    const sizeId = variable ? String(line.sizeId ?? "") : "";
 
-    const image = product.images.find((i) => i.colorId === color.id) ?? product.images[0];
+    if (variable) {
+      const color = product.colors.find((c) => c.id === colorId);
+      const size = product.sizes.find((sz) => sz.id === sizeId);
+      if (!color || !size) return bad("That colour and size combination is not available.");
+    }
+
+    const image = product.images.find((i) => i.colorId === colorId) ?? product.images[0];
     if (!image) return bad("Product imagery is missing.");
 
-    const quantity = Math.max(
-      1,
-      Math.min(Math.floor(Number(line.quantity) || 1), MAX_QTY_PER_LINE, product.totalStock),
-    );
-
-    if (!product.inStock || product.totalStock < 1) {
+    /*
+     * Re-resolve the trade item from Firestore. Everything the browser sent
+     * about this line — SKU, GTIN, price, and how many it was allowed to add —
+     * is discarded here. A tampered localStorage can ask for a hundred of a
+     * one-per-order item; the cap it actually gets is the one the catalogue
+     * says, and the order is rejected rather than silently trimmed, because
+     * quietly shipping fewer than someone paid for is the worse failure.
+     */
+    const selection = resolveSelection(product, colorId, sizeId);
+    if (!selection.buyable || selection.cap.max < 1) {
       return bad(`${product.title.en} has sold out.`);
     }
 
+    const requested = Math.max(1, Math.floor(Number(line.quantity) || 1));
+    const ceiling = Math.min(selection.cap.max, MAX_QTY_PER_LINE);
+    if (requested > ceiling) {
+      return bad(
+        selection.cap.reason === "per-order"
+          ? `${product.title.en} is limited to ${ceiling} per order.`
+          : `Only ${ceiling} of ${product.title.en} remain.`,
+      );
+    }
+
     priced.push({
-      key: cartKey(product.id, color.id, size.id),
+      key: cartKey(product.id, colorId, sizeId),
       productId: product.id,
-      sku: `${product.id}-${color.id}-${size.id}`.toUpperCase(),
+      sku: selection.sku,
+      ...(selection.gtin === undefined ? {} : { gtin: selection.gtin }),
       slug: product.slug,
       title: product.title,
       image,
-      colorId: color.id,
-      colorName: color.name,
-      sizeId: size.id,
-      sizeLabel: size.label,
+      colorId,
+      colorName: product.colors.find((c) => c.id === colorId)?.name ?? { en: "", ar: "" },
+      sizeId,
+      sizeLabel: product.sizes.find((sz) => sz.id === sizeId)?.label ?? "",
       // Authoritative price. The browser's number never reaches this object.
-      unitPrice: product.price,
+      unitPrice: selection.price,
       ...(product.compareAtPrice === undefined ? {} : { compareAtPrice: product.compareAtPrice }),
       currency: product.currency,
-      quantity,
-      maxQuantity: Math.min(product.totalStock, MAX_QTY_PER_LINE),
+      quantity: requested,
+      maxQuantity: ceiling,
+      maxReason: selection.cap.reason,
+      ...(product.shippingClassId === undefined
+        ? {}
+        : { shippingClassId: product.shippingClassId }),
       addedAt: Date.now(),
     });
   }
@@ -140,11 +173,28 @@ export async function POST(request: Request) {
     shippingMethods.find((m) => m.id === body.shippingMethodId) ?? shippingMethods[0];
   if (!shippingMethod) return bad("No delivery method is available.");
 
+  /*
+   * A class can forbid a speed outright. The picker hides those, but the
+   * request is re-checked here — the client is not the gatekeeper, and an
+   * order that promises same-day for a bulky coat is a promise the warehouse
+   * cannot keep.
+   */
+  const blocking = classesInCart(priced, shippingClasses).filter((c) =>
+    c.excludedSpeeds.includes(shippingMethod.speed),
+  );
+  if (blocking.length > 0) {
+    return bad(
+      `${shippingMethod.name.en} is not available for ${blocking
+        .map((c) => c.name.en.toLowerCase())
+        .join(" and ")} items.`,
+    );
+  }
+
   const offer = body.offerCode
     ? (offers.find((o) => o.code.toLowerCase() === String(body.offerCode).toLowerCase()) ?? null)
     : null;
 
-  const totals = priceCart({ items: priced, shippingMethod, offer });
+  const totals = priceCart({ items: priced, shippingMethod, shippingClasses, offer });
 
   /* --- persist ----------------------------------------------------------- */
 

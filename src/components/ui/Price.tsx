@@ -26,6 +26,12 @@ const SIZES = {
  * Tabular figures so a column of prices aligns and a value that animates does
  * not jitter. The original price is struck through and de-emphasised rather
  * than removed, because the saving is the argument.
+ *
+ * It wraps. A discounted price is three pieces — "JOD 349.000", the struck
+ * "JOD 449.000", and the "−22%" chip — and in a card on a 375px screen those
+ * do not fit on one line. Held on one line they pushed the whole document
+ * 59px wider than the viewport, which is how one unbreakable row inside a
+ * product card turns into a page that scrolls sideways on every phone.
  */
 export function Price({
   value,
@@ -40,18 +46,24 @@ export function Price({
   const onSale = off > 0;
 
   return (
-    <span className={cn("tabular inline-flex items-baseline gap-2", SIZES[size], className)}>
-      <span className={cn("font-medium", onSale && "text-alert")}>
+    <span
+      className={cn(
+        "tabular inline-flex flex-wrap items-baseline gap-x-2 gap-y-0.5",
+        SIZES[size],
+        className,
+      )}
+    >
+      <span className={cn("font-medium whitespace-nowrap", onSale && "text-alert")}>
         {formatPrice(value, currency, locale)}
       </span>
 
       {onSale && (
         <>
-          <span className="text-mist text-[0.85em] line-through">
+          <span className="text-mist text-[0.85em] whitespace-nowrap line-through">
             {formatPrice(compareAt!, currency, locale)}
           </span>
           {showDiscount && (
-            <span className="text-alert bg-alert/10 rounded-xs px-1.5 py-0.5 text-[0.7em] font-semibold">
+            <span className="text-alert bg-alert/10 rounded-xs px-1.5 py-0.5 text-[0.7em] font-semibold whitespace-nowrap">
               −{off}%
             </span>
           )}

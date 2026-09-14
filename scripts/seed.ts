@@ -23,6 +23,8 @@ import {
   demoCategories,
   demoOffers,
   demoProducts,
+  demoShippingClasses,
+  demoShippingMethods,
   demoTestimonials,
 } from "../src/data/demo";
 
@@ -128,7 +130,15 @@ async function wipeCollection(database: Firestore, name: string): Promise<number
 async function main() {
   console.log(`\nSeeding "${projectId}"${wipe ? " (wiping first)" : ""}\n`);
 
-  const collections = ["products", "categories", "banners", "offers", "testimonials"];
+  const collections = [
+    "products",
+    "categories",
+    "banners",
+    "offers",
+    "testimonials",
+    "shippingClasses",
+    "shippingMethods",
+  ];
 
   if (wipe) {
     for (const name of collections) {
@@ -145,6 +155,10 @@ async function main() {
   await writeAll("banners", demoBanners);
   await writeAll("offers", demoOffers);
   await writeAll("testimonials", demoTestimonials);
+  // Rate configuration, seeded like the catalogue so a fresh project has
+  // working shipping rather than a checkout that quotes zero for everything.
+  await writeAll("shippingClasses", demoShippingClasses);
+  await writeAll("shippingMethods", demoShippingMethods);
 
   console.log(
     "\nDone. Set NEXT_PUBLIC_DISABLE_DEMO_FALLBACK=true in .env.local once you are\n" +

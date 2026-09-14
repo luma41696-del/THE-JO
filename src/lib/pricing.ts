@@ -7,8 +7,16 @@
  * server still recomputes from Firestore prices — it just uses the same maths.
  */
 
-import type { CartItem, CartTotals, CurrencyCode, Offer, ShippingMethod } from "@/types";
+import type {
+  CartItem,
+  CartTotals,
+  CurrencyCode,
+  Offer,
+  ShippingClass,
+  ShippingMethod,
+} from "@/types";
 import { minorUnits } from "@/lib/format";
+import { quoteShipping } from "@/lib/shipping";
 
 /**
  * Jordan's general sales tax, applied to the discounted subtotal before
@@ -20,6 +28,13 @@ const TAX_RATE = 0.16;
 export interface PriceInput {
   items: CartItem[];
   shippingMethod?: ShippingMethod | null;
+  /**
+   * The store's shipping classes. Omitted, shipping falls back to the method's
+   * flat price — correct for a catalogue with no classes, and never silently
+   * wrong for one that has them, because a missing class cannot add a
+   * surcharge that was never configured.
+   */
+  shippingClasses?: ShippingClass[];
   offer?: Offer | null;
   currency?: CurrencyCode;
 }
@@ -79,13 +94,30 @@ export function discountFor(items: CartItem[], offer: Offer | null | undefined, 
   }
 }
 
+/**
+ * What shipping actually costs for this basket.
+ *
+ * Order of precedence, and each step matters:
+ *  1. A free-shipping *offer* beats everything, including a class that opts
+ *     out of the free threshold — the merchant issued that code deliberately,
+ *     and a code that silently fails to apply is a support ticket.
+ *  2. Otherwise the class-aware quote decides, which is where surcharges, flat
+ *     overrides and the free threshold are resolved together.
+ */
 export function shippingCostFor(
   subtotalAfterDiscount: number,
   method: ShippingMethod | null | undefined,
   offer?: Offer | null,
+  items: CartItem[] = [],
+  classes: ShippingClass[] = [],
 ) {
   if (!method) return 0;
   if (offer?.type === "free-shipping" && offer.active) return 0;
+
+  if (classes.length > 0 && items.length > 0) {
+    return quoteShipping(method, items, classes, subtotalAfterDiscount).total;
+  }
+
   if (method.freeAbove !== undefined && subtotalAfterDiscount >= method.freeAbove) return 0;
   return money(method.price);
 }
@@ -93,6 +125,7 @@ export function shippingCostFor(
 export function priceCart({
   items,
   shippingMethod,
+  shippingClasses = [],
   offer,
   currency,
 }: PriceInput): CartTotals {
@@ -105,7 +138,7 @@ export function priceCart({
   const subtotal = subtotalOf(items);
   const discount = Math.min(discountFor(items, offer), subtotal);
   const discounted = money(subtotal - discount, resolvedCurrency);
-  const shipping = shippingCostFor(discounted, shippingMethod, offer);
+  const shipping = shippingCostFor(discounted, shippingMethod, offer, items, shippingClasses);
   const tax = money(discounted * TAX_RATE, resolvedCurrency);
   const total = money(discounted + shipping + tax, resolvedCurrency);
 

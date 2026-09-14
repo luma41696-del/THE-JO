@@ -9,10 +9,11 @@ import { cn } from "@/lib/utils";
 import { EASE } from "@/lib/motion";
 import { formatPrice, minorUnits } from "@/lib/format";
 import { getIdToken } from "@/lib/firebase/auth";
+import { gtinKind, isValidGtin } from "@/lib/product";
 import { AdminPageHeader } from "./AdminShell";
 import { Panel } from "./AdminUI";
 import { Button } from "@/components/ui/Button";
-import type { Category, Product } from "@/types";
+import type { Category, Product, ProductType, ShippingClass } from "@/types";
 
 /**
  * Product editor.
@@ -40,6 +41,16 @@ type Draft = {
   totalStock: number;
   status: Product["status"];
   tags: string;
+
+  type: ProductType;
+  sku: string;
+  gtin: string;
+  shippingClassId: string;
+  /** "" means no cap — distinct from 0, which would mean unbuyable. */
+  maxPerOrder: number | "";
+  /** Comma-separated product ids. */
+  upsellIds: string;
+  crossSellIds: string;
 };
 
 function toDraft(product: Product | null): Draft {
@@ -58,6 +69,13 @@ function toDraft(product: Product | null): Draft {
       totalStock: 0,
       status: "draft",
       tags: "",
+      type: "variable",
+      sku: "",
+      gtin: "",
+      shippingClassId: "standard",
+      maxPerOrder: "",
+      upsellIds: "",
+      crossSellIds: "",
     };
   }
 
@@ -75,15 +93,24 @@ function toDraft(product: Product | null): Draft {
     totalStock: product.totalStock,
     status: product.status,
     tags: product.tags.join(", "),
+    type: product.type,
+    sku: product.sku,
+    gtin: product.gtin ?? "",
+    shippingClassId: product.shippingClassId ?? "standard",
+    maxPerOrder: product.maxPerOrder ?? "",
+    upsellIds: product.upsellIds.join(", "),
+    crossSellIds: product.crossSellIds.join(", "),
   };
 }
 
 export function ProductEditor({
   product,
   categories,
+  shippingClasses = [],
 }: {
   product: Product | null;
   categories: Category[];
+  shippingClasses?: ShippingClass[];
 }) {
   const router = useLocalizedRouter();
   const [draft, setDraft] = useState<Draft>(() => toDraft(product));
@@ -134,6 +161,13 @@ export function ProductEditor({
           totalStock: draft.totalStock,
           status: draft.status,
           tags: draft.tags.split(",").map((t) => t.trim()).filter(Boolean),
+          type: draft.type,
+          sku: draft.sku.trim(),
+          gtin: draft.gtin.trim() || null,
+          shippingClassId: draft.shippingClassId || null,
+          maxPerOrder: draft.maxPerOrder === "" ? null : draft.maxPerOrder,
+          upsellIds: draft.upsellIds.split(",").map((t) => t.trim()).filter(Boolean),
+          crossSellIds: draft.crossSellIds.split(",").map((t) => t.trim()).filter(Boolean),
         }),
       });
 
@@ -279,7 +313,10 @@ export function ProductEditor({
             </Panel>
           )}
 
-          {product && (
+          {/* A simple product has no matrix to show. An empty variants table
+              under a "Stock is held per variant" heading reads as data that
+              failed to load, rather than a product type that has none. */}
+          {product && draft.type === "variable" && (
             <Panel title="Variants" description="Stock is held per variant, not on the product.">
               <div className="overflow-x-auto">
                 <table className="w-full text-[0.8125rem]">
@@ -361,9 +398,16 @@ export function ProductEditor({
                   onChange={(event) => set("categoryId", event.target.value)}
                   className="border-line focus:border-brand bg-paper text-ink w-full rounded-md border px-3 py-2 text-[0.8125rem] outline-none"
                 >
+                  {/* Indented by depth so the tree is legible in a flat
+                      <select>, and departments are marked as such — filing a
+                      product against a department instead of a subcategory is
+                      the mistake this list exists to prevent. */}
                   {categories.map((category) => (
                     <option key={category.id} value={category.id}>
+                      {"\u00a0\u00a0".repeat(category.depth)}
+                      {category.depth > 0 ? "└ " : ""}
                       {category.name.en}
+                      {category.parentId === null ? " (department)" : ""}
                     </option>
                   ))}
                 </select>
@@ -394,6 +438,116 @@ export function ProductEditor({
                 value={draft.tags}
                 onChange={(v) => set("tags", v)}
                 hint="Comma separated. Used by search and related products."
+              />
+            </div>
+          </Panel>
+
+          <Panel title="Commerce">
+            <div className="grid gap-4">
+              <label className="block">
+                <span className="text-ink-muted mb-1.5 block text-[0.75rem]">Product type</span>
+                <select
+                  value={draft.type}
+                  onChange={(event) => set("type", event.target.value as ProductType)}
+                  className="border-line focus:border-brand bg-paper text-ink w-full rounded-md border px-3 py-2 text-[0.8125rem] outline-none"
+                >
+                  <option value="simple">Simple — one item, no options</option>
+                  <option value="variable">Variable — colour and size variants</option>
+                </select>
+                <span className="text-mist mt-1.5 block text-[0.6875rem]">
+                  {draft.type === "simple"
+                    ? "Stock, SKU and GTIN live on the product. No swatches or size grid are shown."
+                    : "Each colour × size is its own variant with its own SKU, GTIN and stock."}
+                </span>
+              </label>
+
+              <Field
+                label="SKU"
+                value={draft.sku}
+                onChange={(v) => set("sku", v)}
+                mono
+                hint={
+                  draft.type === "variable"
+                    ? "Parent style code. Variants get their own SKU."
+                    : "The code this product ships and invoices under."
+                }
+              />
+
+              {/* GTIN belongs on the trade item. For a variable product that is
+                  the variant, not the parent — so the field is only offered
+                  where it can be correct. */}
+              {draft.type === "simple" && (
+                <div>
+                  <Field
+                    label="GTIN"
+                    value={draft.gtin}
+                    onChange={(v) => set("gtin", v)}
+                    mono
+                    hint="GTIN-8, -12, -13 or -14. The check digit is verified."
+                  />
+                  {draft.gtin.trim() !== "" && (
+                    <p
+                      className={cn(
+                        "mt-1.5 text-[0.6875rem]",
+                        isValidGtin(draft.gtin.trim()) ? "text-mint" : "text-alert",
+                      )}
+                    >
+                      {isValidGtin(draft.gtin.trim())
+                        ? `Valid ${gtinKind(draft.gtin.trim())}.`
+                        : "Check digit does not match — marketplaces will reject this."}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <label className="block">
+                <span className="text-ink-muted mb-1.5 block text-[0.75rem]">Shipping class</span>
+                <select
+                  value={draft.shippingClassId}
+                  onChange={(event) => set("shippingClassId", event.target.value)}
+                  className="border-line focus:border-brand bg-paper text-ink w-full rounded-md border px-3 py-2 text-[0.8125rem] outline-none"
+                >
+                  {shippingClasses.length === 0 && <option value="standard">Standard</option>}
+                  {shippingClasses.map((cls) => (
+                    <option key={cls.id} value={cls.id}>
+                      {cls.name.en}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-mist mt-1.5 block text-[0.6875rem]">
+                  {shippingClasses.find((c) => c.id === draft.shippingClassId)?.description?.en ??
+                    "Decides surcharges and which delivery speeds this product allows."}
+                </span>
+              </label>
+
+              <NumberField
+                label="Max per order"
+                value={draft.maxPerOrder === "" ? 0 : draft.maxPerOrder}
+                onChange={(v) => set("maxPerOrder", v <= 0 ? "" : v)}
+                step={1}
+              />
+              <p className="text-mist -mt-2 text-[0.6875rem]">
+                {draft.maxPerOrder === 1
+                  ? "Sold individually — one per order, whatever the stock."
+                  : draft.maxPerOrder === ""
+                    ? "0 or blank means stock is the only limit."
+                    : `Customers may order at most ${draft.maxPerOrder} per order.`}
+              </p>
+
+              <Field
+                label="Upsells"
+                value={draft.upsellIds}
+                onChange={(v) => set("upsellIds", v)}
+                mono
+                hint="Product ids, comma separated. Shown on this product's page as the upgrade — keep them dearer than this one."
+              />
+
+              <Field
+                label="Cross-sells"
+                value={draft.crossSellIds}
+                onChange={(v) => set("crossSellIds", v)}
+                mono
+                hint="Product ids, comma separated. Shown in the bag once this product is in it."
               />
             </div>
           </Panel>

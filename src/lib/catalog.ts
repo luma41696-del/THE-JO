@@ -34,16 +34,20 @@ import {
   demoCategories,
   demoOffers,
   demoProducts,
+  demoShippingClasses,
   demoShippingMethods,
   demoTestimonials,
 } from "@/data/demo";
+import { buildCategoryTree, descendantIds, withRolledUpCounts } from "@/lib/categories";
 import type {
   Banner,
   BannerSlot,
   Category,
+  CategoryNode,
   Offer,
   Product,
   ProductFilters,
+  ShippingClass,
   ShippingMethod,
   Testimonial,
 } from "@/types";
@@ -183,6 +187,83 @@ export const getRelatedProducts = cache(
 );
 
 /**
+ * Upsells for a product: the pieces it explicitly points at, in the order the
+ * merchant listed them.
+ *
+ * Deliberately *not* padded out with automatic suggestions when the list is
+ * short. An upsell is a merchandising claim — "this is the better one" — and
+ * an algorithm that fills the gap with whatever is expensive turns a curated
+ * recommendation into a slot machine. An empty list renders nothing.
+ */
+export const getUpsellProducts = cache(async (product: Product): Promise<Product[]> => {
+  if (product.upsellIds.length === 0) return [];
+  const all = await getAllProducts();
+  return product.upsellIds
+    .map((id) => all.find((p) => p.id === id))
+    .filter((p): p is Product => Boolean(p) && p!.status === "active" && p!.inStock);
+});
+
+/**
+ * Cross-sells for a whole basket, de-duplicated and with anything already in
+ * the bag removed — suggesting what someone has just added is noise.
+ */
+export const getCrossSellProducts = cache(
+  async (productIds: string[], count = 4): Promise<Product[]> => {
+    if (productIds.length === 0) return [];
+    const all = await getAllProducts();
+    const inBag = new Set(productIds);
+
+    const seen = new Set<string>();
+    const out: Product[] = [];
+    for (const id of productIds) {
+      const source = all.find((p) => p.id === id);
+      if (!source) continue;
+      for (const crossId of source.crossSellIds) {
+        if (inBag.has(crossId) || seen.has(crossId)) continue;
+        const target = all.find((p) => p.id === crossId);
+        if (!target || target.status !== "active" || !target.inStock) continue;
+        seen.add(crossId);
+        out.push(target);
+        if (out.length >= count) return out;
+      }
+    }
+    return out;
+  },
+);
+
+/**
+ * The cross-sell graph, in the smallest form a client can use.
+ *
+ * The bag lives in client state, so the server cannot know which cross-sells
+ * to resolve. Shipping the whole catalogue to find out would work at this size
+ * and be indefensible at any other, so this ships two things instead: the
+ * id → ids edges, and only those products that are actually the *target* of an
+ * edge. In this catalogue that is two documents rather than fourteen, and it
+ * stays proportional to how much cross-selling the merchant has set up rather
+ * than to how many products exist.
+ */
+export const getCrossSellIndex = cache(
+  async (): Promise<{ edges: Record<string, string[]>; targets: Product[] }> => {
+    const all = await getAllProducts();
+    const edges: Record<string, string[]> = {};
+    const targetIds = new Set<string>();
+
+    for (const product of all) {
+      if (product.crossSellIds.length === 0) continue;
+      const live = product.crossSellIds.filter((id) => {
+        const target = all.find((p) => p.id === id);
+        return Boolean(target) && target!.status === "active" && target!.inStock;
+      });
+      if (live.length === 0) continue;
+      edges[product.id] = live;
+      for (const id of live) targetIds.add(id);
+    }
+
+    return { edges, targets: all.filter((p) => targetIds.has(p.id)) };
+  },
+);
+
+/**
  * Listing query. Filtering happens in memory because the catalogue is small
  * and a fashion PLP wants multi-select facets that Firestore cannot express in
  * one composite index. Past a few thousand SKUs this should move to an
@@ -192,7 +273,22 @@ export async function listProducts(filters: ProductFilters = {}): Promise<Produc
   const all = await getAllProducts();
 
   let rows = all.filter((p) => {
-    if (filters.categoryIds?.length && !filters.categoryIds.includes(p.categoryId)) return false;
+    // Match against the whole ancestry, not just the leaf: filtering on
+    // "Outerwear" has to return the coats and the blazers filed beneath it,
+    // and no product is ever filed against a department directly.
+    if (
+      filters.categoryIds?.length &&
+      !p.categoryPath.some((id) => filters.categoryIds!.includes(id))
+    ) {
+      return false;
+    }
+    if (filters.productTypes?.length && !filters.productTypes.includes(p.type)) return false;
+    if (
+      filters.shippingClassIds?.length &&
+      !filters.shippingClassIds.includes(p.shippingClassId ?? "")
+    ) {
+      return false;
+    }
     if (filters.colorIds?.length && !p.colors.some((c) => filters.colorIds!.includes(c.id))) {
       return false;
     }
@@ -262,6 +358,42 @@ export const getCategoryBySlug = cache(async (slug: string): Promise<Category | 
   const rows = await getCategories();
   return rows.find((c) => c.slug === slug) ?? null;
 });
+
+/**
+ * The nav tree, with counts rolled up from the live product list.
+ *
+ * Counts are recomputed here rather than trusted from the category documents:
+ * `productCount` in Firestore is maintained by a Cloud Function and drifts the
+ * moment a product is archived by hand, and a subcategory advertising products
+ * it no longer has is a dead end the customer walks into.
+ */
+export const getCategoryTree = cache(async (): Promise<CategoryNode[]> => {
+  const [categories, products] = await Promise.all([getCategories(), getAllProducts()]);
+  return buildCategoryTree(withRolledUpCounts(categories, products));
+});
+
+/** A category plus every category beneath it — the ids a listing filters on. */
+export const getCategoryScope = cache(async (categoryId: string): Promise<string[]> => {
+  const categories = await getCategories();
+  return descendantIds(categories, categoryId);
+});
+
+/* -------------------------------------------------------------------------- */
+/*  Shipping classes                                                          */
+/* -------------------------------------------------------------------------- */
+
+export const getShippingClasses = cache(async (): Promise<ShippingClass[]> =>
+  readOrFallback(
+    "shippingClasses",
+    async () => {
+      const snap = await getDocs(
+        query(collection(getDb(), "shippingClasses"), orderBy("order")),
+      );
+      return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as ShippingClass);
+    },
+    () => demoShippingClasses,
+  ),
+);
 
 export const getBanners = cache(async (slot: BannerSlot): Promise<Banner[]> => {
   const now = Date.now();

@@ -194,6 +194,19 @@
   html {
     -webkit-text-size-adjust: 100%;
     scroll-behavior: smooth;
+    /*
+     * `clip`, never `hidden`. `overflow-x: hidden` turns the element into a
+     * scroll container, which silently kills every `position: sticky` child —
+     * the sticky navbar, the sticky buy column and the sticky order summary
+     * all stop sticking. `clip` crops without creating that container.
+     *
+     * Set on `html` as well as `body` because a body-only rule does not stop
+     * the *viewport* panning on iOS: the document can still be wider, and the
+     * user still gets a page that slides sideways under their thumb. This is
+     * a backstop, not the fix — anything that overflows is a bug to be found
+     * and fixed at the element, and this only stops it ruining the page.
+     */
+    overflow-x: clip;
   }
 
   body {
@@ -203,6 +216,8 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     overflow-x: clip;
+    /* Long unbroken strings (SKUs, GTINs, URLs) must not widen the page. */
+    overflow-wrap: break-word;
   }
 
   /* Arabic copy gets Baloo and slightly looser leading automatically. Inter
@@ -361,6 +376,25 @@
   }
   .ns-no-scrollbar {
     scrollbar-width: none;
+  }
+
+  /*
+   * Admin: grid and flex children may not be sized by their own content.
+   *
+   * A grid item's default `min-width: auto` means the *content* sets the
+   * track, not the container. On a dashboard full of data tables that is a
+   * standing trap: a table 500px wide forces its 335px track to 543px, the
+   * card overflows the viewport, and the page scrolls sideways — even though
+   * the table already sits in its own `overflow-x: auto` wrapper, because a
+   * wrapper that is never asked to shrink never scrolls.
+   *
+   * Resetting it here rather than adding `min-w-0` to two dozen grids means a
+   * dashboard panel added next month inherits the fix instead of repeating
+   * the bug. Scoped to the admin surface so storefront layouts that
+   * deliberately size to content are untouched.
+   */
+  [data-admin-surface] :is(.grid, .flex) > * {
+    min-width: 0;
   }
 }
 

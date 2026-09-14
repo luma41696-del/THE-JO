@@ -38,9 +38,17 @@ const VARIANTS: Record<ButtonVariant, string> = {
 
 const SIZES: Record<ButtonSize, string> = {
   sm: "h-9 px-4 text-[0.8125rem] gap-1.5",
-  md: "h-11 px-6 text-sm gap-2",
-  lg: "h-13 px-8 text-[0.9375rem] gap-2.5",
-  xl: "h-15 px-10 text-base gap-3",
+  md: "h-11 px-5 sm:px-6 text-sm gap-2",
+  /*
+   * Horizontal padding is narrower on small screens. These labels are
+   * uppercase with letter-spacing, so "Proceed to checkout" is ~244px of text
+   * before any padding; at `px-8` it could not fit inside a summary card on a
+   * 375px phone, and because the button never wraps it pushed the page wider
+   * instead of shrinking. The pill keeps its shape — it just stops reserving
+   * desktop padding on a device that has none to spare.
+   */
+  lg: "h-13 px-6 sm:px-8 text-[0.9375rem] gap-2.5",
+  xl: "h-15 px-7 sm:px-10 text-base gap-3",
 };
 
 export interface ButtonProps extends Omit<React.ComponentPropsWithoutRef<"button">, "onAnimationStart" | "onDragStart" | "onDragEnd" | "onDrag"> {

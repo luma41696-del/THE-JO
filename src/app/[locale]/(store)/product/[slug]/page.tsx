@@ -1,9 +1,18 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { getAllProducts, getProductBySlug, getRelatedProducts } from "@/lib/catalog";
+import {
+  getAllProducts,
+  getCategories,
+  getProductBySlug,
+  getRelatedProducts,
+  getShippingClasses,
+  getUpsellProducts,
+} from "@/lib/catalog";
+import { categoryTrail } from "@/lib/categories";
 import { ProductDetail } from "@/components/product/ProductDetail";
 import { ProductRail } from "@/components/product/ProductRail";
+import { UpsellRail } from "@/components/product/UpsellRail";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { LOCALES, isLocale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionaries";
@@ -71,30 +80,69 @@ export default async function ProductPage({
   const product = await getProductBySlug(slug);
   if (!product || product.status !== "active") notFound();
 
-  const related = await getRelatedProducts(product, 8);
+  const [related, upsells, categories, shippingClasses] = await Promise.all([
+    getRelatedProducts(product, 8),
+    getUpsellProducts(product),
+    getCategories(),
+    getShippingClasses(),
+  ]);
+
+  const trail = categoryTrail(categories, product.categoryId);
+  const shippingClass =
+    shippingClasses.find((c) => c.id === product.shippingClassId) ?? null;
 
   /**
    * Product structured data. Worth the few lines: it is what produces the price
    * and rating chips in search results, which measurably lifts click-through on
    * product queries.
    */
+  const url = `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/${locale}/product/${product.slug}`;
+
+  /*
+   * A variable product publishes one Offer per variant, each with its own SKU,
+   * GTIN and availability. A single parent Offer would claim one barcode for
+   * every size — Merchant Center rejects that outright, and the sizes that are
+   * sold out would still advertise as in stock.
+   */
+  const offers =
+    product.type === "variable" && product.variants?.length
+      ? product.variants.map((variant) => ({
+          "@type": "Offer",
+          sku: variant.sku,
+          ...(variant.gtin ? { gtin: variant.gtin } : {}),
+          price: variant.priceOverride ?? product.price,
+          priceCurrency: product.currency,
+          availability:
+            variant.stock > 0
+              ? "https://schema.org/InStock"
+              : "https://schema.org/OutOfStock",
+          url,
+        }))
+      : {
+          "@type": "Offer",
+          sku: product.sku,
+          ...(product.gtin ? { gtin: product.gtin } : {}),
+          price: product.price,
+          priceCurrency: product.currency,
+          availability: product.inStock
+            ? "https://schema.org/InStock"
+            : "https://schema.org/OutOfStock",
+          url,
+        };
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
     name: pick(product.title, locale),
     description: pick(product.description, locale),
     image: product.images.map((i) => i.url),
-    sku: product.id,
+    sku: product.sku,
+    ...(product.gtin ? { gtin: product.gtin } : {}),
     brand: { "@type": "Brand", name: "net sale" },
-    offers: {
-      "@type": "Offer",
-      price: product.price,
-      priceCurrency: product.currency,
-      availability: product.inStock
-        ? "https://schema.org/InStock"
-        : "https://schema.org/OutOfStock",
-      url: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/${locale}/product/${product.slug}`,
-    },
+    ...(trail.length > 0
+      ? { category: trail.map((c) => pick(c.name, locale)).join(" > ") }
+      : {}),
+    offers,
     ...(product.rating
       ? {
           aggregateRating: {
@@ -114,7 +162,20 @@ export default async function ProductPage({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <ProductDetail product={product} locale={locale} />
+      <ProductDetail
+        product={product}
+        locale={locale}
+        trail={trail}
+        shippingClass={shippingClass}
+      />
+
+      {/*
+        Upsells sit directly under the product, before the "wear it with" rail.
+        An upsell competes with the thing being viewed, so it has to appear
+        while the decision is still open — after the related-products rail, the
+        customer has already moved on to browsing.
+      */}
+      {upsells.length > 0 && <UpsellRail products={upsells} current={product} locale={locale} />}
 
       {related.length > 0 && (
         <section className="ns-container pb-20 md:pb-28">

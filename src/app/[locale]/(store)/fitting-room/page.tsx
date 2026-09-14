@@ -28,7 +28,16 @@ export default async function FittingRoomPage({
   const locale: Locale = isLocale(raw) ? raw : "en";
   const t = getDictionary(locale);
 
-  const products = await getAllProducts();
+  /*
+   * Garments only. The fitting room's whole job is "what size am I", and a
+   * simple product has no sizes to recommend — a leather balm offered a size M
+   * is the kind of detail that makes a shopper stop trusting the feature.
+   * Filtered here rather than inside the component so the client never
+   * receives products it would only have to discard.
+   */
+  const products = (await getAllProducts()).filter(
+    (p) => p.type === "variable" && p.sizes.length > 0 && Boolean(p.fit),
+  );
 
   return (
     <>

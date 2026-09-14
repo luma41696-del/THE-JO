@@ -201,9 +201,16 @@ export function CartDrawer({ locale = "en" }: { locale?: Locale }) {
                                 >
                                   {t(item.title, locale)}
                                 </Link>
-                                <p className="text-smoke mt-1 text-[0.75rem]">
-                                  {t(item.colorName, locale)} · {item.sizeLabel}
-                                </p>
+                                {/* Simple products carry no colour or size.
+                                    Printing " · " around two empty strings
+                                    leaves a stray separator under the title. */}
+                                {(item.sizeLabel || t(item.colorName, locale)) && (
+                                  <p className="text-smoke mt-1 truncate text-[0.75rem]">
+                                    {[t(item.colorName, locale), item.sizeLabel]
+                                      .filter(Boolean)
+                                      .join(" · ")}
+                                  </p>
+                                )}
                               </div>
                               <button
                                 type="button"
@@ -222,6 +229,7 @@ export function CartDrawer({ locale = "en" }: { locale?: Locale }) {
                               <QuantityStepper
                                 value={item.quantity}
                                 max={item.maxQuantity}
+                                reason={item.maxReason}
                                 onChange={(next) => setQuantity(item.key, next)}
                                 locale={locale}
                               />
@@ -296,42 +304,74 @@ export function CartDrawer({ locale = "en" }: { locale?: Locale }) {
 
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Quantity stepper.
+ *
+ * A "+" that stops responding is indistinguishable from a broken button, so
+ * the reason for the ceiling is printed under the control the moment it is
+ * reached — and the two reasons are worded differently on purpose. A merchant
+ * cap is a policy ("Limit 1 per order"); low stock is a claim about the world
+ * ("Only 1 left") and is only ever shown when it is true.
+ */
 function QuantityStepper({
   value,
   max,
+  reason,
   onChange,
   locale,
 }: {
   value: number;
   max: number;
+  reason?: "stock" | "per-order";
   onChange: (next: number) => void;
   locale: Locale;
 }) {
+  const rtl = locale === "ar";
+  const atCeiling = value >= max;
+
   return (
-    <div className="border-line inline-flex items-center rounded-pill border">
-      <StepButton
-        onClick={() => onChange(value - 1)}
-        disabled={value <= 1}
-        label={locale === "ar" ? "إنقاص" : "Decrease quantity"}
-      >
-        −
-      </StepButton>
-      <motion.span
-        key={value}
-        className="text-ink w-8 text-center text-[0.8125rem] font-medium tabular-nums"
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.18, ease: EASE.spring }}
-      >
-        {value}
-      </motion.span>
-      <StepButton
-        onClick={() => onChange(value + 1)}
-        disabled={value >= max}
-        label={locale === "ar" ? "زيادة" : "Increase quantity"}
-      >
-        +
-      </StepButton>
+    <div className="flex flex-col gap-1">
+      <div className="border-line inline-flex items-center rounded-pill border">
+        <StepButton
+          onClick={() => onChange(value - 1)}
+          disabled={value <= 1}
+          label={rtl ? "إنقاص" : "Decrease quantity"}
+        >
+          −
+        </StepButton>
+        <motion.span
+          key={value}
+          className="text-ink w-8 text-center text-[0.8125rem] font-medium tabular-nums"
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.18, ease: EASE.spring }}
+        >
+          {value}
+        </motion.span>
+        <StepButton
+          onClick={() => onChange(value + 1)}
+          disabled={atCeiling}
+          label={rtl ? "زيادة" : "Increase quantity"}
+        >
+          +
+        </StepButton>
+      </div>
+
+      {atCeiling && (
+        <p className="text-mist text-[0.6875rem]" aria-live="polite">
+          {reason === "per-order"
+            ? max === 1
+              ? rtl
+                ? "قطعة واحدة لكل طلب"
+                : "Limit 1 per order"
+              : rtl
+                ? `بحد أقصى ${max} لكل طلب`
+                : `Limit ${max} per order`
+            : rtl
+              ? `بقي ${max} في المخزون`
+              : `Only ${max} in stock`}
+        </p>
+      )}
     </div>
   );
 }

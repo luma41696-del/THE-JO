@@ -62,8 +62,85 @@ function withId<T extends { id: string }>(): FirestoreDataConverter<T> {
   };
 }
 
-export const productConverter = withId<Product>();
-export const categoryConverter = withId<Category>();
+/* -------------------------------------------------------------------------- */
+/*  Backfills                                                                 */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * A converter's job is to hand the app a *complete* domain object. A cast
+ * alone does not do that: `{...data} as Product` type-checks perfectly while
+ * returning a document with no `upsellIds`, and the first `.length` on it
+ * throws inside a Server Component — which renders the whole route as "Something
+ * went wrong" rather than one missing rail.
+ *
+ * That is not hypothetical. A deploy that adds a field always runs against
+ * documents written before it: the code ships, the backfill has not, and every
+ * product page is down in between. So new fields are defaulted here, at the
+ * boundary, and the storefront degrades to "no upsells" instead of an error
+ * page. Re-seeding fills in the real values; nothing waits on it.
+ */
+
+export const productConverter: FirestoreDataConverter<Product> = {
+  toFirestore: withId<Product>().toFirestore,
+  fromFirestore(snapshot, options): Product {
+    const raw = normaliseTimestamps<Record<string, unknown>>(snapshot.data(options));
+    const colors = Array.isArray(raw.colors) ? raw.colors : [];
+    const sizes = Array.isArray(raw.sizes) ? raw.sizes : [];
+
+    return {
+      ...raw,
+      id: snapshot.id,
+      // A document with options is variable; one without is simple. That is
+      // the same rule the admin applies, so an un-migrated product infers the
+      // type it would have been given anyway.
+      type: raw.type === "simple" || raw.type === "variable"
+        ? raw.type
+        : colors.length > 0 && sizes.length > 0
+          ? "variable"
+          : "simple",
+      colors,
+      sizes,
+      // No SKU is worse than a derived one: it is printed on the invoice.
+      sku: typeof raw.sku === "string" && raw.sku ? raw.sku : snapshot.id.toUpperCase(),
+      upsellIds: Array.isArray(raw.upsellIds) ? raw.upsellIds : [],
+      crossSellIds: Array.isArray(raw.crossSellIds) ? raw.crossSellIds : [],
+      // Falling back to the leaf id keeps ancestry queries working on a
+      // pre-tree document — it just cannot match against a parent yet.
+      categoryPath: Array.isArray(raw.categoryPath) && raw.categoryPath.length > 0
+        ? raw.categoryPath
+        : [String(raw.categoryId ?? "")],
+    } as Product;
+  },
+};
+
+export const categoryConverter: FirestoreDataConverter<Category> = {
+  toFirestore: withId<Category>().toFirestore,
+  fromFirestore(snapshot, options): Category {
+    const raw = normaliseTimestamps<Record<string, unknown>>(snapshot.data(options));
+    const parentId = typeof raw.parentId === "string" ? raw.parentId : null;
+
+    /*
+     * `path` cannot be computed here — one converter call sees one document
+     * and has no view of the tree. A one-level guess is the honest fallback:
+     * correct for every root category, and for a child it yields
+     * [parent, self], which is right for the two-level tree this store
+     * actually has. `withComputedPaths` recomputes properly on write.
+     */
+    const path = Array.isArray(raw.path) && raw.path.length > 0
+      ? (raw.path as string[])
+      : parentId
+        ? [parentId, snapshot.id]
+        : [snapshot.id];
+
+    return {
+      ...raw,
+      id: snapshot.id,
+      parentId,
+      path,
+      depth: typeof raw.depth === "number" ? raw.depth : path.length - 1,
+    } as Category;
+  },
+};
 export const bannerConverter = withId<Banner>();
 export const offerConverter = withId<Offer>();
 export const orderConverter = withId<Order>();

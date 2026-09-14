@@ -7,7 +7,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { EASE } from "@/lib/motion";
 import { t } from "@/lib/format";
-import type { Category, Locale } from "@/types";
+import type { CategoryNode, Locale } from "@/types";
 
 /**
  * Category tiles.
@@ -16,12 +16,18 @@ import type { Category, Locale } from "@/types";
  * gives the eye an entry point and stops six equal rectangles from reading as a
  * file browser. Each tile crops its image on hover instead of scaling the whole
  * card, so the layout never shifts.
+ *
+ * Subcategories are listed *inside* the department tile as direct links rather
+ * than hidden behind it. A shopper who already knows they want blazers should
+ * not have to land on Outerwear first and filter — that is one wasted page
+ * view per visit, and it is the page view where people leave.
  */
 export function CategoryGrid({
   categories,
   locale = "en",
 }: {
-  categories: Category[];
+  /** Departments, each carrying its children. */
+  categories: CategoryNode[];
   locale?: Locale;
 }) {
   const reduced = useReducedMotion();
@@ -34,7 +40,7 @@ export function CategoryGrid({
         return (
           <motion.div
             key={category.id}
-            className={cn(feature && "col-span-2 row-span-2")}
+            className={cn("relative", feature && "col-span-2 row-span-2")}
             initial={reduced ? undefined : { opacity: 0, y: 24 }}
             whileInView={reduced ? undefined : { opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-8%" }}
@@ -85,6 +91,28 @@ export function CategoryGrid({
                 </span>
               </div>
             </Link>
+
+            {/* Subcategory shortcuts, layered over the tile's own link.
+                Absolutely positioned so they sit inside the card without
+                nesting an anchor in an anchor, which is invalid and makes the
+                whole tile unclickable in some browsers. */}
+            {category.children.length > 0 && (
+              <div className="pointer-events-none absolute inset-x-0 top-0 p-4 md:p-5">
+                <ul className="pointer-events-auto flex flex-wrap gap-1.5">
+                  {category.children.map((child) => (
+                    <li key={child.id}>
+                      <Link
+                        href={`/shop?category=${child.id}`}
+                        className="rounded-pill bg-white/15 px-2.5 py-1 text-[0.6875rem] font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/30"
+                        data-cursor="hover"
+                      >
+                        {t(child.name, locale)}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </motion.div>
         );
       })}

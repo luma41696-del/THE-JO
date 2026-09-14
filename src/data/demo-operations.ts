@@ -1,6 +1,7 @@
 import { demoProducts, demoShippingMethods } from "./demo";
 import { priceCart } from "@/lib/pricing";
 import { cartKey } from "@/lib/utils";
+import { resolveSelection } from "@/lib/product";
 import type {
   CartItem,
   Invoice,
@@ -172,27 +173,47 @@ function buildItems(): CartItem[] {
     if (chosen.has(product.id)) continue;
     chosen.add(product.id);
 
-    const color = pick(product.colors);
-    const size = pick(product.sizes);
-    const image = product.images.find((img) => img.colorId === color.id) ?? product.images[0];
+    /*
+     * A simple product has no colours and no sizes, so `pick` over an empty
+     * array returns undefined. Both ids stay empty strings, exactly as the
+     * live cart builds them, and the order line reads as an object rather
+     * than a garment with a blank size.
+     */
+    const color = product.colors.length > 0 ? pick(product.colors) : undefined;
+    const size = product.sizes.length > 0 ? pick(product.sizes) : undefined;
+    const colorId = color?.id ?? "";
+    const sizeId = size?.id ?? "";
+
+    const image = product.images.find((img) => img.colorId === colorId) ?? product.images[0];
     if (!image) continue;
 
+    // Resolve the real variant so the seeded history carries SKUs and GTINs
+    // that exist — an invoice quoting a SKU the catalogue never had is a
+    // document nobody can reconcile.
+    const selection = resolveSelection(product, colorId, sizeId);
+    const quantity = Math.min(rand() < 0.88 ? 1 : 2, Math.max(1, selection.cap.max));
+
     items.push({
-      key: cartKey(product.id, color.id, size.id),
+      key: cartKey(product.id, colorId, sizeId),
       productId: product.id,
-      sku: `${product.id}-${color.id}-${size.id}`.toUpperCase(),
+      sku: selection.sku,
+      ...(selection.gtin === undefined ? {} : { gtin: selection.gtin }),
       slug: product.slug,
       title: product.title,
       image,
-      colorId: color.id,
-      colorName: color.name,
-      sizeId: size.id,
-      sizeLabel: size.label,
-      unitPrice: product.price,
+      colorId,
+      colorName: color?.name ?? { en: "", ar: "" },
+      sizeId,
+      sizeLabel: size?.label ?? "",
+      unitPrice: selection.price,
       compareAtPrice: product.compareAtPrice,
       currency: product.currency,
-      quantity: rand() < 0.88 ? 1 : 2,
-      maxQuantity: 10,
+      quantity,
+      maxQuantity: Math.max(1, selection.cap.max),
+      maxReason: selection.cap.reason,
+      ...(product.shippingClassId === undefined
+        ? {}
+        : { shippingClassId: product.shippingClassId }),
       addedAt: 0,
     });
   }
