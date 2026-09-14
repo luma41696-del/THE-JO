@@ -2,7 +2,7 @@
 
 - Primary website: https://netsale.shop
 - Primary admin: https://netsale.shop/admin
-- `www.netsale.shop`: configured to redirect to `netsale.shop` with HTTP 308
+- Additional storefront: https://www.netsale.shop (serves directly)
 - Vercel fallback: https://the-jo-shop.vercel.app (admin: `/admin`)
 - GitHub: https://github.com/luma41696-del/THE-JO
 - Vercel project: `luma-02c2/the-jo-shop`
@@ -10,10 +10,11 @@
 - Firebase project: `the-jo-shop`
 - Firestore database: `(default)`, `europe-west1`
 
-DNS records are configured at GoDaddy and verified by Vercel. HTTPS serves
-the storefront, and `www` redirects to the primary domain while preserving
-the path. Production uses `NEXT_PUBLIC_SITE_URL=https://netsale.shop` for
-canonical URLs. The Vercel fallback remains available during DNS propagation.
+DNS records are configured at GoDaddy and verified by Vercel. Both custom
+hostnames serve the storefront over HTTPS. `www` serves directly so networks
+with a cached negative DNS answer for the apex can still open the store.
+Production uses `NEXT_PUBLIC_SITE_URL=https://netsale.shop` for canonical URLs.
+The Vercel fallback remains available during DNS propagation.
 
 Vercel is connected to the GitHub repository. Pushes to `main` publish the
 production website. `vercel.json` selects Next.js and the production build.
