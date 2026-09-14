@@ -1,9 +1,10 @@
 # net sale | نت سيل
 
-Live site: [the-jo-shop.vercel.app](https://the-jo-shop.vercel.app/ar).
+Primary domain: [netsale.shop](https://netsale.shop/ar).
+Vercel fallback: [the-jo-shop.vercel.app](https://the-jo-shop.vercel.app/ar).
 Deployment and administrator access: [DEPLOYMENT.md](DEPLOYMENT.md).
 
-> The Firebase project id, the Vercel host and this directory are still
+> The Firebase project id, the Vercel project name and this directory are still
 > `the-jo-shop` — they predate the rename to **net sale** and are deliberately
 > left alone. A Firebase project id is immutable, and changing the identifiers
 > that reference it would break authentication, Firestore and the deployment.
