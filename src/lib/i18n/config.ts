@@ -38,6 +38,21 @@ export function isLocale(value: string | undefined): value is Locale {
   return typeof value === "string" && (LOCALES as readonly string[]).includes(value);
 }
 
+/**
+ * Paths that live outside the localised tree.
+ *
+ * The admin is internal tooling in one language and the API has no UI, so
+ * neither is ever prefixed. This is the single definition of that rule — the
+ * middleware, `Link` and `useLocalizedRouter` all read it, so they cannot drift
+ * apart. They did drift once: `Link` prefixed `/admin` into `/en/admin` and
+ * every admin link 404'd.
+ */
+const UNLOCALISED = ["/admin", "/api", "/_next"];
+
+export function isLocalisedPath(path: string) {
+  return !UNLOCALISED.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+}
+
 export function localeDir(locale: Locale) {
   return LOCALE_META[locale].dir;
 }

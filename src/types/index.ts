@@ -433,3 +433,143 @@ export interface ProductFilters {
   inStockOnly?: boolean;
   sort?: SortOption["id"];
 }
+
+/* -------------------------------------------------------------------------- */
+/*  Support                                                                   */
+/* -------------------------------------------------------------------------- */
+
+export type TicketStatus = "open" | "pending" | "resolved" | "closed";
+export type TicketPriority = "low" | "normal" | "high" | "urgent";
+export type TicketTopic =
+  | "delivery"
+  | "returns"
+  | "sizing"
+  | "payment"
+  | "product"
+  | "other";
+
+export interface TicketMessage {
+  id: string;
+  /** `customer` or a staff uid. */
+  authorId: string;
+  authorName: string;
+  fromStaff: boolean;
+  body: string;
+  at: number;
+}
+
+export interface SupportTicket {
+  id: string;
+  reference: string;
+  uid: string | null;
+  customerName: string;
+  email: string;
+  subject: string;
+  topic: TicketTopic;
+  status: TicketStatus;
+  priority: TicketPriority;
+  /** Linked order, when the ticket is about one. */
+  orderReference?: string;
+  messages: TicketMessage[];
+  assignedTo?: string;
+  createdAt: number;
+  updatedAt: number;
+  /** Minutes from creation to the first staff reply — the metric that matters. */
+  firstResponseMinutes?: number;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Invoicing                                                                 */
+/* -------------------------------------------------------------------------- */
+
+export type InvoiceStatus = "draft" | "issued" | "paid" | "credited";
+
+/**
+ * An invoice is a *record of what was billed*, not a view of the order.
+ *
+ * It snapshots the seller details, tax rate and line prices at issue time, so a
+ * later price change or a VAT rate change can never alter a document that has
+ * already been sent to a customer or filed with an accountant.
+ */
+export interface Invoice {
+  id: string;
+  /** Sequential and gapless — required by most tax authorities. */
+  number: string;
+  orderId: string;
+  orderReference: string;
+  status: InvoiceStatus;
+
+  issuedAt: number;
+  dueAt?: number;
+  paidAt?: number;
+
+  billTo: {
+    name: string;
+    email: string;
+    phone?: string;
+    line1: string;
+    line2?: string;
+    city: string;
+    countryCode: string;
+    taxNumber?: string;
+  };
+
+  lines: {
+    description: Localized;
+    sku: string;
+    quantity: number;
+    unitPrice: number;
+    total: number;
+  }[];
+
+  subtotal: number;
+  discount: number;
+  shipping: number;
+  taxRate: number;
+  tax: number;
+  total: number;
+  currency: CurrencyCode;
+
+  paymentMethod: PaymentMethod;
+  notes?: Localized;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Analytics                                                                 */
+/* -------------------------------------------------------------------------- */
+
+export interface TimeseriesPoint {
+  /** Epoch ms at the start of the bucket. */
+  t: number;
+  revenue: number;
+  orders: number;
+  units: number;
+}
+
+export interface AdminKpi {
+  revenue: number;
+  orders: number;
+  units: number;
+  averageOrderValue: number;
+  /** Fractional change against the preceding window of equal length. */
+  revenueChange: number;
+  ordersChange: number;
+  aovChange: number;
+  currency: CurrencyCode;
+}
+
+export interface ProductPerformance {
+  productId: string;
+  slug: string;
+  title: Localized;
+  image?: ProductImage;
+  units: number;
+  revenue: number;
+  orders: number;
+}
+
+export interface CategoryPerformance {
+  categoryId: string;
+  units: number;
+  revenue: number;
+}

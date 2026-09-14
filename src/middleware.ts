@@ -1,6 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { DEFAULT_LOCALE, LOCALES, isLocale, negotiateLocale } from "@/lib/i18n/config";
+import {
+  DEFAULT_LOCALE,
+  LOCALES,
+  isLocale,
+  isLocalisedPath,
+  negotiateLocale,
+} from "@/lib/i18n/config";
 
 /**
  * Locale routing.
@@ -22,9 +28,12 @@ const PUBLIC_FILE = /\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|json|txt|xml|woff2?
 export function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
-  // Never touch API routes, Next internals, or static files.
+  // Never touch Next internals, static files, or anything outside the
+  // localised tree. That last rule is defined once in `isLocalisedPath` and
+  // shared with the `Link` wrapper, so the two cannot drift apart — they did
+  // once, and every `/admin` link became `/en/admin` and 404'd.
   if (
-    pathname.startsWith("/api") ||
+    !isLocalisedPath(pathname) ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/_vercel") ||
     PUBLIC_FILE.test(pathname)
@@ -68,7 +77,7 @@ export const config = {
    * the handler still costs an invocation per request, and image requests are
    * the bulk of the traffic on a fashion storefront.
    */
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|brand|demo|fonts|lottie).*)"],
+  matcher: ["/((?!api|admin|_next/static|_next/image|favicon.ico|brand|demo|fonts|lottie).*)"],
 };
 
 export const runtime = "nodejs";

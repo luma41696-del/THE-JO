@@ -4,7 +4,7 @@ import NextLink from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { forwardRef, useCallback, type ComponentPropsWithoutRef } from "react";
 
-import { localeFromPath, localePath } from "@/lib/i18n/config";
+import { isLocalisedPath, localeFromPath, localePath } from "@/lib/i18n/config";
 
 /**
  * Locale-aware `Link`.
@@ -24,8 +24,10 @@ import { localeFromPath, localePath } from "@/lib/i18n/config";
 
 type LinkProps = ComponentPropsWithoutRef<typeof NextLink>;
 
-function isInternal(href: string) {
-  return href.startsWith("/") && !href.startsWith("//");
+/** Internal, and inside the localised tree — `/admin` and `/api` are neither. */
+function shouldLocalise(href: string) {
+  if (!href.startsWith("/") || href.startsWith("//")) return false;
+  return isLocalisedPath(href.split(/[?#]/)[0] ?? href);
 }
 
 export const Link = forwardRef<HTMLAnchorElement, LinkProps>(function Link(
@@ -34,7 +36,7 @@ export const Link = forwardRef<HTMLAnchorElement, LinkProps>(function Link(
 ) {
   const pathname = usePathname();
 
-  if (typeof href !== "string" || !isInternal(href)) {
+  if (typeof href !== "string" || !shouldLocalise(href)) {
     return <NextLink ref={ref} href={href} {...props} />;
   }
 
@@ -56,7 +58,7 @@ export function useLocalizedRouter() {
 
   const push = useCallback(
     (path: string) => {
-      if (!isInternal(path)) {
+      if (!shouldLocalise(path)) {
         router.push(path);
         return;
       }
@@ -68,6 +70,10 @@ export function useLocalizedRouter() {
 
   const replace = useCallback(
     (path: string) => {
+      if (!shouldLocalise(path)) {
+        router.replace(path);
+        return;
+      }
       const [base = "/", suffix] = path.split(/(?=[?#])/);
       router.replace(`${localePath(base, locale)}${suffix ?? ""}`);
     },

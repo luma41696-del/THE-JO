@@ -12,10 +12,12 @@
     "dev:turbo": "next dev --turbopack -p 3000",
     "brand": "node scripts/generate-brand.mjs",
     "rules:deploy": "firebase deploy --only firestore:rules,storage:rules",
-    "emulators": "firebase emulators:start"
+    "emulators": "firebase emulators:start",
+    "grant-admin": "tsx scripts/grant-admin.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",
+    "exceljs": "^4.4.0",
     "firebase": "^12.0.0",
     "firebase-admin": "^14.4.0",
     "lottie-react": "^2.4.1",

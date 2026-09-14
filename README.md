@@ -98,6 +98,93 @@ Component ever imports it, the **build fails** rather than leaking the key.
 
 ---
 
+## Admin
+
+`/admin` — deliberately outside the `[locale]` tree, in English only. Internal
+tooling read by the team, not by shoppers; a half-translated operations surface
+is worse than one language done properly.
+
+| Screen | Does |
+| --- | --- |
+| `/admin` | KPIs vs the preceding window, revenue curve, fulfilment queue, best sellers, category mix |
+| `/admin/orders` | Inbox, defaulting to **what still needs a person** rather than newest-first |
+| `/admin/orders/[ref]` | One order — status transitions, timeline, totals, tracking |
+| `/admin/products` | Catalogue, **lowest stock first** |
+| `/admin/products/[id]` | Bilingual editor, variant grid, pricing |
+| `/admin/offers` | Discount codes and campaign banners, together |
+| `/admin/customers` | Lifetime value, repeat rate, revenue from repeat buyers |
+| `/admin/support` | Two-pane ticket reader with reply |
+| `/admin/invoices` | Ledger, net of credits |
+| `/admin/invoices/[ref]` | Printable invoice, EN/AR |
+
+### Getting in
+
+Access is a **Firebase custom claim**, not a Firestore field. A claim is signed
+by Firebase and cannot be edited by the account it belongs to; a `role` field in
+a document is self-assignable wherever the rules let a user write their own
+profile.
+
+```bash
+# 1. Create the account — sign up at /en/register
+# 2. Grant it (needs FIREBASE_ADMIN_* in .env.local)
+npm run grant-admin -- luma41696@gmail.com
+
+# staff instead of admin, or take it away
+npm run grant-admin -- someone@example.com --role staff
+npm run grant-admin -- someone@example.com --revoke
+```
+
+Existing sessions are revoked on grant, so sign out and back in to pick the
+claim up.
+
+**Before Firebase is configured**, `NEXT_PUBLIC_ADMIN_DEV_BYPASS=true` in
+`.env.local` opens the admin without an account so the screens can be reviewed.
+It is gated on `NODE_ENV === "development"`, which Next inlines at build time —
+the branch is dead code in a production bundle and cannot be switched on by an
+environment variable on a server. It grants *reading the UI*, nothing more:
+every mutation still needs a verified admin token and is refused without one.
+
+### Three layers, and only one of them is the lock
+
+1. `AdminGate` decides what to **render**. Delete it and no data becomes writable.
+2. Every route handler under `/api/admin/*` re-verifies the caller's claim with
+   the Admin SDK, and re-checks the *shape* of what was sent — a legal status
+   transition, a price that is a number, a slug that does not collide.
+3. Security Rules reject unauthorised writes regardless of what any client thinks.
+
+Order status changes go through a transition graph enforced **server-side**, not
+just hidden in the UI: without it a crafted request could mark an order
+delivered before it shipped, and the customer's tracking timeline would start
+lying.
+
+### Exports
+
+Excel and CSV from any table; PDF for invoices.
+
+The PDF path is a print-styled route plus the browser's own print-to-PDF, not a
+JS PDF library — and that is an engineering decision, not a shortcut. Arabic
+needs bidirectional reordering and contextual glyph shaping. `jsPDF` and
+`pdfmake` do neither: they lay glyphs out left-to-right in isolated forms, so an
+Arabic invoice comes out reversed and disconnected. The browser already has a
+correct text engine; using it gives perfect Arabic, embedded fonts and
+selectable text for zero dependencies.
+
+Excel is written with ExcelJS so numbers arrive as **numbers** with a real
+currency format — 3dp for the dinar — rather than as text the recipient has to
+re-type before they can sum a column. CSV carries a UTF-8 BOM, without which
+Excel on Windows renders every Arabic name as mojibake.
+
+### Sample data
+
+With no Firestore orders, the admin renders a **deterministic** generated
+120-day trading history (`src/data/demo-operations.ts`) — seeded PRNG, so the
+same figures appear on every machine and a number in a review matches the number
+on screen. It has a weekend lift, a growth trend and a private-sale spike,
+because flat random noise makes every chart look the same and hides layout
+problems. The sidebar says plainly when a screen is showing it.
+
+---
+
 ## Languages & currency
 
 Both languages are first-class. Routing is **prefix-always** — `/en/shop` and

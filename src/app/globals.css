@@ -91,9 +91,38 @@
   --animate-shimmer: shimmer 2.2s linear infinite;
   --animate-ripple: ripple 2.8s var(--ease-jo) infinite;
 
+  /* --- Data visualisation ------------------------------------------------
+     The admin's categorical series palette. Brand violet leads; the remaining
+     four hues were chosen for separation rather than for looks, then checked:
+     worst adjacent pair ΔE 9.1 under protanopia and 22.9 at normal vision on a
+     white surface (target ≥8 and ≥15).
+
+     Aqua and yellow sit below 3:1 contrast against paper, so every chart using
+     them carries visible labels and a legend that doubles as a table — that is
+     the relief rule for low-contrast slots, not a stylistic preference.
+
+     Assign slots in fixed order and never cycle: a ninth series folds into
+     "Other" rather than inventing a hue, and colour follows the entity so a
+     filter that drops a series never repaints the survivors. */
+  --color-chart-1: #703bec;
+  --color-chart-2: #eb6834;
+  --color-chart-3: #1baf7a;
+  --color-chart-4: #eda100;
+  --color-chart-5: #2a78d6;
+
   /* --- Layout ------------------------------------------------------------ */
   --spacing-gutter: 1.25rem;
   --container-shell: 88rem;
+}
+
+/* Chart components read these role names rather than raw hex, so the palette
+   swaps in one place. */
+.viz-root {
+  --chart-1: var(--color-chart-1);
+  --chart-2: var(--color-chart-2);
+  --chart-3: var(--color-chart-3);
+  --chart-4: var(--color-chart-4);
+  --chart-5: var(--color-chart-5);
 }
 
 @keyframes wave {
@@ -332,5 +361,53 @@
   }
   .jo-no-scrollbar {
     scrollbar-width: none;
+  }
+}
+
+/* ===========================================================================
+   Print
+
+   Used by the admin invoice route, which produces its PDF by printing rather
+   than through a JS PDF library. Arabic needs bidirectional reordering and
+   contextual glyph shaping; the browser's text engine does both correctly and
+   `jsPDF` and friends do neither, so printing is the only route to an Arabic
+   invoice that is actually readable.
+   ========================================================================= */
+@media print {
+  @page {
+    size: A4;
+    margin: 18mm 16mm;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+  }
+
+  /* Strip the admin chrome — what prints is the document alone. */
+  aside,
+  nav,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+    padding-inline-start: 0 !important;
+  }
+
+  /* Browsers drop background colour when printing to save ink, which would
+     lose the brand mark and every status chip. */
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* A table row split across a page break is unreadable on an invoice. */
+  tr,
+  article {
+    break-inside: avoid;
   }
 }
