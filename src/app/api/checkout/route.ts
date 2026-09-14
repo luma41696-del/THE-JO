@@ -50,11 +50,19 @@ function bad(message: string, status = 400) {
 }
 
 export async function POST(request: Request) {
+  if (process.env.NODE_ENV === "production" && !isAdminConfigured()) {
+    return bad("Checkout is temporarily unavailable. Please try again later.", 503);
+  }
+
   let body: CheckoutBody;
   try {
     body = (await request.json()) as CheckoutBody;
   } catch {
     return bad("Malformed request body.");
+  }
+
+  if (process.env.NODE_ENV === "production" && body.paymentMethod !== "cod") {
+    return bad("Only cash on delivery is currently available.");
   }
 
   /* --- shape validation ------------------------------------------------- */
@@ -120,7 +128,7 @@ export async function POST(request: Request) {
       sizeLabel: size.label,
       // Authoritative price. The browser's number never reaches this object.
       unitPrice: product.price,
-      compareAtPrice: product.compareAtPrice,
+      ...(product.compareAtPrice === undefined ? {} : { compareAtPrice: product.compareAtPrice }),
       currency: product.currency,
       quantity,
       maxQuantity: Math.min(product.totalStock, MAX_QTY_PER_LINE),
@@ -159,8 +167,8 @@ export async function POST(request: Request) {
     totals,
     shippingAddress: { ...address, id: "shipping", isDefault: false },
     shippingMethod,
-    appliedOfferCode: offer?.code,
-    paymentMethod: body.paymentMethod ?? "card",
+    ...(offer ? { appliedOfferCode: offer.code } : {}),
+    paymentMethod: body.paymentMethod ?? "cod",
     status: "pending",
     timeline,
     estimatedDeliveryAt: now + shippingMethod.maxDays * 86_400_000,

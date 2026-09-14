@@ -174,6 +174,8 @@ export function AuthForm({ mode, locale = "en" }: { mode: "signin" | "signup"; l
           </p>
 
           {/* Google */}
+          {(process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_GOOGLE_SIGN_IN_ENABLED === "true") && (
+            <>
           <button
             type="button"
             onClick={handleGoogle}
@@ -197,7 +199,9 @@ export function AuthForm({ mode, locale = "en" }: { mode: "signin" | "signup"; l
             <span className="bg-line h-px flex-1" />
           </div>
 
-          <form onSubmit={handleSubmit} noValidate className="space-y-4">
+            </>
+          )}
+          <form onSubmit={handleSubmit} noValidate className="mt-7 space-y-4">
             {isSignup && (
               <Field
                 id="name"

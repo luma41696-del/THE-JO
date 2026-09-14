@@ -1,0 +1,9 @@
+.env*
+.deployment-local/
+.claude/
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+*.tsbuildinfo
+*-service-account*.json
+serviceAccountKey.json

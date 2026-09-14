@@ -77,6 +77,8 @@ if (!getApps().length) {
 }
 
 const db = getFirestore();
+// Optional catalogue fields must be omitted rather than sent as undefined.
+db.settings({ ignoreUndefinedProperties: true });
 const wipe = process.argv.includes("--wipe");
 
 /* -------------------------------------------------------------------------- */

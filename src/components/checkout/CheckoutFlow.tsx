@@ -67,7 +67,7 @@ export function CheckoutFlow({
   const [email, setEmail] = useState(profile?.email ?? user?.email ?? "");
   const [address, setAddress] = useState({ ...EMPTY_ADDRESS, fullName: profile?.displayName ?? "" });
   const [methodId, setMethodId] = useState(shippingMethods[0]?.id ?? "standard");
-  const [payment, setPayment] = useState<PaymentMethod>("card");
+  const [payment, setPayment] = useState<PaymentMethod>("cod");
   const [offerCode] = useState<string>("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -468,9 +468,9 @@ export function CheckoutFlow({
                         // CliQ is Jordan's instant bank-transfer rail — far more
                         // widely used here than any card-on-file wallet.
                         { id: "cliq", en: "CliQ", ar: "كليك", note: "Instant bank transfer" },
-                        { id: "cod", en: "Cash on delivery", ar: "الدفع عند الاستلام", note: "+ 2 JOD" },
+                        { id: "cod", en: "Cash on delivery", ar: "الدفع عند الاستلام", note: rtl ? "ادفع عند استلام طلبك" : "Pay when your order arrives" },
                       ] as const
-                    ).map((option) => (
+                    ).filter((option) => process.env.NODE_ENV !== "production" || option.id === "cod").map((option) => (
                       <label
                         key={option.id}
                         className={cn(

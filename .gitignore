@@ -34,8 +34,13 @@ firebase-debug.log*
 firestore-debug.log*
 *-service-account*.json
 serviceAccountKey.json
+.vercel/
+.deployment-local/
 
 # editor
 .vscode/*
 !.vscode/extensions.json
 .idea
+
+.env*
+!.env.example
