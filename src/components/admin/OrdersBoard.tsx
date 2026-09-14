@@ -170,8 +170,8 @@ export function OrdersBoard({
               { header: "Total", value: (o) => o.totals.total, format: "currency" },
               { header: "Tracking", value: (o) => o.trackingNumber ?? "" },
             ]}
-            filename="the-jo-orders"
-            title="THE JO — orders"
+            filename="net-sale-orders"
+            title="net sale — orders"
           />
         }
       />
@@ -185,7 +185,7 @@ export function OrdersBoard({
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Reference, customer, tracking…"
-            className="border-line focus:border-violet bg-paper-raised text-ink placeholder:text-mist w-64 rounded-pill border py-2 ps-9 pe-4 text-[0.8125rem] outline-none transition-colors"
+            className="border-line focus:border-brand bg-paper-raised text-ink placeholder:text-mist w-64 rounded-pill border py-2 ps-9 pe-4 text-[0.8125rem] outline-none transition-colors"
           />
           <svg
             width="15"

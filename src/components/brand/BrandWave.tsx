@@ -3,7 +3,7 @@
 import { motion, useReducedMotion } from "motion/react";
 
 import { cn } from "@/lib/utils";
-import { BLOB_WAVES, JO_CENTROID, JO_VIEWBOX } from "./paths";
+import { BLOB_WAVES, NS_CENTROID, NS_VIEWBOX } from "./paths";
 
 /**
  * Decorative ripple field built from the logo silhouette.
@@ -16,7 +16,7 @@ import { BLOB_WAVES, JO_CENTROID, JO_VIEWBOX } from "./paths";
  * Always `aria-hidden`: it carries no information.
  */
 
-export interface JoWaveProps {
+export interface BrandWaveProps {
   /** How many concentric rings. Three reads as a ripple; more reads as noise. */
   rings?: number;
   className?: string;
@@ -27,18 +27,18 @@ export interface JoWaveProps {
   solidCore?: boolean;
 }
 
-export function JoWave({
+export function BrandWave({
   rings = 3,
   className,
-  color = "var(--color-violet)",
+  color = "var(--color-brand)",
   speed = 9,
   solidCore = false,
-}: JoWaveProps) {
+}: BrandWaveProps) {
   const reduced = useReducedMotion();
 
   return (
     <svg
-      viewBox={JO_VIEWBOX}
+      viewBox={NS_VIEWBOX}
       fill="none"
       aria-hidden="true"
       className={cn("pointer-events-none block h-full w-full overflow-visible", className)}
@@ -56,14 +56,14 @@ export function JoWave({
           transition={{ duration: speed, ease: "easeInOut", repeat: Infinity }}
           style={{
             transformBox: "view-box",
-            transformOrigin: `${JO_CENTROID.x}px ${JO_CENTROID.y}px`,
+            transformOrigin: `${NS_CENTROID.x}px ${NS_CENTROID.y}px`,
           }}
         />
       )}
 
       {Array.from({ length: rings }).map((_, index) => {
         // Each ring starts where the previous one is halfway out, so the field
-        // reads as one continuous expansion rather than three separate pulses.
+        // reads as one continuous expansion rather than separate pulses.
         const delay = (speed / rings) * index * 0.5;
         const shape = BLOB_WAVES[index % BLOB_WAVES.length];
 
@@ -76,7 +76,7 @@ export function JoWave({
             fill="none"
             style={{
               transformBox: "view-box",
-              transformOrigin: `${JO_CENTROID.x}px ${JO_CENTROID.y}px`,
+              transformOrigin: `${NS_CENTROID.x}px ${NS_CENTROID.y}px`,
             }}
             initial={{ scale: 1, opacity: 0 }}
             animate={
@@ -91,12 +91,7 @@ export function JoWave({
             transition={
               reduced
                 ? undefined
-                : {
-                    duration: speed * 0.75,
-                    ease: "easeOut",
-                    repeat: Infinity,
-                    delay,
-                  }
+                : { duration: speed * 0.75, ease: "easeOut", repeat: Infinity, delay }
             }
           />
         );

@@ -182,7 +182,7 @@ export function ProductEditor({
               </Link>
             )}
             <Button
-              variant="violet"
+              variant="brand"
               size="sm"
               loading={saving}
               success={saved}
@@ -198,10 +198,10 @@ export function ProductEditor({
       {error && (
         <motion.p
           role="alert"
-          className="bg-coral/10 text-coral mb-4 rounded-md p-3 text-[0.8125rem]"
+          className="bg-alert/10 text-alert mb-4 rounded-md p-3 text-[0.8125rem]"
           initial={{ opacity: 0, y: -6 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25, ease: EASE.jo }}
+          transition={{ duration: 0.25, ease: EASE.brand }}
         >
           {error}
         </motion.p>
@@ -268,7 +268,7 @@ export function ProductEditor({
                     <Image src={image.url} alt={image.alt} fill sizes="96px" className="object-cover" />
                   </div>
                 ))}
-                <label className="border-line hover:border-violet text-mist hover:text-violet grid h-32 w-24 cursor-pointer place-items-center rounded-md border border-dashed text-[0.75rem] transition-colors">
+                <label className="border-line hover:border-brand text-mist hover:text-brand grid h-32 w-24 cursor-pointer place-items-center rounded-md border border-dashed text-[0.75rem] transition-colors">
                   <span className="text-center leading-tight">
                     +<br />
                     Add
@@ -313,7 +313,7 @@ export function ProductEditor({
                               defaultValue={Math.floor(
                                 product.totalStock / (product.colors.length * product.sizes.length),
                               )}
-                              className="border-line focus:border-violet bg-paper w-14 rounded-sm border px-2 py-1 text-center text-[0.75rem] tabular-nums outline-none"
+                              className="border-line focus:border-brand bg-paper w-14 rounded-sm border px-2 py-1 text-center text-[0.75rem] tabular-nums outline-none"
                             />
                           </td>
                         ))}
@@ -359,7 +359,7 @@ export function ProductEditor({
                 <select
                   value={draft.categoryId}
                   onChange={(event) => set("categoryId", event.target.value)}
-                  className="border-line focus:border-violet bg-paper text-ink w-full rounded-md border px-3 py-2 text-[0.8125rem] outline-none"
+                  className="border-line focus:border-brand bg-paper text-ink w-full rounded-md border px-3 py-2 text-[0.8125rem] outline-none"
                 >
                   {categories.map((category) => (
                     <option key={category.id} value={category.id}>
@@ -374,7 +374,7 @@ export function ProductEditor({
                 <select
                   value={draft.status}
                   onChange={(event) => set("status", event.target.value as Product["status"])}
-                  className="border-line focus:border-violet bg-paper text-ink w-full rounded-md border px-3 py-2 text-[0.8125rem] outline-none"
+                  className="border-line focus:border-brand bg-paper text-ink w-full rounded-md border px-3 py-2 text-[0.8125rem] outline-none"
                 >
                   <option value="draft">Draft — hidden from the store</option>
                   <option value="active">Active — on sale</option>
@@ -404,7 +404,7 @@ export function ProductEditor({
               <ul className="mt-2 space-y-1">
                 {missing.map((item) => (
                   <li key={item} className="text-smoke flex items-center gap-2 text-[0.75rem]">
-                    <span className="bg-coral h-1.5 w-1.5 rounded-full" aria-hidden="true" />
+                    <span className="bg-alert h-1.5 w-1.5 rounded-full" aria-hidden="true" />
                     {item}
                   </li>
                 ))}
@@ -439,7 +439,7 @@ function Field({
   mono?: boolean;
 }) {
   const classes = cn(
-    "border-line focus:border-violet bg-paper text-ink placeholder:text-mist w-full rounded-md border px-3 py-2 text-[0.8125rem] outline-none transition-colors",
+    "border-line focus:border-brand bg-paper text-ink placeholder:text-mist w-full rounded-md border px-3 py-2 text-[0.8125rem] outline-none transition-colors",
     rtl && "font-arabic text-[0.9375rem]",
     mono && "font-mono",
   );
@@ -448,7 +448,7 @@ function Field({
     <label className="block">
       <span className="text-ink-muted mb-1.5 flex items-center gap-1.5 text-[0.75rem]">
         {label}
-        {required && <span className="text-coral">*</span>}
+        {required && <span className="text-alert">*</span>}
       </span>
       {multiline ? (
         <textarea
@@ -493,7 +493,7 @@ function NumberField({
         step={step}
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="border-line focus:border-violet bg-paper text-ink w-full rounded-md border px-3 py-2 text-[0.8125rem] tabular-nums outline-none transition-colors"
+        className="border-line focus:border-brand bg-paper text-ink w-full rounded-md border px-3 py-2 text-[0.8125rem] tabular-nums outline-none transition-colors"
       />
       {hint && <span className="text-mist mt-1 block text-[0.6875rem]">{hint}</span>}
     </label>

@@ -53,7 +53,7 @@ export function Reveal({
       initial={{ opacity: 0, [axis]: distance * sign }}
       whileInView={{ opacity: 1, [axis]: 0 }}
       viewport={viewportOnce}
-      transition={{ duration: 0.62, ease: EASE.jo, delay }}
+      transition={{ duration: 0.62, ease: EASE.brand, delay }}
     >
       {children}
     </MotionTag>
@@ -110,7 +110,7 @@ export function StaggerItem({
       className={className}
       variants={{
         hidden: { opacity: 0, y: distance },
-        show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE.jo } },
+        show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE.brand } },
       }}
     >
       {children}

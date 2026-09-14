@@ -2,7 +2,7 @@
 
 import { Link } from "@/components/ui/Link";
 import { useI18n } from "@/components/providers/LocaleProvider";
-import { JoWave } from "@/components/brand/JoWave";
+import { BrandWave } from "@/components/brand/BrandWave";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 
@@ -18,12 +18,12 @@ export default function NotFound() {
   const ar = locale === "ar";
 
   return (
-    <div className="jo-container flex min-h-screen flex-col items-center justify-center py-24 text-center">
+    <div className="ns-container flex min-h-screen flex-col items-center justify-center py-24 text-center">
       <div className="h-36 w-36 opacity-80">
-        <JoWave rings={4} solidCore color="var(--color-violet)" speed={7} />
+        <BrandWave rings={4} solidCore color="var(--color-brand)" speed={7} />
       </div>
 
-      <p className="font-display text-violet mt-10 text-6xl md:text-8xl">404</p>
+      <p className="font-display text-brand mt-10 text-6xl md:text-8xl">404</p>
 
       <h1
         className={cn(

@@ -55,7 +55,7 @@ export const useWishlist = create<WishlistState>()(
       },
     }),
     {
-      name: "the-jo:wishlist",
+      name: "net-sale:wishlist",
       version: 1,
       storage: createJSONStorage(() => localStorage),
     },

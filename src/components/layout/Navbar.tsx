@@ -77,7 +77,7 @@ export function Navbar({ announcement }: { announcement?: React.ReactNode }) {
       <motion.header
         className="fixed inset-x-0 top-0 z-[120]"
         animate={{ y: hidden ? "-140%" : 0 }}
-        transition={{ duration: 0.42, ease: EASE.jo }}
+        transition={{ duration: 0.42, ease: EASE.brand }}
       >
         {announcement}
 
@@ -86,9 +86,9 @@ export function Navbar({ announcement }: { announcement?: React.ReactNode }) {
         <div className="px-3 pt-3 md:px-6 md:pt-4">
           <motion.nav
             className={cn(
-              "jo-container flex items-center justify-between gap-4",
+              "ns-container flex items-center justify-between gap-4",
               "rounded-pill transition-all duration-500",
-              compact ? "jo-glass shadow-float" : "bg-transparent",
+              compact ? "ns-glass shadow-float" : "bg-transparent",
             )}
             animate={{ paddingTop: compact ? 10 : 14, paddingBottom: compact ? 10 : 14 }}
             transition={transition.base}
@@ -108,10 +108,10 @@ export function Navbar({ announcement }: { announcement?: React.ReactNode }) {
                   // which needs no tracking because it is already open.
                   locale === "ar"
                     ? "font-arabic text-[1.0625rem]"
-                    : "font-display tracking-[0.16em] uppercase",
+                    : "font-display lowercase tracking-[0.02em]",
                 )}
               >
-                {locale === "ar" ? "ذاجو" : "The Jo"}
+                {t.brand.name}
               </span>
             </Link>
 
@@ -125,7 +125,7 @@ export function Navbar({ announcement }: { announcement?: React.ReactNode }) {
                     <Link
                       href={item.href}
                       className={cn(
-                        "font-ui jo-underline relative text-[0.8125rem] font-semibold transition-colors",
+                        "font-ui ns-underline relative text-[0.8125rem] font-semibold transition-colors",
                         locale === "ar" ? "text-[0.9375rem]" : "tracking-[0.1em] uppercase",
                         active ? "text-ink" : "text-ink-muted hover:text-ink",
                       )}
@@ -238,7 +238,7 @@ function IconButton({
             className={cn(
               "absolute -end-0.5 -top-0.5 grid h-4.5 min-w-4.5 place-items-center rounded-full px-1",
               "text-[0.625rem] font-semibold tabular-nums",
-              emphasis ? "bg-violet text-white" : "bg-ink text-white",
+              emphasis ? "bg-brand text-white" : "bg-ink text-white",
             )}
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: [0, 1.35, 1], opacity: 1 }}
@@ -314,7 +314,7 @@ function MobileNav() {
                   key={item.href}
                   initial={{ opacity: 0, x: -16 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.08 + index * 0.05, duration: 0.4, ease: EASE.jo }}
+                  transition={{ delay: 0.08 + index * 0.05, duration: 0.4, ease: EASE.brand }}
                 >
                   <Link
                     href={item.href}
@@ -439,7 +439,7 @@ function MenuIcon({ open }: { open: boolean }) {
         d={BURGER_TOP}
         initial={{ d: BURGER_TOP }}
         animate={{ d: open ? "M5 5 L15 15" : BURGER_TOP }}
-        transition={{ duration: 0.3, ease: EASE.jo }}
+        transition={{ duration: 0.3, ease: EASE.brand }}
       />
       <motion.path
         stroke="currentColor"
@@ -448,7 +448,7 @@ function MenuIcon({ open }: { open: boolean }) {
         d={BURGER_BOTTOM}
         initial={{ d: BURGER_BOTTOM }}
         animate={{ d: open ? "M15 5 L5 15" : BURGER_BOTTOM }}
-        transition={{ duration: 0.3, ease: EASE.jo }}
+        transition={{ duration: 0.3, ease: EASE.brand }}
       />
     </svg>
   );

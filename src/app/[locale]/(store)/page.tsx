@@ -78,7 +78,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       <Hero banner={hero} products={featured} locale={locale} />
 
       {/* --- Campaigns / advertising rail --------------------------------- */}
-      <section className="jo-container py-16 md:py-24">
+      <section className="ns-container py-16 md:py-24">
         <SectionHeading
           eyebrow={t.home.campaignsEyebrow}
           title={t.home.campaignsTitle}
@@ -90,7 +90,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       </section>
 
       {/* --- New arrivals -------------------------------------------------- */}
-      <section className="jo-container py-16 md:py-24">
+      <section className="ns-container py-16 md:py-24">
         <SectionHeading
           eyebrow={t.home.newArrivalsEyebrow}
           title={t.home.newArrivalsTitle}
@@ -101,7 +101,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       </section>
 
       {/* --- Categories ---------------------------------------------------- */}
-      <section className="jo-container py-16 md:py-24">
+      <section className="ns-container py-16 md:py-24">
         <SectionHeading
           eyebrow={t.home.categoriesEyebrow}
           title={t.home.categoriesTitle}
@@ -112,7 +112,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       </section>
 
       {/* --- Featured ------------------------------------------------------ */}
-      <section className="jo-container py-16 md:py-24">
+      <section className="ns-container py-16 md:py-24">
         <SectionHeading
           eyebrow={t.home.featuredEyebrow}
           title={t.home.featuredTitle}
@@ -123,13 +123,13 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       </section>
 
       {/* --- AI fitting room ----------------------------------------------- */}
-      <section className="jo-container py-16 md:py-24">
+      <section className="ns-container py-16 md:py-24">
         <FittingRoomTeaser products={featured} locale={locale} />
       </section>
 
       {/* --- Offers -------------------------------------------------------- */}
       {offers.length > 0 && (
-        <section className="jo-container py-16 md:py-24">
+        <section className="ns-container py-16 md:py-24">
           <SectionHeading
             eyebrow={t.home.offersEyebrow}
             title={t.home.offersTitle}
@@ -142,7 +142,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       )}
 
       {/* --- Trending ------------------------------------------------------ */}
-      <section className="jo-container py-16 md:py-24">
+      <section className="ns-container py-16 md:py-24">
         <SectionHeading
           eyebrow={t.home.trendingEyebrow}
           title={t.home.trendingTitle}
@@ -153,12 +153,12 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       </section>
 
       {/* --- Brand story --------------------------------------------------- */}
-      <section className="jo-container py-16 md:py-28">
+      <section className="ns-container py-16 md:py-28">
         <BrandStory locale={locale} />
       </section>
 
       {/* --- Reviews ------------------------------------------------------- */}
-      <section className="jo-container py-16 md:py-24">
+      <section className="ns-container py-16 md:py-24">
         <SectionHeading
           eyebrow={t.home.reviewsEyebrow}
           title={t.home.reviewsTitle}
@@ -169,12 +169,12 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       </section>
 
       {/* --- Newsletter ---------------------------------------------------- */}
-      <section className="jo-container py-8 md:py-16">
+      <section className="ns-container py-8 md:py-16">
         <Newsletter locale={locale} />
       </section>
 
       {/* --- Closing CTA --------------------------------------------------- */}
-      <section className="jo-container pt-8 pb-20 text-center md:pb-28">
+      <section className="ns-container pt-8 pb-20 text-center md:pb-28">
         <Reveal>
           <p
             className={

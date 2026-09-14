@@ -50,7 +50,7 @@ export function SectionHeading({
           <Reveal>
             <p
               className={cn(
-                "font-ui text-violet mb-4",
+                "font-ui text-brand mb-4",
                 ar ? "text-[0.8125rem] font-semibold" : "text-eyebrow uppercase",
               )}
             >
@@ -82,7 +82,7 @@ export function SectionHeading({
           <Link
             href={action.href}
             className={cn(
-              "font-ui text-ink jo-underline group inline-flex items-center gap-2 font-semibold",
+              "font-ui text-ink ns-underline group inline-flex items-center gap-2 font-semibold",
               ar ? "text-[0.9375rem]" : "text-sm tracking-[0.08em] uppercase",
             )}
             data-cursor="hover"

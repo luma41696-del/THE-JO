@@ -12,7 +12,7 @@ import { syncAdminSession } from "@/lib/firebase/session-client";
 import type { User } from "firebase/auth";
 import { Button } from "@/components/ui/Button";
 import { AnimatedLogo } from "@/components/brand/AnimatedLogo";
-import { JoWave } from "@/components/brand/JoWave";
+import { BrandWave } from "@/components/brand/BrandWave";
 import type { Locale } from "@/types";
 
 /**
@@ -122,17 +122,17 @@ export function AuthForm({ mode, locale = "en" }: { mode: "signin" | "signup"; l
       {/* Brand panel */}
       <aside className="bg-ink relative hidden overflow-hidden lg:block">
         <div className="absolute -start-20 -top-20 h-[36rem] w-[36rem] opacity-20">
-          <JoWave rings={4} color="var(--color-violet-bright)" speed={12} />
+          <BrandWave rings={4} color="var(--color-brand-bright)" speed={12} />
         </div>
         <div className="absolute end-[-10%] bottom-[-10%] h-[28rem] w-[28rem] opacity-15">
-          <JoWave rings={3} color="#ffffff" speed={16} />
+          <BrandWave rings={3} color="#ffffff" speed={16} />
         </div>
 
         <div className="relative flex h-full flex-col justify-between p-14">
-          <Link href="/" className="flex items-center gap-3" aria-label="THE JO — home">
-            <AnimatedLogo tone="light" className="h-11 w-11" alwaysWave title={null} />
+          <Link href="/" className="flex items-center gap-3" aria-label="net sale — home">
+            <AnimatedLogo tone="onDark" className="h-11 w-11" alwaysWave title={null} />
             <span className="font-display text-[1.0625rem] font-semibold tracking-[0.16em] text-white uppercase">
-              The&nbsp;Jo
+              net&nbsp;sale
             </span>
           </Link>
 
@@ -150,7 +150,7 @@ export function AuthForm({ mode, locale = "en" }: { mode: "signin" | "signup"; l
           </div>
 
           <p className="text-[0.75rem] tracking-[0.14em] text-white/30 uppercase">
-            THE JO — ذاجو
+            net sale — نت سيل
           </p>
         </div>
       </aside>
@@ -161,10 +161,10 @@ export function AuthForm({ mode, locale = "en" }: { mode: "signin" | "signup"; l
           className="w-full max-w-sm"
           initial={reduced ? undefined : { opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: EASE.jo }}
+          transition={{ duration: 0.6, ease: EASE.brand }}
         >
           <div className="mb-8 lg:hidden">
-            <Link href="/" aria-label="THE JO — home">
+            <Link href="/" aria-label="net sale — home">
               <AnimatedLogo className="h-12 w-12" title={null} />
             </Link>
           </div>
@@ -267,7 +267,7 @@ export function AuthForm({ mode, locale = "en" }: { mode: "signin" | "signup"; l
                   className={cn(
                     "bg-paper-raised text-ink rounded-md w-full border py-3 ps-4 pe-12 text-[0.9375rem] outline-none",
                     "transition-colors duration-200",
-                    errors.password ? "border-coral" : "border-line focus:border-violet",
+                    errors.password ? "border-alert" : "border-line focus:border-brand",
                   )}
                 />
                 <button
@@ -281,7 +281,7 @@ export function AuthForm({ mode, locale = "en" }: { mode: "signin" | "signup"; l
                 </button>
               </div>
               {errors.password && (
-                <p id="password-error" role="alert" className="text-coral mt-1.5 text-[0.75rem]">
+                <p id="password-error" role="alert" className="text-alert mt-1.5 text-[0.75rem]">
                   {errors.password}
                 </p>
               )}
@@ -298,7 +298,7 @@ export function AuthForm({ mode, locale = "en" }: { mode: "signin" | "signup"; l
                   type="checkbox"
                   checked={marketing}
                   onChange={(event) => setMarketing(event.target.checked)}
-                  className="accent-violet mt-0.5 h-3.5 w-3.5 cursor-pointer"
+                  className="accent-brand mt-0.5 h-3.5 w-3.5 cursor-pointer"
                 />
                 <span>
                   {rtl
@@ -311,7 +311,7 @@ export function AuthForm({ mode, locale = "en" }: { mode: "signin" | "signup"; l
             {errors.form && (
               <motion.p
                 role="alert"
-                className="bg-coral/10 text-coral rounded-md p-3 text-[0.8125rem]"
+                className="bg-alert/10 text-alert rounded-md p-3 text-[0.8125rem]"
                 initial={{ opacity: 0, y: -6 }}
                 animate={{ opacity: 1, y: 0 }}
               >
@@ -331,7 +331,7 @@ export function AuthForm({ mode, locale = "en" }: { mode: "signin" | "signup"; l
               </motion.p>
             )}
 
-            <Button type="submit" variant="violet" size="lg" fullWidth loading={loading} className="mt-2">
+            <Button type="submit" variant="brand" size="lg" fullWidth loading={loading} className="mt-2">
               {isSignup
                 ? rtl
                   ? "إنشاء الحساب"
@@ -352,7 +352,7 @@ export function AuthForm({ mode, locale = "en" }: { mode: "signin" | "signup"; l
               </>
             ) : (
               <>
-                {rtl ? "ليس لديك حساب؟" : "New to THE JO?"}{" "}
+                {rtl ? "ليس لديك حساب؟" : "New to net sale?"}{" "}
                 <Link href="/register" className="text-ink font-medium underline-offset-4 hover:underline">
                   {rtl ? "أنشئ حساباً" : "Create an account"}
                 </Link>
@@ -415,11 +415,11 @@ function Field({
         className={cn(
           "bg-paper-raised text-ink rounded-md w-full border px-4 py-3 text-[0.9375rem] outline-none",
           "transition-colors duration-200",
-          error ? "border-coral" : "border-line focus:border-violet",
+          error ? "border-alert" : "border-line focus:border-brand",
         )}
       />
       {error && (
-        <p id={`${id}-error`} role="alert" className="text-coral mt-1.5 text-[0.75rem]">
+        <p id={`${id}-error`} role="alert" className="text-alert mt-1.5 text-[0.75rem]">
           {error}
         </p>
       )}

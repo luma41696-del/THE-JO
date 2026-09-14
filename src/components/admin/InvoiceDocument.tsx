@@ -6,7 +6,7 @@ import { Link } from "@/components/ui/Link";
 import { cn } from "@/lib/utils";
 import { formatDate, formatPrice, t as pick } from "@/lib/format";
 import { printToPdf } from "@/lib/admin/export";
-import { JoMark } from "@/components/brand/JoMark";
+import { NetSaleMark } from "@/components/brand/NetSaleMark";
 import { Button } from "@/components/ui/Button";
 import { AdminPageHeader } from "./AdminShell";
 import type { Invoice, Locale } from "@/types";
@@ -51,7 +51,7 @@ export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
     tax: rtl ? "ضريبة المبيعات (١٦٪)" : "Sales tax (16%)",
     total: rtl ? "الإجمالي" : "Total",
     paidBy: rtl ? "طريقة الدفع" : "Paid by",
-    thanks: rtl ? "شكراً لتسوّقك من ذاجو." : "Thank you for shopping with THE JO.",
+    thanks: rtl ? "شكراً لتسوّقك من نت سيل." : "Thank you for shopping with net sale.",
     terms: rtl
       ? "تم إصدار هذه الفاتورة إلكترونياً وهي صالحة دون توقيع."
       : "This invoice was issued electronically and is valid without a signature.",
@@ -88,7 +88,7 @@ export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
                   </button>
                 ))}
               </div>
-              <Button variant="violet" size="sm" onClick={printToPdf}>
+              <Button variant="brand" size="sm" onClick={printToPdf}>
                 Save as PDF
               </Button>
             </>
@@ -113,16 +113,16 @@ export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
       >
         <header className="border-line flex items-start justify-between gap-8 border-b pb-8">
           <div>
-            <JoMark className="h-12 w-12" title={null} />
+            <NetSaleMark className="h-12 w-12" title={null} />
             <p className="font-display text-ink mt-3 text-[0.9375rem] font-semibold tracking-[0.14em] uppercase">
-              The&nbsp;Jo
+              net&nbsp;sale
             </p>
             <p className="text-smoke mt-2 text-[0.75rem] leading-relaxed">
-              {rtl ? "ذاجو للأزياء" : "THE JO Fashion"}
+              {rtl ? "نت سيل للأزياء" : "net sale"}
               <br />
               {rtl ? "عمّان، الأردن" : "Amman, Jordan"}
               <br />
-              hello@thejo.shop
+              hello@netsale.jo
             </p>
           </div>
 
@@ -266,7 +266,7 @@ export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
       </article>
 
       {/* Print rules live in `globals.css` under `@media print` — A4 margins,
-          admin chrome hidden, and colour adjustment forced so the violet mark
+          admin chrome hidden, and colour adjustment forced so the brand mark
           is not dropped by the browser's ink-saving default. */}
     </>
   );

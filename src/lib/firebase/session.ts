@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 
 import { getAdminAuth, isAdminConfigured } from "./admin";
 
-export const ADMIN_SESSION_COOKIE = "jo-admin-session";
+export const ADMIN_SESSION_COOKIE = "ns-admin-session";
 export const ADMIN_SESSION_MAX_AGE = 60 * 60 * 24 * 5;
 export const adminSessionCookieOptions = {
   httpOnly: true,

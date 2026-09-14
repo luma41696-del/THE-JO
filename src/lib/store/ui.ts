@@ -38,7 +38,7 @@ interface UIState {
   setLocale: (locale: Locale) => void;
 }
 
-const INTRO_KEY = "the-jo:intro-played";
+const INTRO_KEY = "net-sale:intro-played";
 
 function introAlreadyPlayed() {
   if (typeof window === "undefined") return false;

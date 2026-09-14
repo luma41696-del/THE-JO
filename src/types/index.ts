@@ -1,5 +1,5 @@
 /**
- * THE JO — domain model.
+ * net sale — domain model.
  *
  * These types are the contract between Firestore, the server components that
  * read it, and the client components that render it. Firestore documents are
@@ -162,7 +162,7 @@ export type BannerSlot =
   | "category-strip"
   | "announcement";
 
-export type BannerTone = "ink" | "violet" | "sand" | "paper";
+export type BannerTone = "ink" | "brand" | "sand" | "paper";
 
 /**
  * One card in the merchandising system. The homepage ad rail, the hero, and
@@ -340,7 +340,7 @@ export interface OrderEvent {
 
 export interface Order {
   id: string;
-  /** Human-readable, e.g. `JO-7K4M2X`. Shown to the customer, not the doc id. */
+  /** Human-readable, e.g. `NS-7K4M2X`. Shown to the customer, not the doc id. */
   reference: string;
   uid: string;
   email: string;

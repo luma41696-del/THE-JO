@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { EASE, transition } from "@/lib/motion";
 import { formatPrice, t } from "@/lib/format";
 import { useUI } from "@/lib/store/ui";
-import { JoWave } from "@/components/brand/JoWave";
+import { BrandWave } from "@/components/brand/BrandWave";
 import type { CurrencyCode, Locale, Localized, ProductImage } from "@/types";
 
 /**
@@ -170,9 +170,9 @@ export function SearchOverlay({ locale = "en" }: { locale?: Locale }) {
             exit={{ y: "-100%" }}
             transition={transition.drawer}
           >
-            <div className="jo-container py-6 md:py-8">
+            <div className="ns-container py-6 md:py-8">
               {/* Input */}
-              <div className="border-line focus-within:border-violet flex items-center gap-4 border-b pb-4 transition-colors">
+              <div className="border-line focus-within:border-brand flex items-center gap-4 border-b pb-4 transition-colors">
                 <SearchIcon />
                 <input
                   ref={inputRef}
@@ -221,7 +221,7 @@ export function SearchOverlay({ locale = "en" }: { locale?: Locale }) {
                 ) : loading && results.length === 0 ? (
                   <div className="flex items-center gap-3 py-10">
                     <div className="h-10 w-10 opacity-70">
-                      <JoWave rings={2} color="var(--color-violet)" speed={4} />
+                      <BrandWave rings={2} color="var(--color-brand)" speed={4} />
                     </div>
                     <span className="text-smoke text-[0.875rem]">
                       {rtl ? "جارٍ البحث…" : "Searching…"}

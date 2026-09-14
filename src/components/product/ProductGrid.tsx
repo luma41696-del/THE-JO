@@ -66,10 +66,10 @@ export function ProductGridSkeleton({
     <div className={cn("grid gap-x-4 gap-y-10 md:gap-x-6 md:gap-y-14", COLUMNS[columns])}>
       {Array.from({ length: count }).map((_, index) => (
         <div key={index}>
-          <div className="jo-shimmer rounded-lg aspect-[3/4]" />
-          <div className="jo-shimmer mt-4 h-4 w-3/4 rounded-xs" />
-          <div className="jo-shimmer mt-2 h-3 w-1/2 rounded-xs" />
-          <div className="jo-shimmer mt-3 h-4 w-1/4 rounded-xs" />
+          <div className="ns-shimmer rounded-lg aspect-[3/4]" />
+          <div className="ns-shimmer mt-4 h-4 w-3/4 rounded-xs" />
+          <div className="ns-shimmer mt-2 h-3 w-1/2 rounded-xs" />
+          <div className="ns-shimmer mt-3 h-4 w-1/4 rounded-xs" />
         </div>
       ))}
     </div>

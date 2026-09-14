@@ -46,7 +46,7 @@ export function BrandStory({ locale = "en" }: { locale?: Locale }) {
           </motion.div>
 
           <motion.div
-            className="jo-glass rounded-xl shadow-float absolute bottom-6 start-0 w-56 p-5"
+            className="ns-glass rounded-xl shadow-float absolute bottom-6 start-0 w-56 p-5"
             style={{ y: plateY }}
           >
             <AnimatedLogo className="h-10 w-10" intro={false} title={null} />
@@ -61,7 +61,7 @@ export function BrandStory({ locale = "en" }: { locale?: Locale }) {
         {/* Copy */}
         <div>
           <Reveal>
-            <p className="text-eyebrow font-display text-violet mb-5 uppercase">
+            <p className="text-eyebrow font-display text-brand mb-5 uppercase">
               {rtl ? "قصتنا" : "Our story"}
             </p>
           </Reveal>
@@ -76,8 +76,8 @@ export function BrandStory({ locale = "en" }: { locale?: Locale }) {
             <div className="text-ink-muted mt-6 space-y-4 text-pretty md:text-[1.0625rem]">
               <p>
                 {rtl
-                  ? "بدأت ذاجو بسؤال بسيط: لماذا تُصنع أغلب الملابس لتدوم موسماً واحداً؟ اخترنا الطريق الأبطأ — مصانع أقل، أقمشة أثقل، ودفعات محدودة."
-                  : "THE JO started with a blunt question: why is most clothing built to last one season? We took the slower route — fewer mills, heavier cloth, deliberately small runs."}
+                  ? "بدأت نت سيل بسؤال بسيط: لماذا تُصنع أغلب الملابس لتدوم موسماً واحداً؟ اخترنا الطريق الأبطأ — مصانع أقل، أقمشة أثقل، ودفعات محدودة."
+                  : "net sale started with a blunt question: why is most clothing built to last one season? We took the slower route — fewer mills, heavier cloth, deliberately small runs."}
               </p>
               <p>
                 {rtl
@@ -99,7 +99,7 @@ export function BrandStory({ locale = "en" }: { locale?: Locale }) {
                   initial={reduced ? undefined : { opacity: 0, y: 14 }}
                   whileInView={reduced ? undefined : { opacity: 1, y: 0 }}
                   viewport={{ once: true }}
-                  transition={{ delay: index * 0.08, duration: 0.5, ease: EASE.jo }}
+                  transition={{ delay: index * 0.08, duration: 0.5, ease: EASE.brand }}
                 >
                   <dt className="font-display text-ink text-3xl font-semibold tabular-nums">
                     {stat.value}
@@ -113,7 +113,7 @@ export function BrandStory({ locale = "en" }: { locale?: Locale }) {
           <Reveal delay={0.22}>
             <Link
               href="/about"
-              className="font-display jo-underline text-ink mt-9 inline-flex items-center gap-2 text-sm font-semibold tracking-[0.08em] uppercase"
+              className="font-display ns-underline text-ink mt-9 inline-flex items-center gap-2 text-sm font-semibold tracking-[0.08em] uppercase"
               data-cursor="hover"
             >
               {rtl ? "اقرأ القصة كاملة" : "Read the full story"}

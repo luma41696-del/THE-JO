@@ -4,19 +4,19 @@ import { motion, useReducedMotion, type Variants } from "motion/react";
 
 import { cn } from "@/lib/utils";
 import { EASE } from "@/lib/motion";
-import { BLOB_WAVES, DOT, J_STEM, JO_CENTROID, JO_VIEWBOX, O_RING, WEDGE } from "./paths";
-import type { MarkTone } from "./JoMark";
+import { BLOB_WAVES, DOT, MONOGRAM, NS_CENTROID, NS_VIEWBOX } from "./paths";
+import type { MarkTone } from "./NetSaleMark";
 
 /**
- * The animated JO mark.
+ * The animated net sale mark.
  *
- * Intro: the bubble inflates from nothing, the monogram fades up behind it,
- * and the dot drops in last — the dot landing is the beat that reads as
- * "brand", so nothing else moves while it happens.
+ * Intro: the pebble inflates from nothing, the N fades up inside it, and the
+ * dot drops in last — the dot landing is the beat that reads as "brand", so
+ * nothing else moves while it happens.
  *
- * Hover: the bubble morphs through its wave states and a violet ripple escapes
- * it. Both stop when the pointer leaves; a permanently animating logo in a
- * navbar is noise, not personality.
+ * Hover: the pebble morphs through its wave states and a red ripple escapes it.
+ * Both stop when the pointer leaves; a permanently animating logo in a navbar
+ * is noise, not personality.
  *
  * Implementation notes:
  *  - The wave morph works because every path in `BLOB_WAVES` shares an
@@ -25,47 +25,38 @@ import type { MarkTone } from "./JoMark";
  *  - Morph and intro live on *different* elements: an element with an object
  *    `animate` prop stops receiving variant labels from its parent, so the
  *    transform lives on a wrapping `<g>` and the `d` morph on the path inside.
- *  - Transforms use `transform-box: view-box` with an explicit origin so every
- *    part scales about the same point rather than about its own bounding box.
+ *  - Every animated path also carries a literal `d`. Without it Motion reads
+ *    the start value off the DOM, gets nothing, and writes the string
+ *    "undefined" into the attribute — the path silently disappears.
+ *  - The N is knocked out of the pebble, so it is painted in the ground colour
+ *    and must sit *above* the morphing pebble in paint order.
  */
 
-const TONES: Record<MarkTone, { blob: string; mono: string; dot: string; ripple: string }> = {
-  ink: {
-    blob: "var(--color-ink)",
-    mono: "var(--color-violet)",
-    dot: "var(--color-ink)",
-    ripple: "var(--color-violet)",
+const TONES: Record<MarkTone, { pebble: string; monogram: string; dot: string; ripple: string }> = {
+  onLight: {
+    pebble: "var(--color-brand)",
+    monogram: "var(--color-paper)",
+    dot: "var(--color-brand)",
+    ripple: "var(--color-brand)",
   },
-  light: {
-    blob: "#ffffff",
-    mono: "var(--color-violet)",
-    dot: "#ffffff",
-    ripple: "var(--color-violet-bright)",
+  onDark: {
+    pebble: "var(--color-brand)",
+    monogram: "var(--color-ink)",
+    dot: "var(--color-brand)",
+    ripple: "var(--color-brand-bright)",
   },
-  violet: {
-    blob: "var(--color-violet)",
-    mono: "#ffffff",
-    dot: "var(--color-violet)",
-    ripple: "var(--color-violet)",
-  },
-  mono: {
-    blob: "currentColor",
-    mono: "currentColor",
+  solid: {
+    pebble: "currentColor",
+    monogram: "transparent",
     dot: "currentColor",
     ripple: "currentColor",
   },
 };
 
-/** Shared transform origin: the optical centre of the bubble. */
+/** Shared transform origin: the optical centre of the pebble. */
 const ORIGIN = {
   transformBox: "view-box",
-  transformOrigin: `${JO_CENTROID.x}px ${JO_CENTROID.y}px`,
-} as const;
-
-/** The dot pivots about itself, not about the bubble. */
-const DOT_ORIGIN = {
-  transformBox: "view-box",
-  transformOrigin: "98.2px 93.2px",
+  transformOrigin: `${NS_CENTROID.x}px ${NS_CENTROID.y}px`,
 } as const;
 
 export interface AnimatedLogoProps {
@@ -82,12 +73,12 @@ export interface AnimatedLogoProps {
 }
 
 export function AnimatedLogo({
-  tone = "ink",
+  tone = "onLight",
   className,
   intro = true,
   delay = 0,
   alwaysWave = false,
-  title = "THE JO",
+  title = "net sale",
   onIntroComplete,
 }: AnimatedLogoProps) {
   const reduced = useReducedMotion();
@@ -96,7 +87,7 @@ export function AnimatedLogo({
   const playIntro = intro && !reduced;
   const wave = alwaysWave && !reduced;
 
-  const bubble: Variants = {
+  const pebble: Variants = {
     hidden: { scale: 0.2, opacity: 0, rotate: -14 },
     show: {
       scale: 1,
@@ -104,7 +95,7 @@ export function AnimatedLogo({
       rotate: 0,
       transition: { duration: 0.78, ease: EASE.spring, delay },
     },
-    hover: { scale: 1.06, rotate: 3, transition: { duration: 0.5, ease: EASE.jo } },
+    hover: { scale: 1.06, rotate: 3, transition: { duration: 0.5, ease: EASE.brand } },
   };
 
   const mono: Variants = {
@@ -112,9 +103,9 @@ export function AnimatedLogo({
     show: {
       scale: 1,
       opacity: 1,
-      transition: { duration: 0.5, ease: EASE.jo, delay: delay + 0.22 },
+      transition: { duration: 0.5, ease: EASE.brand, delay: delay + 0.22 },
     },
-    hover: { scale: 1.05, transition: { duration: 0.45, ease: EASE.jo } },
+    hover: { scale: 1.05, transition: { duration: 0.45, ease: EASE.brand } },
   };
 
   const dot: Variants = {
@@ -136,7 +127,7 @@ export function AnimatedLogo({
     hover: {
       opacity: [0, 0.45, 0],
       scale: [1, 1.5, 1.85],
-      transition: { duration: 1.6, ease: EASE.jo, repeat: Infinity },
+      transition: { duration: 1.6, ease: EASE.brand, repeat: Infinity },
     },
   };
 
@@ -146,7 +137,7 @@ export function AnimatedLogo({
 
   return (
     <motion.svg
-      viewBox={JO_VIEWBOX}
+      viewBox={NS_VIEWBOX}
       fill="none"
       className={cn("block h-9 w-9 overflow-visible", className)}
       role={title === null ? "presentation" : "img"}
@@ -170,12 +161,9 @@ export function AnimatedLogo({
         style={ORIGIN}
       />
 
-      <motion.g variants={bubble} style={ORIGIN}>
+      <motion.g variants={pebble} style={ORIGIN}>
         <motion.path
-          fill={c.blob}
-          // The literal `d` matters: it is what the server renders, and it is
-          // the value Motion reads as the morph's starting point. Without it
-          // the first keyframe interpolates from `undefined`.
+          fill={c.pebble}
           d={BLOB_WAVES[0]}
           initial={{ d: BLOB_WAVES[0] }}
           animate={wave ? morph : { d: BLOB_WAVES[0] }}
@@ -195,18 +183,16 @@ export function AnimatedLogo({
         />
       </motion.g>
 
-      <motion.g
-        fill={c.mono}
-        variants={mono}
-        style={ORIGIN}
-        opacity={tone === "mono" ? 0.45 : 1}
-      >
-        <path d={J_STEM} />
-        <path d={O_RING} />
-        <path d={WEDGE} />
-      </motion.g>
+      {/* Painted over the pebble, in the ground colour — the N is a hole. */}
+      {tone !== "solid" && (
+        <motion.g fill={c.monogram} variants={mono} style={ORIGIN}>
+          {MONOGRAM.map((d) => (
+            <path key={d.slice(0, 24)} d={d} />
+          ))}
+        </motion.g>
+      )}
 
-      <motion.path d={DOT} fill={c.dot} variants={dot} style={DOT_ORIGIN} />
+      <motion.path d={DOT} fill={c.dot} variants={dot} style={ORIGIN} />
     </motion.svg>
   );
 }

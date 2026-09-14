@@ -1,4 +1,4 @@
-# THE JO | ذاجو — Design & Architecture
+# net sale | نت سيل — Design & Architecture
 
 The complete brief: concept, visual system, UX architecture, motion system, page
 breakdown, technical architecture, folder structure, Firebase structure.
@@ -12,10 +12,16 @@ and the tokens are the ones the site actually renders from.
 
 ### The idea the logo gives you
 
-The mark is an organic pebble — a **bubble** — with a violet `Jo` monogram
-inside it and a small **detached dot** sitting outside, bottom-right. That dot
-is the whole brand in one detail: it is a speech-bubble tail, a full stop, and a
-pointer all at once.
+The mark is an organic pebble — a **bubble** — in brand red, with a lowercase
+`n` **knocked out** of it, and a small **detached dot** sitting outside,
+bottom-right. That dot is the whole brand in one detail: it is a speech-bubble
+tail, a full stop, and a pointer all at once.
+
+The knockout is a constraint, not a styling choice. The `n` is a *hole*, so it
+is always painted in whatever sits behind the mark — which is why `MarkTone` is
+named after the **ground** (`onLight` / `onDark`) rather than after the mark.
+Getting that backwards fills the hole with the wrong colour and the logo
+collapses into a red blob.
 
 So the concept is: **a soft, living surface with one precise point.**
 
@@ -25,21 +31,23 @@ That reads three ways across the product:
 | --- | --- |
 | Organic bubble | Generous radii, floating panels, nothing hard-edged |
 | Wave / ripple | Ambient motion, the Lottie, the loading and empty states |
-| The precise dot | The cursor's real pointer, the violet accent, the single CTA per screen |
+| The precise dot | The cursor's real pointer, the red accent, the single CTA per screen |
 
 ### Positioning
 
-Not "luxury" in the gold-serif sense — **considered**. Twelve pieces a season,
-Italian mills, built to outlast the season. The copy throughout names specifics
-(`88% virgin wool, 12% cashmere`, `Biella, Italy`, `14-gauge`) because a premium
-fashion brand earns trust with facts, not adjectives.
+Not "luxury" in the gold-serif sense, and not a discount bin either — **net**.
+Mill-grade pieces at the price they actually cost, with the margin taken out
+instead of the quality. The copy throughout names specifics (`88% virgin wool,
+12% cashmere`, `Biella, Italy`, `14-gauge`) because a brand whose *name* makes
+a price claim has to earn trust with facts, not adjectives — otherwise "net
+sale" reads as a permanent clearance rack.
 
 The tone is confident and plain. `Buy less. Choose well. Make it last.`
 
 ### What makes it different from the reference
 
 The reference gives a clean floating panel and a right-side control rail. Rather
-than copying the sidebar, THE JO reinterprets it: the hero's right column is a
+than copying the sidebar, net sale reinterprets it: the hero's right column is a
 **live merchandising panel** — real, shoppable product cards floating over a
 campaign plate, parallaxing at different rates. The first screen is a shop, not
 a decoration.
@@ -50,39 +58,43 @@ a decoration.
 
 ### 2.1 Colour
 
-Taken directly from the artwork (`#703BEC` sampled from the master logo), then
+Taken directly from the artwork (`#CE1212` sampled from the master logo), then
 extended into a working palette. Defined in `src/app/globals.css` under
 `@theme`.
 
 | Token | Hex | Role |
 | --- | --- | --- |
-| `violet` | `#703BEC` | Brand signature. The single primary CTA, links, active state |
-| `violet-deep` | `#4B21B0` | Pressed / hover on violet surfaces |
-| `violet-bright` | `#8B5CF6` | Violet on dark grounds, where `#703BEC` goes muddy |
-| `violet-mist` | `#F0EAFF` | Tinted surfaces, chips |
-| `violet-veil` | `#FAF7FF` | Whole-section wash |
-| `ink` | `#0B0B0F` | Text, the dark ground, primary buttons |
-| `ink-soft` | `#1A1A22` | Hover on ink |
-| `ink-muted` | `#4A4A55` | Body copy |
-| `smoke` | `#6B6B76` | Secondary copy |
-| `mist` | `#9D9DA8` | Tertiary, metadata |
-| `paper` | `#FAF8F4` | Page ground |
-| `paper-raised` | `#FFFFFF` | Cards |
-| `paper-sunken` | `#F2EFE9` | Image wells, skeletons |
-| `line` / `line-strong` | `#E6E2DA` / `#D5D0C5` | Hairlines |
-| `sand` / `clay` | `#E9DFD2` / `#C8A68A` | Editorial accents |
-| `coral` | `#FF4F3D` | **Sale and scarcity only** |
-| `mint` | `#14A07A` | **In stock and success only** |
+| `brand` | `#CE1212` | Brand signature. The single primary CTA, links, active state |
+| `brand-deep` | `#810000` | Pressed / hover on red surfaces |
+| `brand-bright` | `#EE4B47` | Red on dark grounds, where `#CE1212` goes muddy |
+| `brand-mist` | `#FBE7E5` | Tinted surfaces, chips |
+| `brand-veil` | `#FDF6F4` | Whole-section wash |
+| `ink` | `#1B1717` | Text, the dark ground, primary buttons |
+| `ink-soft` | `#2B2424` | Hover on ink |
+| `ink-muted` | `#514949` | Body copy |
+| `smoke` | `#6F6765` | Secondary copy |
+| `mist` | `#9C9490` | Tertiary, metadata |
+| `paper` | `#EEEBDD` | Page ground |
+| `paper-raised` | `#FBFAF3` | Cards |
+| `paper-sunken` | `#E3DFCC` | Image wells, skeletons |
+| `line` / `line-strong` | `#D9D4C0` / `#C5BDA5` | Hairlines |
+| `sand` / `clay` | `#DED6BD` / `#B08A68` | Editorial accents |
+| `alert` | `#8A0F0F` | **Errors, destructive actions and scarcity only** |
+| `mint` | `#157F5B` | **In stock and success only** |
 
 Three rules that hold the palette together:
 
-1. **The ground is bone, not white.** `#FAF8F4` rather than `#FFFFFF`. Pure
-   white makes fashion photography look clinical and makes the violet look
-   cheap. The warmth is what reads as expensive.
-2. **Violet is rationed.** One violet CTA per screen. When everything is the
-   brand colour, nothing is.
-3. **Coral and mint mean something.** Coral is never decoration — it is always
-   a reduction or a scarcity signal. Mint is never decoration — it is always
+1. **The ground is cream, not white.** `#EEEBDD` rather than `#FFFFFF`. Pure
+   white makes fashion photography look clinical, and it makes a saturated red
+   look like a sale sticker. The warmth is what keeps the red expensive.
+2. **Red is rationed.** One red CTA per screen — a stricter rule than a brand
+   colour usually needs, because red is the discount colour by convention. A
+   page covered in it reads as a clearance rack, which is exactly the
+   misreading the name already invites. The red marks the *one* thing to do
+   next; everything else is ink on cream.
+3. **`alert` is a second red, and it is never a series colour.** `#8A0F0F` is
+   darker and duller than the brand red, so an error never reads as a CTA and a
+   CTA never reads as an error. Mint is never decoration — it is always
    confirmation. A customer learns this in two screens and then trusts it.
 
 ### 2.2 Typography
@@ -164,10 +176,10 @@ Shadows are wide, low-opacity and warm-tinted — never a hard grey drop.
 lift   0 1px 2px  /0.04, 0 8px 24px  -12px /0.12   resting cards
 float  0 2px 6px  /0.04, 0 18px 48px -20px /0.18   floating panels, nav
 hover  0 4px 10px /0.05, 0 32px 64px -28px /0.26   lifted
-violet 0 12px 40px -12px rgb(112 59 236 /0.45)     the violet CTA only
+brand  0 12px 40px -12px rgb(206 18 18 /0.42)      the red CTA only
 ```
 
-Glass (`.jo-glass`) is a 72% paper ground with `blur(20px) saturate(1.6)` — the
+Glass (`.ns-glass`) is a 72% paper ground with `blur(20px) saturate(1.6)` — the
 saturation bump is what stops frosted panels looking grey.
 
 ---
@@ -344,12 +356,12 @@ instant 120ms   quick 220ms   base 380ms   slow 600ms   ambient 9s
 ### 4.1 The logo animation — `components/brand/AnimatedLogo.tsx`
 
 **Intro** (1.6s, once per session): the bubble inflates from `scale 0.2` with a
-`-14°` rotation, the monogram fades up at +0.22s, and the dot **drops in last**
+`-14°` rotation, the knocked-out `n` fades up at +0.22s, and the dot **drops in last**
 at +0.46s from up-left with a spring overshoot. Nothing else moves while the dot
 lands — that beat is what reads as "brand".
 
 **Hover**: the bubble morphs continuously through its wave states, scales to
-1.06, rotates 3°; the dot pops to 1.35; a violet ripple escapes the silhouette
+1.06, rotates 3°; the dot pops to 1.35; a red ripple escapes the silhouette
 on a 1.6s loop. All of it stops when the pointer leaves.
 
 Two implementation details that matter:
@@ -364,7 +376,7 @@ Two implementation details that matter:
   interpolates from `undefined` and writes the string `"undefined"` into the
   attribute — the path silently disappears.
 
-### 4.2 The Lottie — `public/lottie/jo-bubble-wave.json`
+### 4.2 The Lottie — `public/lottie/net-sale-wave.json`
 
 A real bodymovin v5 file, **generated from the logo geometry** by
 `scripts/generate-brand.mjs` (`npm run brand`). The traced SVG cubics are
@@ -378,18 +390,18 @@ vertex, which is the whole conversion — then keyframed:
 - three ripple rings expand outward from 100% to ~214–298%, fading to zero,
   staggered so the field reads as one continuous expansion
 
-`JoLottie` loads it **lazily**: an `IntersectionObserver` triggers the import of
+`BrandLottie` loads it **lazily**: an `IntersectionObserver` triggers the import of
 both the player (~60KB) and the JSON only when the element is about to be seen,
-and `JoWave` — an inline-SVG version of the same motion, ~1KB of DOM — renders
+and `BrandWave` — an inline-SVG version of the same motion, ~1KB of DOM — renders
 until then and **permanently replaces it** under `prefers-reduced-motion`.
 Nothing is downloaded that will not play.
 
-### 4.3 The cursor — `components/cursor/JoCursor.tsx`
+### 4.3 The cursor — `components/cursor/BrandCursor.tsx`
 
 The mark is a bubble with a detached dot, which maps onto a cursor almost too
 neatly. The design takes it literally:
 
-- **The dot is the real pointer.** 6px, violet, spring `{1400, 60, 0.25}` — zero
+- **The dot is the real pointer.** 6px, red, spring `{1400, 60, 0.25}` — zero
   perceptible lag. Precision is never traded for style.
 - **The bubble trails behind** on a softer spring `{420, 34, 0.55}`, morphing
   through its wave states on a 7s loop. It is the personality, and it is never
@@ -399,7 +411,7 @@ States are declarative — any element opts in with a data attribute:
 
 ```html
 <button data-cursor="hover">                        bubble → 58px
-<a data-cursor="view" data-cursor-label="View">      bubble → 84px violet, label inside, dot hidden
+<a data-cursor="view" data-cursor-label="View">      bubble → 84px red, label inside, dot hidden
 <input data-cursor="text">                           bubble → 2×26px caret bar
 ```
 
@@ -411,7 +423,7 @@ On click, the **logo silhouette** expands from the exact click point and fades.
 Bail-outs, all deliberate: no pointer-fine device → never mounts;
 `prefers-reduced-motion` → never mounts; window blur or pointer leaving the
 document → fades out. The OS cursor is only hidden **after** the component
-mounts and sets `data-jo-cursor="on"` on `<html>`, so a JS failure can never
+mounts and sets `data-ns-cursor="on"` on `<html>`, so a JS failure can never
 leave a visitor with no pointer at all.
 
 ### 4.4 Microinteractions
@@ -433,7 +445,7 @@ leave a visitor with no pointer at all.
 Four states, and the third and fourth are the ones usually skipped:
 
 ```
-rest      violet fill, shadow-violet, magnetic drift (capped at 6px)
+rest      red fill, shadow-brand, magnetic drift (capped at 6px)
 press     scale 0.97 + ink ripple from the click point
 loading   spinner + "Working", width unchanged so nothing jumps
 success   stroke-drawn tick over 360ms, held 900ms before advancing
@@ -455,7 +467,7 @@ scrollable row.
 
 ## 5. Layout system
 
-- **Container** — `.jo-container`, max `88rem`, gutters `1.25rem` → `2.5rem` at
+- **Container** — `.ns-container`, max `88rem`, gutters `1.25rem` → `2.5rem` at
   `md`.
 - **Section rhythm** — `py-16 md:py-24`, `md:py-28` for editorial sections. One
   value, used everywhere, so adding or removing a section never disturbs the
@@ -500,7 +512,7 @@ deploy and without a designer.
 What keeps it from looking like an ad block:
 
 - a deliberately asymmetric grid, not equal thirds;
-- four tones (`ink` / `violet` / `sand` / `paper`) with matched typography,
+- four tones (`ink` / `brand` / `sand` / `paper`) with matched typography,
   rather than one generic card chrome;
 - a **live countdown** on anything with an `endsAt` — the one piece of urgency
   that is factual rather than manufactured. It renders nothing until mounted,
@@ -606,12 +618,12 @@ rather than summing — someone who added 2 on their phone and 2 on desktop mean
 ## 9. Folder structure
 
 ```
-the-jo-shop/
+the-jo-shop/            directory + Firebase project id predate the rename
 ├── public/
-│   ├── brand/          jo-mark.svg, -light, -violet, jo-icon.svg, PNG lockups
+│   ├── brand/          net-sale-mark.svg, -light, -ink, net-sale-icon.svg, PNG lockup
 │   ├── demo/           35 generated product + campaign placeholders
 │   ├── fonts/          Quadrillion Sb / Sb-Italic (otf + woff2)
-│   └── lottie/         jo-bubble-wave.json
+│   └── lottie/         net-sale-wave.json
 ├── scripts/
 │   ├── brand-paths.json      traced logo geometry (the source of truth)
 │   ├── generate-brand.mjs    → SVGs, paths.ts, the Lottie
@@ -630,9 +642,9 @@ the-jo-shop/
 │   │   │   ├── layout.tsx  checkout/  login/  register/
 │   │   └── api/                    checkout/  search/  newsletter/
 │   ├── components/
-│   │   ├── brand/      paths.ts, JoMark, JoLockup, AnimatedLogo, JoWave,
-│   │   │               JoLottie, BrandIntro
-│   │   ├── cursor/     JoCursor
+│   │   ├── brand/      paths.ts, NetSaleMark, NetSaleLockup, AnimatedLogo,
+│   │   │               BrandWave, BrandLottie, BrandIntro
+│   │   ├── cursor/     BrandCursor
 │   │   ├── layout/     Navbar, Footer, AnnouncementBar, SearchOverlay
 │   │   ├── home/       Hero, PromoRail, CategoryGrid, BrandStory,
 │   │   │               FittingRoomTeaser, Testimonials, Newsletter
@@ -682,7 +694,7 @@ collections/{collectionId}     slug, name{}, productIds[], season, active
 
 banners/{bannerId}             ← the whole merchandising system, one shape
   slot hero|promo-rail|spotlight|category-strip|announcement
-  tone ink|violet|sand|paper
+  tone ink|brand|sand|paper
   eyebrow{}, title{}, body{}, cta{label{},href}, media{}
   startsAt, endsAt, priority, span 1|2, active
 
@@ -701,7 +713,7 @@ users/{uid}                    ← document id IS the auth uid
 carts/{uid}                    items[], updatedAt
 
 orders/{orderId}
-  reference JO-XXXXXX, uid, email
+  reference NS-XXXXXX, uid, email
   items[] (price snapshot), totals{subtotal,discount,shipping,tax,total,currency}
   shippingAddress, shippingMethod, appliedOfferCode
   paymentMethod, paymentIntentId          ← never card data
@@ -795,7 +807,7 @@ store into a PCI-DSS audit.
 | Server Components by default | Product markup ships as HTML, not as a fetch waterfall |
 | `next/font`, self-hosted, woff2 | No render-blocking font request, no layout shift |
 | Lottie behind an `IntersectionObserver` | ~60KB player + 21KB JSON never load above the fold, and never at all under reduced motion |
-| `JoWave` as the default ambient | ~1KB of DOM instead of a player, for most decorative moments |
+| `BrandWave` as the default ambient | ~1KB of DOM instead of a player, for most decorative moments |
 | AVIF/WebP via `next/image` | Automatic, with `sizes` set per grid breakpoint |
 | `priority` on the first row only | One LCP candidate, not twelve |
 | Native scroll + snap for rails | No carousel library; keyboard, trackpad and reading order for free |
@@ -806,7 +818,7 @@ store into a PCI-DSS audit.
 
 ### Accessibility
 
-Skip link first in the DOM · visible `:focus-visible` ring on the brand violet ·
+Skip link first in the DOM · visible `:focus-visible` ring on the brand red ·
 `aria-pressed` on every toggle, swatch and size · `role="listbox"` with
 `aria-activedescendant` in search · `aria-live` on the result count · alt text
 required by the `ProductImage` type, not optional · full keyboard paths through

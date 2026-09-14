@@ -88,13 +88,13 @@ export function AccountPanel({ locale = "en" }: { locale?: Locale }) {
     .toUpperCase();
 
   return (
-    <div className="jo-container pb-24">
+    <div className="ns-container pb-24">
       <div className="grid gap-8 lg:grid-cols-[1fr_1.8fr] lg:gap-12">
         {/* Identity + nav */}
         <aside className="lg:sticky lg:top-32 lg:self-start">
           <div className="bg-paper-raised border-line rounded-xl border p-6">
             <div className="flex items-center gap-4">
-              <span className="bg-violet font-display grid h-14 w-14 shrink-0 place-items-center rounded-full text-lg font-semibold text-white">
+              <span className="bg-brand font-display grid h-14 w-14 shrink-0 place-items-center rounded-full text-lg font-semibold text-white">
                 {initials}
               </span>
               <div className="min-w-0">
@@ -149,7 +149,7 @@ export function AccountPanel({ locale = "en" }: { locale?: Locale }) {
             <button
               type="button"
               onClick={handleSignOut}
-              className="text-smoke hover:text-coral rounded-md mt-2 cursor-pointer px-4 py-3 text-start text-[0.875rem] transition-colors"
+              className="text-smoke hover:text-alert rounded-md mt-2 cursor-pointer px-4 py-3 text-start text-[0.875rem] transition-colors"
               data-cursor="hover"
             >
               {rtl ? "تسجيل الخروج" : "Sign out"}
@@ -176,7 +176,7 @@ export function AccountPanel({ locale = "en" }: { locale?: Locale }) {
             {orders === null ? (
               <div className="space-y-3">
                 {[0, 1].map((i) => (
-                  <div key={i} className="jo-shimmer rounded-lg h-24" />
+                  <div key={i} className="ns-shimmer rounded-lg h-24" />
                 ))}
               </div>
             ) : orders.length === 0 ? (
@@ -197,7 +197,7 @@ export function AccountPanel({ locale = "en" }: { locale?: Locale }) {
                     key={order.id}
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05, duration: 0.4, ease: EASE.jo }}
+                    transition={{ delay: index * 0.05, duration: 0.4, ease: EASE.brand }}
                   >
                     <Link
                       href={`/orders/${order.reference}`}
@@ -242,7 +242,7 @@ export function AccountPanel({ locale = "en" }: { locale?: Locale }) {
                     id="displayName"
                     value={name}
                     onChange={(event) => setName(event.target.value)}
-                    className="border-line focus:border-violet bg-paper text-ink rounded-md min-w-0 flex-1 border px-4 py-2.5 text-[0.9375rem] outline-none transition-colors"
+                    className="border-line focus:border-brand bg-paper text-ink rounded-md min-w-0 flex-1 border px-4 py-2.5 text-[0.9375rem] outline-none transition-colors"
                   />
                   <Button
                     variant="secondary"
@@ -257,7 +257,7 @@ export function AccountPanel({ locale = "en" }: { locale?: Locale }) {
                   </Button>
                 </div>
                 {saveError && (
-                  <p role="alert" className="text-coral mt-1.5 text-[0.75rem]">
+                  <p role="alert" className="text-alert mt-1.5 text-[0.75rem]">
                     {saveError}
                   </p>
                 )}
@@ -309,7 +309,7 @@ export function AccountPanel({ locale = "en" }: { locale?: Locale }) {
                       {address.city}, {address.countryCode}
                     </p>
                     {address.isDefault && (
-                      <span className="bg-violet-mist text-violet-deep rounded-xs mt-2 inline-block px-2 py-0.5 text-[0.6875rem]">
+                      <span className="bg-brand-mist text-brand-deep rounded-xs mt-2 inline-block px-2 py-0.5 text-[0.6875rem]">
                         {rtl ? "الافتراضي" : "Default"}
                       </span>
                     )}
@@ -331,9 +331,9 @@ export function StatusChip({ status, locale = "en" }: { status: Order["status"];
       className={cn(
         "rounded-pill inline-block px-2.5 py-1 text-[0.6875rem] font-medium",
         tone === "done" && "bg-mint/12 text-mint",
-        tone === "progress" && "bg-violet-mist text-violet-deep",
+        tone === "progress" && "bg-brand-mist text-brand-deep",
         tone === "neutral" && "bg-paper-sunken text-smoke",
-        tone === "bad" && "bg-coral/12 text-coral",
+        tone === "bad" && "bg-alert/12 text-alert",
       )}
     >
       {STATUS_LABELS[status][locale]}

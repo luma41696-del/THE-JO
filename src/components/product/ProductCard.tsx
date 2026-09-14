@@ -84,7 +84,7 @@ export function ProductCard({
       initial={reduced ? undefined : { opacity: 0, y: 20 }}
       whileInView={reduced ? undefined : { opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-8%" }}
-      transition={{ duration: 0.5, ease: EASE.jo, delay: Math.min(index * 0.05, 0.3) }}
+      transition={{ duration: 0.5, ease: EASE.brand, delay: Math.min(index * 0.05, 0.3) }}
       onHoverStart={() => setHovered(true)}
       onHoverEnd={() => setHovered(false)}
     >
@@ -107,7 +107,7 @@ export function ProductCard({
         <motion.div
           className="absolute inset-0"
           animate={{ scale: hovered && !reduced ? 1.05 : 1 }}
-          transition={{ duration: 0.7, ease: EASE.jo }}
+          transition={{ duration: 0.7, ease: EASE.brand }}
         >
           <Image
             src={primary.url}
@@ -129,7 +129,7 @@ export function ProductCard({
               initial={{ opacity: 0, scale: 1.06 }}
               animate={{ opacity: 1, scale: 1.02 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.45, ease: EASE.jo }}
+              transition={{ duration: 0.45, ease: EASE.brand }}
             >
               <Image
                 src={secondary.url}
@@ -169,7 +169,7 @@ export function ProductCard({
                 : "Add to wishlist"
           }
           className={cn(
-            "jo-glass absolute end-3 top-3 z-20 grid h-9 w-9 place-items-center rounded-full",
+            "ns-glass absolute end-3 top-3 z-20 grid h-9 w-9 place-items-center rounded-full",
             "cursor-pointer transition-all duration-300",
             "md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100",
             wished && "md:opacity-100",
@@ -189,7 +189,7 @@ export function ProductCard({
               exit={{ opacity: 0, y: 12 }}
               transition={transition.base}
             >
-              <div className="jo-glass rounded-md shadow-float flex items-center gap-1 p-1.5">
+              <div className="ns-glass rounded-md shadow-float flex items-center gap-1 p-1.5">
                 <span className="text-mist ps-2 pe-1 text-[0.625rem] tracking-[0.14em] uppercase">
                   {locale === "ar" ? "أضف" : "Add"}
                 </span>
@@ -234,7 +234,7 @@ export function ProductCard({
       <div className="mt-4 flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h3 className="text-ink truncate text-[0.9375rem] font-medium">
-            <Link href={`/product/${product.slug}`} className="jo-underline">
+            <Link href={`/product/${product.slug}`} className="ns-underline">
               {title}
             </Link>
           </h3>
@@ -290,8 +290,8 @@ function Heart({ filled }: { filled: boolean }) {
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
       <path
         d="M8 13.8s-5.4-3.4-5.4-7A3.1 3.1 0 0 1 8 5.2a3.1 3.1 0 0 1 5.4 1.6c0 3.6-5.4 7-5.4 7Z"
-        fill={filled ? "var(--color-violet)" : "none"}
-        stroke={filled ? "var(--color-violet)" : "currentColor"}
+        fill={filled ? "var(--color-brand)" : "none"}
+        stroke={filled ? "var(--color-brand)" : "currentColor"}
         strokeWidth={1.4}
         strokeLinejoin="round"
       />

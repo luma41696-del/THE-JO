@@ -13,7 +13,7 @@ import { amountToFreeShipping, freeShippingProgress, subtotalOf } from "@/lib/pr
 import { useCart, useCartHydrated } from "@/lib/store/cart";
 import { useUI } from "@/lib/store/ui";
 import { Button } from "@/components/ui/Button";
-import { JoWave } from "@/components/brand/JoWave";
+import { BrandWave } from "@/components/brand/BrandWave";
 import { demoShippingMethods } from "@/data/demo";
 import type { Locale } from "@/types";
 
@@ -119,12 +119,12 @@ export function CartDrawer({ locale = "en" }: { locale?: Locale }) {
 
             {/* Free-shipping meter */}
             {hydrated && items.length > 0 && standard?.freeAbove && (
-              <div className="border-line bg-violet-veil border-b px-6 py-4">
+              <div className="border-line bg-brand-veil border-b px-6 py-4">
                 <p className="text-ink-muted text-[0.8125rem]">
                   {remaining > 0 ? (
                     <>
                       {rtl ? "أضف " : "Add "}
-                      <strong className="text-violet font-semibold tabular-nums">
+                      <strong className="text-brand font-semibold tabular-nums">
                         {formatPrice(remaining, currency, locale)}
                       </strong>
                       {rtl ? " للحصول على شحن مجاني" : " more for free express shipping"}
@@ -135,28 +135,28 @@ export function CartDrawer({ locale = "en" }: { locale?: Locale }) {
                     </span>
                   )}
                 </p>
-                <div className="bg-violet/12 mt-2.5 h-1 overflow-hidden rounded-full">
+                <div className="bg-brand/12 mt-2.5 h-1 overflow-hidden rounded-full">
                   <motion.div
-                    className={cn("h-full rounded-full", remaining > 0 ? "bg-violet" : "bg-mint")}
+                    className={cn("h-full rounded-full", remaining > 0 ? "bg-brand" : "bg-mint")}
                     initial={{ scaleX: 0 }}
                     animate={{ scaleX: progress }}
                     style={{ transformOrigin: rtl ? "right" : "left" }}
-                    transition={{ duration: 0.7, ease: EASE.jo }}
+                    transition={{ duration: 0.7, ease: EASE.brand }}
                   />
                 </div>
               </div>
             )}
 
             {/* Lines */}
-            <div className="jo-no-scrollbar flex-1 overflow-y-auto px-6">
+            <div className="ns-no-scrollbar flex-1 overflow-y-auto px-6">
               {!hydrated ? (
                 <div className="space-y-4 py-6">
                   {[0, 1].map((i) => (
                     <div key={i} className="flex gap-4">
-                      <div className="jo-shimmer rounded-md h-28 w-21" />
+                      <div className="ns-shimmer rounded-md h-28 w-21" />
                       <div className="flex-1 space-y-2 pt-2">
-                        <div className="jo-shimmer h-3 w-2/3 rounded-xs" />
-                        <div className="jo-shimmer h-3 w-1/3 rounded-xs" />
+                        <div className="ns-shimmer h-3 w-2/3 rounded-xs" />
+                        <div className="ns-shimmer h-3 w-1/3 rounded-xs" />
                       </div>
                     </div>
                   ))}
@@ -197,7 +197,7 @@ export function CartDrawer({ locale = "en" }: { locale?: Locale }) {
                                 <Link
                                   href={`/product/${item.slug}`}
                                   onClick={closeCart}
-                                  className="text-ink jo-underline block truncate text-[0.875rem] font-medium"
+                                  className="text-ink ns-underline block truncate text-[0.875rem] font-medium"
                                 >
                                   {t(item.title, locale)}
                                 </Link>
@@ -208,7 +208,7 @@ export function CartDrawer({ locale = "en" }: { locale?: Locale }) {
                               <button
                                 type="button"
                                 onClick={() => remove(item.key)}
-                                className="text-mist hover:text-coral -mt-1 shrink-0 cursor-pointer p-1 transition-colors"
+                                className="text-mist hover:text-alert -mt-1 shrink-0 cursor-pointer p-1 transition-colors"
                                 aria-label={`${rtl ? "إزالة" : "Remove"} ${t(item.title, locale)}`}
                                 data-cursor="hover"
                               >
@@ -253,7 +253,7 @@ export function CartDrawer({ locale = "en" }: { locale?: Locale }) {
                     className="font-display text-ink text-lg font-semibold tabular-nums"
                     initial={{ opacity: 0, y: -6 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.24, ease: EASE.jo }}
+                    transition={{ duration: 0.24, ease: EASE.brand }}
                   >
                     {formatPrice(subtotal, currency, locale)}
                   </motion.span>
@@ -265,7 +265,7 @@ export function CartDrawer({ locale = "en" }: { locale?: Locale }) {
                 </p>
 
                 <Button
-                  variant="violet"
+                  variant="brand"
                   size="lg"
                   fullWidth
                   magnetic
@@ -370,7 +370,7 @@ function EmptyBag({ locale, onClose }: { locale: Locale; onClose: () => void }) 
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center">
       <div className="h-28 w-28 opacity-70">
-        <JoWave rings={3} solidCore={false} color="var(--color-violet)" speed={7} />
+        <BrandWave rings={3} solidCore={false} color="var(--color-brand)" speed={7} />
       </div>
       <h3 className="font-display text-ink mt-6 text-lg font-semibold">
         {rtl ? "حقيبتك فارغة" : "Your bag is empty"}

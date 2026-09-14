@@ -208,7 +208,7 @@ function reference(n: number) {
     out += alphabet[value % alphabet.length];
     value = Math.floor(value / alphabet.length) + 31;
   }
-  return `JO-${out}`;
+  return `NS-${out}`;
 }
 
 function buildOrders(): Order[] {
@@ -418,7 +418,7 @@ export const demoTickets: SupportTicket[] = TICKET_SEEDS.map((seed, index) => {
     messages.push({
       id: `m-${index}-2`,
       authorId: "staff-1",
-      authorName: "THE JO Support",
+      authorName: "net sale Support",
       fromStaff: true,
       body: seed.reply,
       at: replyAt,

@@ -16,7 +16,7 @@ function required(name: string, value: string | undefined): string {
     // Fail loudly at module load rather than with an opaque Firebase error
     // three screens into the checkout flow.
     throw new Error(
-      `[THE JO] Missing environment variable ${name}. ` +
+      `[net sale] Missing environment variable ${name}. ` +
         `Copy .env.example to .env.local and fill it in.`,
     );
   }

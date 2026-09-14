@@ -1,7 +1,7 @@
 rules_version = '2';
 
 // ============================================================================
-// THE JO | ذاجو — Firestore Security Rules
+// net sale | نت سيل — Firestore Security Rules
 //
 // The governing principle: the catalogue is public to read and impossible to
 // write from a client; anything about a person is readable only by that person;

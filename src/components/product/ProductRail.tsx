@@ -51,7 +51,7 @@ export function ProductRail({ products, locale = "en", className }: ProductRailP
         ref={trackRef}
         onScroll={updateEdges}
         className={cn(
-          "jo-no-scrollbar -mx-5 flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 pb-2 md:-mx-10 md:gap-6 md:px-10",
+          "ns-no-scrollbar -mx-5 flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 pb-2 md:-mx-10 md:gap-6 md:px-10",
           "scroll-smooth",
         )}
       >
@@ -98,7 +98,7 @@ function RailButton({
       tabIndex={-1}
       aria-hidden="true"
       className={cn(
-        "jo-glass shadow-float pointer-events-auto grid h-11 w-11 place-items-center rounded-full",
+        "ns-glass shadow-float pointer-events-auto grid h-11 w-11 place-items-center rounded-full",
         "text-ink cursor-pointer transition-all duration-300",
         direction === "prev" ? "-ms-3" : "-me-3",
         hidden && "pointer-events-none scale-90 opacity-0",

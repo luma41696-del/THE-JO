@@ -126,7 +126,7 @@ export function ExportMenu<T>({
             initial={{ opacity: 0, y: -6, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.98 }}
-            transition={{ duration: 0.18, ease: EASE.jo }}
+            transition={{ duration: 0.18, ease: EASE.brand }}
           >
             {options.map((option) => (
               <button
@@ -149,7 +149,7 @@ export function ExportMenu<T>({
                   <span className="text-mist block text-[0.6875rem]">{option.hint}</span>
                 </span>
                 {busy === option.kind && (
-                  <span className="border-violet mt-1 h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-t-transparent" />
+                  <span className="border-brand mt-1 h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-t-transparent" />
                 )}
               </button>
             ))}

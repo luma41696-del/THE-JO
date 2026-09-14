@@ -15,10 +15,10 @@ import type { Locale } from "@/types";
 
 const en = {
   brand: {
-    name: "THE JO",
-    tagline: "Modern fashion, built to last",
+    name: "net sale",
+    tagline: "Premium fashion at net prices",
     taglineLong:
-      "Premium pieces cut in Italian and Portuguese mills. Try a full look in the fitting room, get your size from your measurements, and have it in 48 hours.",
+      "Italian and Portuguese mill pieces at net prices. Build a full look in the fitting room, get your size from your own measurements, and have it in 48 hours.",
   },
 
   nav: {
@@ -122,7 +122,7 @@ const en = {
   story: {
     eyebrow: "Our story",
     title: "Fewer pieces, longer lives",
-    p1: "THE JO started with a blunt question: why is most clothing built to last one season? We took the slower route — fewer mills, heavier cloth, deliberately small runs.",
+    p1: "net sale started with a blunt question: why is most clothing built to last one season? We took the slower route — fewer mills, heavier cloth, deliberately small runs.",
     p2: "We work direct with mills in Biella, Como and Porto, with nobody in between. The piece that arrives today is meant to still be in your wardrobe in ten years.",
     plate: "From first cut to last stitch, every piece passes through a person's hands.",
     statPieces: "pieces per season",
@@ -326,7 +326,7 @@ const en = {
     resetSent: "Check your inbox for a reset link.",
     enterEmailFirst: "Enter your email first.",
     haveAccount: "Already have an account?",
-    noAccount: "New to THE JO?",
+    noAccount: "New to net sale?",
     agreeTo: "By creating an account you agree to our",
     terms: "Terms",
     and: "and",
@@ -413,7 +413,7 @@ const en = {
     body: "Limited drops, private invitations, nothing else. One email a week at most.",
     placeholder: "your@email.com",
     join: "Join",
-    consent: "I'd like to hear from THE JO. I can unsubscribe at any time.",
+    consent: "I'd like to hear from net sale. I can unsubscribe at any time.",
     success: "You're in. Check your inbox to confirm.",
     errEmail: "Enter a valid email address.",
     errConsent: "Please confirm you want to hear from us.",
@@ -472,10 +472,10 @@ type Dictionary = typeof en;
 
 const ar: Dictionary = {
   brand: {
-    name: "ذاجو",
-    tagline: "أزياء عصرية تدوم",
+    name: "نت سيل",
+    tagline: "أزياء راقية بأسعار صافية",
     taglineLong:
-      "قطع مختارة من مصانع إيطاليا والبرتغال. كوّن إطلالتك في غرفة القياس، واعرف مقاسك من قياساتك، ويصلك الطلب خلال ٤٨ ساعة.",
+      "قطع من مصانع إيطاليا والبرتغال بأسعار صافية. كوّن إطلالتك في غرفة القياس، واعرف مقاسك من قياساتك، ويصلك الطلب خلال ٤٨ ساعة.",
   },
 
   nav: {
@@ -577,7 +577,7 @@ const ar: Dictionary = {
   story: {
     eyebrow: "قصتنا",
     title: "قطع أقل، وعمر أطول",
-    p1: "بدأت ذاجو بسؤال مباشر: لماذا تُصنع معظم الملابس لتدوم موسماً واحداً؟ اخترنا الطريق الأبطأ — مصانع أقل، وأقمشة أثقل، ودفعات محدودة عن قصد.",
+    p1: "بدأت نت سيل بسؤال مباشر: لماذا تُصنع معظم الملابس لتدوم موسماً واحداً؟ اخترنا الطريق الأبطأ — مصانع أقل، وأقمشة أثقل، ودفعات محدودة عن قصد.",
     p2: "نعمل مباشرة مع مصانع في بييلا وكومو وبورتو، بلا وسطاء. القطعة التي تصلك اليوم مصمَّمة لتبقى في خزانتك بعد عشر سنوات.",
     plate: "من أول قصّة إلى آخر غرزة، كل قطعة تمرّ على يد إنسان.",
     statPieces: "قطعة في الموسم",
@@ -780,7 +780,7 @@ const ar: Dictionary = {
     resetSent: "أرسلنا رابط إعادة التعيين إلى بريدك.",
     enterEmailFirst: "أدخل بريدك الإلكتروني أولاً.",
     haveAccount: "لديك حساب بالفعل؟",
-    noAccount: "جديد على ذاجو؟",
+    noAccount: "جديد على نت سيل؟",
     agreeTo: "بإنشائك حساباً فإنك توافق على",
     terms: "الشروط",
     and: "و",
@@ -866,7 +866,7 @@ const ar: Dictionary = {
     body: "إصدارات محدودة ودعوات خاصة، لا أكثر. رسالة واحدة أسبوعياً على الأكثر.",
     placeholder: "your@email.com",
     join: "اشترك",
-    consent: "أرغب في تلقّي رسائل من ذاجو، ويمكنني إلغاء الاشتراك في أي وقت.",
+    consent: "أرغب في تلقّي رسائل من نت سيل، ويمكنني إلغاء الاشتراك في أي وقت.",
     success: "تم! تحقّق من بريدك للتأكيد.",
     errEmail: "أدخل بريداً إلكترونياً صحيحاً.",
     errConsent: "يرجى تأكيد رغبتك في تلقّي الرسائل.",

@@ -6,7 +6,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { EASE } from "@/lib/motion";
 import { Button } from "@/components/ui/Button";
-import { JoWave } from "@/components/brand/JoWave";
+import { BrandWave } from "@/components/brand/BrandWave";
 import type { Locale } from "@/types";
 
 /**
@@ -57,13 +57,13 @@ export function Newsletter({ locale = "en" }: { locale?: Locale }) {
   }
 
   return (
-    <section className="bg-violet-veil rounded-2xl relative overflow-hidden px-7 py-14 md:px-14 md:py-20">
+    <section className="bg-brand-veil rounded-2xl relative overflow-hidden px-7 py-14 md:px-14 md:py-20">
       <div className="pointer-events-none absolute -start-16 -bottom-20 h-80 w-80 opacity-40">
-        <JoWave rings={4} color="var(--color-violet)" speed={12} />
+        <BrandWave rings={4} color="var(--color-brand)" speed={12} />
       </div>
 
       <div className="relative mx-auto max-w-xl text-center">
-        <p className="text-eyebrow font-display text-violet mb-5 uppercase">
+        <p className="text-eyebrow font-display text-brand mb-5 uppercase">
           {rtl ? "انضم إلينا" : "The list"}
         </p>
 
@@ -97,7 +97,7 @@ export function Newsletter({ locale = "en" }: { locale?: Locale }) {
               className={cn(
                 "bg-paper-raised rounded-pill shadow-lift mx-auto flex max-w-md items-center gap-2 p-2",
                 "border transition-colors duration-300",
-                error ? "border-coral" : "border-line focus-within:border-violet",
+                error ? "border-alert" : "border-line focus-within:border-brand",
               )}
             >
               <label htmlFor="newsletter-email" className="sr-only">
@@ -117,7 +117,7 @@ export function Newsletter({ locale = "en" }: { locale?: Locale }) {
               />
               <Button
                 type="submit"
-                variant="violet"
+                variant="brand"
                 size="md"
                 loading={state === "loading"}
                 className="shrink-0"
@@ -131,12 +131,12 @@ export function Newsletter({ locale = "en" }: { locale?: Locale }) {
                 type="checkbox"
                 checked={consent}
                 onChange={(event) => setConsent(event.target.checked)}
-                className="accent-violet mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer"
+                className="accent-brand mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer"
               />
               <span>
                 {rtl
-                  ? "أوافق على استلام رسائل من ذاجو. يمكنني إلغاء الاشتراك في أي وقت."
-                  : "I'd like to hear from THE JO. I can unsubscribe at any time."}
+                  ? "أوافق على استلام رسائل من نت سيل. يمكنني إلغاء الاشتراك في أي وقت."
+                  : "I'd like to hear from net sale. I can unsubscribe at any time."}
               </span>
             </label>
 
@@ -144,7 +144,7 @@ export function Newsletter({ locale = "en" }: { locale?: Locale }) {
               <motion.p
                 id="newsletter-error"
                 role="alert"
-                className="text-coral mt-3 text-[0.8125rem]"
+                className="text-alert mt-3 text-[0.8125rem]"
                 initial={{ opacity: 0, y: -6 }}
                 animate={{ opacity: 1, y: 0 }}
               >
@@ -170,7 +170,7 @@ function CheckCircle() {
         strokeLinejoin="round"
         initial={{ pathLength: 0 }}
         animate={{ pathLength: 1 }}
-        transition={{ duration: 0.4, ease: EASE.jo, delay: 0.15 }}
+        transition={{ duration: 0.4, ease: EASE.brand, delay: 0.15 }}
       />
     </svg>
   );

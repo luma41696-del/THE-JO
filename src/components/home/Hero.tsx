@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { EASE } from "@/lib/motion";
 import { formatPrice, t } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
-import { JoLottie } from "@/components/brand/JoLottie";
+import { BrandLottie } from "@/components/brand/BrandLottie";
 import { AnimatedLogo } from "@/components/brand/AnimatedLogo";
 import type { Banner, Locale, Product } from "@/types";
 
@@ -58,22 +58,22 @@ export function Hero({ banner, products, locale = "en" }: HeroProps) {
       {/* Ambient brand field. Kept under 6% so it reads as paper texture rather
           than as a shape competing with the headline for attention. */}
       <div className="pointer-events-none absolute -top-32 start-[-18%] h-[30rem] w-[30rem] opacity-[0.05] md:opacity-[0.06]">
-        <JoLottie className="h-full w-full" />
+        <BrandLottie className="h-full w-full" />
       </div>
-      <div className="bg-violet-mist/40 pointer-events-none absolute end-[-20%] top-[10%] h-[46rem] w-[46rem] rounded-full blur-3xl" />
+      <div className="bg-brand-mist/40 pointer-events-none absolute end-[-20%] top-[10%] h-[46rem] w-[46rem] rounded-full blur-3xl" />
 
-      <div className="jo-container relative">
+      <div className="ns-container relative">
         <div className="grid items-center gap-14 lg:grid-cols-[1.05fr_1fr] lg:gap-20">
           {/* Copy */}
           <motion.div style={{ y: copyY, opacity: fade }}>
             {banner?.eyebrow && (
               <motion.p
-                className="text-eyebrow font-display text-violet mb-6 flex items-center gap-3 uppercase"
+                className="text-eyebrow font-display text-brand mb-6 flex items-center gap-3 uppercase"
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.15, duration: 0.5, ease: EASE.jo }}
+                transition={{ delay: 0.15, duration: 0.5, ease: EASE.brand }}
               >
-                <span className="bg-violet inline-block h-1.5 w-1.5 rounded-full" />
+                <span className="bg-brand inline-block h-1.5 w-1.5 rounded-full" />
                 {t(banner.eyebrow, locale)}
               </motion.p>
             )}
@@ -85,7 +85,7 @@ export function Hero({ banner, products, locale = "en" }: HeroProps) {
                     className="block"
                     initial={reduced ? undefined : { y: "110%" }}
                     animate={reduced ? undefined : { y: "0%" }}
-                    transition={{ delay: 0.1 + index * 0.1, duration: 0.85, ease: EASE.jo }}
+                    transition={{ delay: 0.1 + index * 0.1, duration: 0.85, ease: EASE.brand }}
                   >
                     {line}
                   </motion.span>
@@ -119,7 +119,7 @@ export function Hero({ banner, products, locale = "en" }: HeroProps) {
                 className="text-ink-muted mt-7 max-w-lg text-pretty md:text-[1.0625rem]"
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.42, duration: 0.6, ease: EASE.jo }}
+                transition={{ delay: 0.42, duration: 0.6, ease: EASE.brand }}
               >
                 {t(banner.body, locale)}
               </motion.p>
@@ -129,7 +129,7 @@ export function Hero({ banner, products, locale = "en" }: HeroProps) {
               className="mt-10 flex flex-wrap items-center gap-3"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.55, duration: 0.6, ease: EASE.jo }}
+              transition={{ delay: 0.55, duration: 0.6, ease: EASE.brand }}
             >
               <Link href={banner?.cta?.href ?? "/shop"}>
                 <Button variant="primary" size="lg" magnetic>
@@ -174,7 +174,7 @@ export function Hero({ banner, products, locale = "en" }: HeroProps) {
                   className="rounded-2xl relative aspect-[4/3] overflow-hidden"
                   initial={{ opacity: 0, scale: 0.94, rotate: -2 }}
                   animate={{ opacity: 1, scale: 1, rotate: -1.5 }}
-                  transition={{ delay: 0.2, duration: 0.9, ease: EASE.jo }}
+                  transition={{ delay: 0.2, duration: 0.9, ease: EASE.brand }}
                 >
                   <Image
                     src={banner.media.url}
@@ -185,7 +185,7 @@ export function Hero({ banner, products, locale = "en" }: HeroProps) {
                     className="object-cover"
                   />
                   <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 p-6">
-                    <AnimatedLogo tone="light" className="h-12 w-12" intro={false} alwaysWave title={null} />
+                    <AnimatedLogo tone="onDark" className="h-12 w-12" intro={false} alwaysWave title={null} />
                     <span className="font-display text-[0.625rem] tracking-[0.2em] text-white/70 uppercase">
                       {rtl ? "أتلييه الشتاء ٠١" : "Winter Atelier 01"}
                     </span>
@@ -231,7 +231,7 @@ function HeroProductCard({
       className="min-w-0 flex-1"
       initial={{ opacity: 0, y: 40, rotate: index === 1 ? 0 : index === 0 ? -3 : 3 }}
       animate={{ opacity: 1, y: index === 1 ? -18 : 0, rotate: index === 1 ? 0 : index === 0 ? -2 : 2 }}
-      transition={{ delay: 0.45 + index * 0.12, duration: 0.8, ease: EASE.jo }}
+      transition={{ delay: 0.45 + index * 0.12, duration: 0.8, ease: EASE.brand }}
       whileHover={{ y: index === 1 ? -30 : -12, rotate: 0, transition: { duration: 0.4 } }}
     >
       <Link
@@ -240,7 +240,7 @@ function HeroProductCard({
         data-cursor="view"
         data-cursor-label={locale === "ar" ? "عرض" : "View"}
       >
-        <div className="jo-glass rounded-lg shadow-float overflow-hidden p-1.5">
+        <div className="ns-glass rounded-lg shadow-float overflow-hidden p-1.5">
           <div className="bg-paper-sunken rounded-md relative aspect-[3/4] overflow-hidden">
             <Image
               src={image.url}
@@ -252,7 +252,7 @@ function HeroProductCard({
           </div>
           <div className="px-2 pt-2.5 pb-1.5">
             <p className="text-ink truncate text-[0.75rem] font-medium">{t(product.title, locale)}</p>
-            <p className="text-violet mt-0.5 text-[0.75rem] font-semibold tabular-nums">
+            <p className="text-brand mt-0.5 text-[0.75rem] font-semibold tabular-nums">
               {formatPrice(product.price, product.currency, locale)}
             </p>
           </div>

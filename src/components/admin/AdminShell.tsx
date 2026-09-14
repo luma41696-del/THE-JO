@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { EASE, transition } from "@/lib/motion";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { signOut } from "@/lib/firebase/auth";
-import { JoMark } from "@/components/brand/JoMark";
+import { NetSaleMark } from "@/components/brand/NetSaleMark";
 
 /**
  * Admin chrome.
@@ -77,10 +77,10 @@ export function AdminShell({
   const rail = (
     <>
       <Link href="/admin" className="flex items-center gap-2.5 px-2">
-        <JoMark className="h-8 w-8 shrink-0" title={null} />
+        <NetSaleMark className="h-8 w-8 shrink-0" title={null} />
         <span className="min-w-0">
           <span className="font-display text-ink block text-[0.875rem] font-semibold tracking-[0.14em] uppercase">
-            The&nbsp;Jo
+            net&nbsp;sale
           </span>
           <span className="text-mist block text-[0.6875rem] tracking-[0.1em] uppercase">
             Operations
@@ -131,14 +131,14 @@ export function AdminShell({
 
       <div className="border-line mt-4 border-t pt-4">
         {!live && (
-          <p className="bg-violet-mist text-violet-deep mb-3 rounded-md px-3 py-2 text-[0.6875rem] leading-relaxed">
+          <p className="bg-brand-mist text-brand-deep mb-3 rounded-md px-3 py-2 text-[0.6875rem] leading-relaxed">
             <strong className="font-semibold">Sample data.</strong> Firestore has no
             orders yet, so these screens are showing a generated 120-day history.
           </p>
         )}
 
         <div className="flex items-center gap-2.5 px-1">
-          <span className="bg-violet font-display grid h-8 w-8 shrink-0 place-items-center rounded-full text-[0.6875rem] font-semibold text-white">
+          <span className="bg-brand font-display grid h-8 w-8 shrink-0 place-items-center rounded-full text-[0.6875rem] font-semibold text-white">
             {initials}
           </span>
           <span className="min-w-0 flex-1">
@@ -159,7 +159,7 @@ export function AdminShell({
           <button
             type="button"
             onClick={handleSignOut}
-            className="text-smoke hover:text-coral cursor-pointer rounded-md px-2 py-1.5 text-[0.75rem] transition-colors"
+            className="text-smoke hover:text-alert cursor-pointer rounded-md px-2 py-1.5 text-[0.75rem] transition-colors"
             data-cursor="hover"
           >
             Sign out
@@ -179,7 +179,7 @@ export function AdminShell({
       {/* Mobile bar */}
       <header className="border-line bg-paper-raised sticky top-0 z-30 flex items-center justify-between border-b px-4 py-3 lg:hidden">
         <Link href="/admin" className="flex items-center gap-2">
-          <JoMark className="h-7 w-7" title={null} />
+          <NetSaleMark className="h-7 w-7" title={null} />
           <span className="font-display text-[0.8125rem] font-semibold tracking-[0.14em] uppercase">
             Operations
           </span>
@@ -229,7 +229,7 @@ export function AdminShell({
           key={pathname}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, ease: EASE.jo }}
+          transition={{ duration: 0.3, ease: EASE.brand }}
           className="p-5 md:p-8"
         >
           {children}

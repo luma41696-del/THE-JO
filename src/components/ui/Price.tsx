@@ -41,7 +41,7 @@ export function Price({
 
   return (
     <span className={cn("tabular inline-flex items-baseline gap-2", SIZES[size], className)}>
-      <span className={cn("font-medium", onSale && "text-coral")}>
+      <span className={cn("font-medium", onSale && "text-alert")}>
         {formatPrice(value, currency, locale)}
       </span>
 
@@ -51,7 +51,7 @@ export function Price({
             {formatPrice(compareAt!, currency, locale)}
           </span>
           {showDiscount && (
-            <span className="text-coral bg-coral/10 rounded-xs px-1.5 py-0.5 text-[0.7em] font-semibold">
+            <span className="text-alert bg-alert/10 rounded-xs px-1.5 py-0.5 text-[0.7em] font-semibold">
               −{off}%
             </span>
           )}

@@ -4,7 +4,7 @@ import { useEffect } from "react";
 
 import { Link } from "@/components/ui/Link";
 import { useI18n } from "@/components/providers/LocaleProvider";
-import { JoWave } from "@/components/brand/JoWave";
+import { BrandWave } from "@/components/brand/BrandWave";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 
@@ -28,13 +28,13 @@ export default function ErrorBoundary({
 
   useEffect(() => {
     // Replace with your error reporter (Sentry, Firebase Crashlytics, …).
-    console.error("[THE JO] Route error", error.digest ?? error.message);
+    console.error("[net sale] Route error", error.digest ?? error.message);
   }, [error]);
 
   return (
-    <div className="jo-container flex min-h-screen flex-col items-center justify-center py-24 text-center">
+    <div className="ns-container flex min-h-screen flex-col items-center justify-center py-24 text-center">
       <div className="h-32 w-32 opacity-70">
-        <JoWave rings={3} color="var(--color-coral)" speed={5} />
+        <BrandWave rings={3} color="var(--color-alert)" speed={5} />
       </div>
 
       <h1

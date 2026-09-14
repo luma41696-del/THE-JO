@@ -20,8 +20,8 @@ export default function RootNotFound() {
       <body className="bg-paper text-ink min-h-screen antialiased">
         <main className="flex min-h-screen flex-col items-center justify-center gap-8 px-6 text-center">
           <svg viewBox="0 0 120 120" width="88" height="88" fill="none" aria-hidden="true">
-            <circle cx="60" cy="60" r="46" fill="#F0EAFF" />
-            <circle cx="60" cy="60" r="10" fill="#703BEC" />
+            <circle cx="60" cy="60" r="46" fill="#FBE7E5" />
+            <circle cx="60" cy="60" r="10" fill="#CE1212" />
           </svg>
 
           <div>

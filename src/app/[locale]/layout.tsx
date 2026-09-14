@@ -7,7 +7,7 @@ import "../globals.css";
 
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import { LocaleProvider } from "@/components/providers/LocaleProvider";
-import { JoCursor } from "@/components/cursor/JoCursor";
+import { BrandCursor } from "@/components/cursor/BrandCursor";
 import { BrandIntro } from "@/components/brand/BrandIntro";
 import { LOCALES, LOCALE_META, isLocale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionaries";
@@ -95,20 +95,20 @@ export async function generateMetadata({
   const t = getDictionary(locale);
   const meta = LOCALE_META[locale];
 
-  const title = `${t.brand.name} — ${locale === "ar" ? "THE JO" : "ذاجو"} | ${t.brand.tagline}`;
+  const title = `${t.brand.name} — ${locale === "ar" ? "net sale" : "نت سيل"} | ${t.brand.tagline}`;
 
   return {
     metadataBase: new URL(siteUrl),
     title: { default: title, template: `%s · ${t.brand.name}` },
     description: t.brand.taglineLong,
-    applicationName: "THE JO",
+    applicationName: "net sale",
     keywords:
       locale === "ar"
-        ? ["أزياء", "ذاجو", "ملابس", "الأردن", "غرفة القياس", "تسوق"]
-        : ["fashion", "premium", "THE JO", "Jordan", "AI fitting room", "luxury basics"],
+        ? ["أزياء", "نت سيل", "ملابس", "الأردن", "غرفة القياس", "تسوق"]
+        : ["fashion", "premium", "net sale", "Jordan", "AI fitting room", "luxury basics"],
     openGraph: {
       type: "website",
-      siteName: "THE JO — ذاجو",
+      siteName: "net sale — نت سيل",
       title,
       description: t.brand.taglineLong,
       url: `${siteUrl}/${locale}`,
@@ -117,8 +117,8 @@ export async function generateMetadata({
     },
     twitter: { card: "summary_large_image", title, description: t.brand.tagline },
     icons: {
-      icon: [{ url: "/brand/jo-icon.svg", type: "image/svg+xml" }],
-      apple: [{ url: "/brand/jo-icon.svg" }],
+      icon: [{ url: "/brand/net-sale-icon.svg", type: "image/svg+xml" }],
+      apple: [{ url: "/brand/net-sale-icon.svg" }],
     },
     /**
      * `hreflang` for both languages plus `x-default`. Without these, Google
@@ -139,8 +139,8 @@ export async function generateMetadata({
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#faf8f4" },
-    { media: "(prefers-color-scheme: dark)", color: "#0b0b0f" },
+    { media: "(prefers-color-scheme: light)", color: "#eeebdd" },
+    { media: "(prefers-color-scheme: dark)", color: "#1b1717" },
   ],
   width: "device-width",
   initialScale: 1,
@@ -187,7 +187,7 @@ export default async function LocaleLayout({
         <LocaleProvider locale={locale}>
           <AuthProvider>
             <BrandIntro />
-            <JoCursor />
+            <BrandCursor />
 
             <main id="main">{children}</main>
           </AuthProvider>

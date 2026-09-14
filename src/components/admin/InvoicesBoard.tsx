@@ -65,7 +65,7 @@ export function InvoicesBoard({ invoices }: { invoices: Invoice[] }) {
       key: "order",
       header: "Order",
       cell: (invoice) => (
-        <Link href={`/admin/orders/${invoice.orderReference}`} className="text-violet">
+        <Link href={`/admin/orders/${invoice.orderReference}`} className="text-brand">
           {invoice.orderReference}
         </Link>
       ),
@@ -139,8 +139,8 @@ export function InvoicesBoard({ invoices }: { invoices: Invoice[] }) {
               { header: "Total", value: (i) => i.total, format: "currency" },
               { header: "Payment", value: (i) => i.paymentMethod },
             ]}
-            filename="the-jo-invoices"
-            title="THE JO — invoice ledger"
+            filename="net-sale-invoices"
+            title="net sale — invoice ledger"
           />
         }
       />
@@ -159,7 +159,7 @@ export function InvoicesBoard({ invoices }: { invoices: Invoice[] }) {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Invoice number, order, customer…"
-            className="border-line focus:border-violet bg-paper-raised text-ink placeholder:text-mist w-72 rounded-pill border px-4 py-2 text-[0.8125rem] outline-none transition-colors"
+            className="border-line focus:border-brand bg-paper-raised text-ink placeholder:text-mist w-72 rounded-pill border px-4 py-2 text-[0.8125rem] outline-none transition-colors"
           />
         </label>
       </div>

@@ -4,9 +4,8 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { Link } from "@/components/ui/Link";
 import { useAuth } from "@/components/providers/AuthProvider";
-import { getFirebaseAuth } from "@/lib/firebase/client";
 import { Button } from "@/components/ui/Button";
-import { JoWave } from "@/components/brand/JoWave";
+import { BrandWave } from "@/components/brand/BrandWave";
 
 /**
  * Admin access gate.
@@ -96,7 +95,7 @@ export function AdminGate({ children }: { children: ReactNode }) {
     return (
       <div className="grid min-h-screen place-items-center">
         <div className="h-20 w-20 opacity-60">
-          <JoWave rings={3} color="var(--color-violet)" speed={5} />
+          <BrandWave rings={3} color="var(--color-brand)" speed={5} />
         </div>
         <span className="sr-only">Checking access</span>
       </div>
@@ -110,7 +109,7 @@ export function AdminGate({ children }: { children: ReactNode }) {
         body="The admin is only reachable by a signed-in account with a staff or admin role."
         action={
           <Link href="/login?next=/admin">
-            <Button variant="violet" size="lg" magnetic>
+            <Button variant="brand" size="lg" magnetic>
               Sign in
             </Button>
           </Link>
@@ -152,7 +151,7 @@ export function AdminGate({ children }: { children: ReactNode }) {
       {DEV_BYPASS && (
         <p
           role="status"
-          className="bg-coral sticky top-0 z-[200] px-4 py-1.5 text-center text-[0.6875rem] font-medium text-white"
+          className="bg-alert sticky top-0 z-[200] px-4 py-1.5 text-center text-[0.6875rem] font-medium text-white"
         >
           Development preview — access checks are bypassed. Writes still require a
           verified admin token and will be refused.
@@ -176,7 +175,7 @@ function Shell({
     <div className="grid min-h-screen place-items-center px-6">
       <div className="max-w-md text-center">
         <div className="mx-auto h-24 w-24 opacity-70">
-          <JoWave rings={3} color="var(--color-violet)" speed={8} />
+          <BrandWave rings={3} color="var(--color-brand)" speed={8} />
         </div>
         <h1 className="font-display text-ink mt-6 text-xl font-semibold">{title}</h1>
         <div className="text-smoke mt-3 text-[0.9375rem] leading-relaxed">{body}</div>

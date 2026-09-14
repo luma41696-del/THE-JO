@@ -35,7 +35,7 @@ export function PageIntro({
   return (
     <header
       className={cn(
-        "jo-container pt-32 pb-10 md:pt-44 md:pb-14",
+        "ns-container pt-32 pb-10 md:pt-44 md:pb-14",
         align === "center" && "text-center",
         className,
       )}
@@ -45,7 +45,7 @@ export function PageIntro({
           <Reveal>
             <p
               className={cn(
-                "font-ui text-violet mb-4",
+                "font-ui text-brand mb-4",
                 ar ? "text-[0.8125rem] font-semibold" : "text-eyebrow uppercase",
               )}
             >

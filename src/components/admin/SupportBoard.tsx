@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "motion/react";
 
 import { Link } from "@/components/ui/Link";
 import { cn } from "@/lib/utils";
-import { EASE, transition } from "@/lib/motion";
+import { transition } from "@/lib/motion";
 import { formatDate } from "@/lib/format";
 import { AdminPageHeader } from "./AdminShell";
 import { FilterChips, Panel, PriorityFlag, StatTile, TicketStatusPill } from "./AdminUI";
@@ -97,7 +97,7 @@ export function SupportBoard({ tickets: initial }: { tickets: SupportTicket[] })
                 {
                   id: `local-${now}`,
                   authorId: "staff",
-                  authorName: "THE JO Support",
+                  authorName: "net sale Support",
                   fromStaff: true,
                   body: reply.trim(),
                   at: now,
@@ -171,7 +171,7 @@ export function SupportBoard({ tickets: initial }: { tickets: SupportTicket[] })
                       onClick={() => setSelectedId(ticket.id)}
                       className={cn(
                         "w-full cursor-pointer px-4 py-3 text-start transition-colors",
-                        active ? "bg-violet-veil" : "hover:bg-paper-sunken/60",
+                        active ? "bg-brand-veil" : "hover:bg-paper-sunken/60",
                       )}
                       data-cursor="hover"
                     >
@@ -213,7 +213,7 @@ export function SupportBoard({ tickets: initial }: { tickets: SupportTicket[] })
                       {" · "}
                       <Link
                         href={`/admin/orders/${selected.orderReference}`}
-                        className="text-violet"
+                        className="text-brand"
                       >
                         {selected.orderReference}
                       </Link>
@@ -245,7 +245,7 @@ export function SupportBoard({ tickets: initial }: { tickets: SupportTicket[] })
                       className={cn(
                         "max-w-[80%] rounded-lg px-4 py-3",
                         message.fromStaff
-                          ? "bg-violet text-white"
+                          ? "bg-brand text-white"
                           : "bg-paper-sunken text-ink",
                       )}
                     >
@@ -272,7 +272,7 @@ export function SupportBoard({ tickets: initial }: { tickets: SupportTicket[] })
                   onChange={(event) => setReply(event.target.value)}
                   rows={3}
                   placeholder="Write a reply…"
-                  className="border-line focus:border-violet bg-paper text-ink placeholder:text-mist w-full resize-y rounded-md border px-3 py-2.5 text-[0.875rem] outline-none transition-colors"
+                  className="border-line focus:border-brand bg-paper text-ink placeholder:text-mist w-full resize-y rounded-md border px-3 py-2.5 text-[0.875rem] outline-none transition-colors"
                 />
               </label>
               <div className="mt-3 flex items-center justify-between gap-3">
@@ -280,7 +280,7 @@ export function SupportBoard({ tickets: initial }: { tickets: SupportTicket[] })
                   Sending also emails the customer and moves the ticket to Waiting.
                 </p>
                 <Button
-                  variant="violet"
+                  variant="brand"
                   size="sm"
                   loading={sending}
                   disabled={!reply.trim()}

@@ -5,23 +5,23 @@ import { useReducedMotion } from "motion/react";
 import type { LottieRefCurrentProps } from "lottie-react";
 
 import { cn } from "@/lib/utils";
-import { JoWave } from "./JoWave";
+import { BrandWave } from "./BrandWave";
 
 /**
- * Lottie player for `public/lottie/jo-bubble-wave.json`.
+ * Lottie player for `public/lottie/net-sale-wave.json`.
  *
  * That file is generated from the same traced vectors as the rest of the brand
- * (see `scripts/generate-brand.mjs`): the bubble morphs through its wave
- * states while violet ripple rings expand out of it.
+ * (see `scripts/generate-brand.mjs`): the pebble morphs through its wave states
+ * while red ripple rings expand out of it.
  *
  * Cost control, because a Lottie player is ~60KB of JS:
  *  - the player and the JSON are both fetched lazily, only once the component
  *    scrolls into view;
- *  - `JoWave` renders in the meantime and permanently replaces it under
+ *  - `BrandWave` renders in the meantime and permanently replaces it under
  *    `prefers-reduced-motion`, so nothing is downloaded that will not play.
  */
 
-export interface JoLottieProps {
+export interface BrandLottieProps {
   className?: string;
   loop?: boolean;
   /** Start paused and play on hover — used by the fitting-room teaser. */
@@ -32,12 +32,12 @@ export interface JoLottieProps {
 
 type LottieModule = typeof import("lottie-react");
 
-export function JoLottie({
+export function BrandLottie({
   className,
   loop = true,
   playOnHover = false,
-  fallbackColor = "var(--color-violet)",
-}: JoLottieProps) {
+  fallbackColor = "var(--color-brand)",
+}: BrandLottieProps) {
   const reduced = useReducedMotion();
   const hostRef = useRef<HTMLDivElement>(null);
   const lottieRef = useRef<LottieRefCurrentProps>(null);
@@ -72,7 +72,7 @@ export function JoLottie({
       try {
         const [mod, json] = await Promise.all([
           import("lottie-react"),
-          fetch("/lottie/jo-bubble-wave.json").then((r) => {
+          fetch("/lottie/net-sale-wave.json").then((r) => {
             if (!r.ok) throw new Error(`lottie ${r.status}`);
             return r.json();
           }),
@@ -81,7 +81,7 @@ export function JoLottie({
         setLottie(() => mod.default);
         setData(json);
       } catch {
-        // Leave `JoWave` in place — it is a complete substitute, not a spinner.
+        // Leave `BrandWave` in place — it is a complete substitute, not a spinner.
       }
     })();
 
@@ -110,7 +110,7 @@ export function JoLottie({
           rendererSettings={{ preserveAspectRatio: "xMidYMid meet" }}
         />
       ) : (
-        <JoWave solidCore rings={3} color={fallbackColor} className="h-full w-full" />
+        <BrandWave solidCore rings={3} color={fallbackColor} className="h-full w-full" />
       )}
     </div>
   );

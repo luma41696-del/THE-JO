@@ -13,7 +13,7 @@ import { useCart, useCartHydrated } from "@/lib/store/cart";
 import { Button } from "@/components/ui/Button";
 import { ProductRail } from "@/components/product/ProductRail";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { JoWave } from "@/components/brand/JoWave";
+import { BrandWave } from "@/components/brand/BrandWave";
 import type { Locale, Offer, Product, ShippingMethod } from "@/types";
 
 /**
@@ -85,29 +85,29 @@ export function CartPageClient({
 
   if (!mounted || !hydrated) {
     return (
-      <div className="jo-container grid gap-10 pb-24 lg:grid-cols-[1.6fr_1fr]">
+      <div className="ns-container grid gap-10 pb-24 lg:grid-cols-[1.6fr_1fr]">
         <div className="space-y-6">
           {[0, 1, 2].map((i) => (
             <div key={i} className="flex gap-5">
-              <div className="jo-shimmer rounded-lg h-40 w-30" />
+              <div className="ns-shimmer rounded-lg h-40 w-30" />
               <div className="flex-1 space-y-3 pt-2">
-                <div className="jo-shimmer h-4 w-1/2 rounded-xs" />
-                <div className="jo-shimmer h-3 w-1/3 rounded-xs" />
+                <div className="ns-shimmer h-4 w-1/2 rounded-xs" />
+                <div className="ns-shimmer h-3 w-1/3 rounded-xs" />
               </div>
             </div>
           ))}
         </div>
-        <div className="jo-shimmer rounded-xl h-80" />
+        <div className="ns-shimmer rounded-xl h-80" />
       </div>
     );
   }
 
   if (items.length === 0) {
     return (
-      <div className="jo-container pb-24">
+      <div className="ns-container pb-24">
         <div className="border-line rounded-xl flex flex-col items-center border border-dashed py-20 text-center">
           <div className="h-28 w-28 opacity-70">
-            <JoWave rings={3} color="var(--color-violet)" speed={8} />
+            <BrandWave rings={3} color="var(--color-brand)" speed={8} />
           </div>
           <h2 className="font-display text-ink mt-6 text-xl font-semibold">
             {rtl ? "حقيبتك فارغة" : "Your bag is empty"}
@@ -136,7 +136,7 @@ export function CartPageClient({
 
   return (
     <>
-      <div className="jo-container grid gap-10 pb-20 lg:grid-cols-[1.6fr_1fr] lg:gap-16">
+      <div className="ns-container grid gap-10 pb-20 lg:grid-cols-[1.6fr_1fr] lg:gap-16">
         {/* Lines */}
         <div>
           <ul className="divide-line divide-y border-y border-[var(--color-line)]">
@@ -172,7 +172,7 @@ export function CartPageClient({
                         <div className="min-w-0">
                           <Link
                             href={`/product/${item.slug}`}
-                            className="text-ink jo-underline text-[0.9375rem] font-medium"
+                            className="text-ink ns-underline text-[0.9375rem] font-medium"
                           >
                             {t(item.title, locale)}
                           </Link>
@@ -211,7 +211,7 @@ export function CartPageClient({
                         <button
                           type="button"
                           onClick={() => remove(item.key)}
-                          className="text-smoke hover:text-coral cursor-pointer text-[0.8125rem] underline-offset-4 transition-colors hover:underline"
+                          className="text-smoke hover:text-alert cursor-pointer text-[0.8125rem] underline-offset-4 transition-colors hover:underline"
                           data-cursor="hover"
                         >
                           {rtl ? "إزالة" : "Remove"}
@@ -257,7 +257,7 @@ export function CartPageClient({
                       className={cn(
                         "flex cursor-pointer items-start gap-3 rounded-md border p-3.5 transition-all duration-200",
                         methodId === option.id
-                          ? "border-violet bg-violet-veil"
+                          ? "border-brand bg-brand-veil"
                           : "border-line hover:border-ink/30",
                       )}
                     >
@@ -267,7 +267,7 @@ export function CartPageClient({
                         value={option.id}
                         checked={methodId === option.id}
                         onChange={() => setMethodId(option.id)}
-                        className="accent-violet mt-0.5"
+                        className="accent-brand mt-0.5"
                       />
                       <span className="min-w-0 flex-1">
                         <span className="flex items-center justify-between gap-2">
@@ -330,7 +330,7 @@ export function CartPageClient({
                       placeholder={rtl ? "أدخل الرمز" : "Enter code"}
                       className={cn(
                         "rounded-pill text-ink placeholder:text-mist min-w-0 flex-1 border px-4 py-2.5 text-[0.875rem] outline-none transition-colors",
-                        codeError ? "border-coral" : "border-line focus:border-violet",
+                        codeError ? "border-alert" : "border-line focus:border-brand",
                       )}
                     />
                     <Button
@@ -344,7 +344,7 @@ export function CartPageClient({
                     </Button>
                   </div>
                   {codeError && (
-                    <p role="alert" className="text-coral mt-2 text-[0.75rem]">
+                    <p role="alert" className="text-alert mt-2 text-[0.75rem]">
                       {codeError}
                     </p>
                   )}
@@ -382,7 +382,7 @@ export function CartPageClient({
                   className="font-display text-ink text-xl font-semibold tabular-nums"
                   initial={{ opacity: 0, y: -6 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.24, ease: EASE.jo }}
+                  transition={{ duration: 0.24, ease: EASE.brand }}
                 >
                   {formatPrice(totals.total, totals.currency, locale)}
                 </motion.dd>
@@ -390,7 +390,7 @@ export function CartPageClient({
             </dl>
 
             <Button
-              variant="violet"
+              variant="brand"
               size="lg"
               fullWidth
               magnetic
@@ -408,7 +408,7 @@ export function CartPageClient({
       </div>
 
       {suggestions.length > 0 && (
-        <section className="jo-container pb-24">
+        <section className="ns-container pb-24">
           <SectionHeading
             locale={locale}
             eyebrow={rtl ? "يناسب ما في حقيبتك" : "Goes with your bag"}

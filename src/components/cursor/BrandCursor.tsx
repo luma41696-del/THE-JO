@@ -10,18 +10,18 @@ import {
 } from "motion/react";
 
 import { EASE } from "@/lib/motion";
-import { BLOB_WAVES, JO_CENTROID, JO_VIEWBOX } from "@/components/brand/paths";
+import { BLOB_WAVES, NS_CENTROID, NS_VIEWBOX } from "@/components/brand/paths";
 import { useUI, type CursorMode } from "@/lib/store/ui";
 
 /**
- * The JO cursor.
+ * The net sale cursor.
  *
- * The brand mark is a bubble with a detached dot. That maps onto a cursor
+ * The brand mark is a pebble with a detached dot. That maps onto a cursor
  * almost too neatly, so the design takes it literally:
  *
  *   - the **dot** is the real pointer. It tracks the mouse with zero lag, so
  *     precision is never sacrificed for style;
- *   - the **bubble** trails behind on a spring, morphing through its wave
+ *   - the **pebble** trails behind on a spring, morphing through its wave
  *     states. It is the personality; it is also never the thing you aim with.
  *
  * Elements opt into states declaratively:
@@ -36,7 +36,7 @@ import { useUI, type CursorMode } from "@/lib/store/ui";
  *   - window blur / pointer leaves the document → fades out
  *
  * The OS cursor is only hidden once this component has actually mounted and
- * set `data-jo-cursor="on"` on `<html>`, so a JS failure can never leave a
+ * set `data-ns-cursor="on"` on `<html>`, so a JS failure can never leave a
  * visitor with no pointer at all.
  */
 
@@ -59,7 +59,7 @@ interface Ripple {
   y: number;
 }
 
-export function JoCursor() {
+export function BrandCursor() {
   const reduced = useReducedMotion();
   const mode = useUI((s) => s.cursorMode);
   const label = useUI((s) => s.cursorLabel);
@@ -91,8 +91,8 @@ export function JoCursor() {
 
   useEffect(() => {
     if (!enabled) return;
-    document.documentElement.setAttribute("data-jo-cursor", "on");
-    return () => document.documentElement.removeAttribute("data-jo-cursor");
+    document.documentElement.setAttribute("data-ns-cursor", "on");
+    return () => document.documentElement.removeAttribute("data-ns-cursor");
   }, [enabled]);
 
   /* --- pointer tracking -------------------------------------------------- */
@@ -173,7 +173,7 @@ export function JoCursor() {
         {ripples.map((ripple) => (
           <motion.svg
             key={ripple.id}
-            viewBox={JO_VIEWBOX}
+            viewBox={NS_VIEWBOX}
             fill="none"
             className="absolute"
             style={{
@@ -187,23 +187,23 @@ export function JoCursor() {
             initial={{ opacity: 0.5, scale: 0.15 }}
             animate={{ opacity: 0, scale: 1.1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.7, ease: EASE.jo }}
+            transition={{ duration: 0.7, ease: EASE.brand }}
           >
             <path
               d={BLOB_WAVES[0]}
-              stroke="var(--color-violet)"
+              stroke="var(--color-brand)"
               strokeWidth={2}
               fill="none"
               style={{
                 transformBox: "view-box",
-                transformOrigin: `${JO_CENTROID.x}px ${JO_CENTROID.y}px`,
+                transformOrigin: `${NS_CENTROID.x}px ${NS_CENTROID.y}px`,
               }}
             />
           </motion.svg>
         ))}
       </AnimatePresence>
 
-      {/* The bubble — trails, morphs, carries the label. */}
+      {/* The pebble — trails, morphs, carries the label. */}
       <motion.div
         className="absolute top-0 left-0 flex items-center justify-center"
         style={{ x: bubbleX, y: bubbleY }}
@@ -217,14 +217,14 @@ export function JoCursor() {
             height: isText ? 26 : size,
             scale: pressed ? 0.82 : 1,
           }}
-          transition={{ duration: 0.34, ease: EASE.jo }}
+          transition={{ duration: 0.34, ease: EASE.brand }}
           style={{ marginLeft: isText ? -1 : -size / 2, marginTop: isText ? -13 : -size / 2 }}
         >
           {isText ? (
-            <span className="h-full w-full rounded-full bg-violet" />
+            <span className="h-full w-full rounded-full bg-brand" />
           ) : (
             <motion.svg
-              viewBox={JO_VIEWBOX}
+              viewBox={NS_VIEWBOX}
               fill="none"
               className="h-full w-full overflow-visible"
             >
@@ -237,7 +237,7 @@ export function JoCursor() {
                 transition={{ duration: 7, ease: "easeInOut", repeat: Infinity }}
                 fill={
                   mode === "view" || mode === "drag"
-                    ? "var(--color-violet)"
+                    ? "var(--color-brand)"
                     : "var(--color-ink)"
                 }
                 fillOpacity={mode === "default" ? 0.14 : 1}
@@ -256,7 +256,7 @@ export function JoCursor() {
                 initial={{ opacity: 0, scale: 0.7 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.7 }}
-                transition={{ duration: 0.22, ease: EASE.jo }}
+                transition={{ duration: 0.22, ease: EASE.brand }}
               >
                 {label}
               </motion.span>
@@ -268,7 +268,7 @@ export function JoCursor() {
       {/* The dot — the actual pointer. Never lags, never grows large enough to
           obscure what is underneath it. */}
       <motion.span
-        className="absolute top-0 left-0 rounded-full bg-violet"
+        className="absolute top-0 left-0 rounded-full bg-brand"
         style={{ x: dotX, y: dotY }}
         animate={{
           width: mode === "view" ? 0 : 6,
@@ -277,7 +277,7 @@ export function JoCursor() {
           marginLeft: mode === "view" ? 0 : -3,
           marginTop: mode === "view" ? 0 : -3,
         }}
-        transition={{ duration: 0.25, ease: EASE.jo }}
+        transition={{ duration: 0.25, ease: EASE.brand }}
       />
     </div>
   );

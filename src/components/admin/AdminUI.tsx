@@ -103,13 +103,13 @@ export function StatTile({
           )}
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: EASE.jo }}
+          transition={{ duration: 0.4, ease: EASE.brand }}
         >
           {value}
         </motion.p>
         {spark && spark.length > 1 && (
           <div className="shrink-0 opacity-90">
-            <Sparkline values={spark} tone={emphasis ? "mint" : "violet"} />
+            <Sparkline values={spark} tone={emphasis ? "mint" : "brand"} />
           </div>
         )}
       </div>
@@ -120,7 +120,7 @@ export function StatTile({
             className={cn(
               "inline-flex items-center gap-0.5 font-medium tabular-nums",
               tone === "up" && "text-mint",
-              tone === "down" && "text-coral",
+              tone === "down" && "text-alert",
               tone === "flat" && (emphasis ? "text-white/60" : "text-mist"),
             )}
           >
@@ -144,18 +144,18 @@ export function StatTile({
  * Status is encoded in **shape and text**, not colour alone.
  *
  * Each pill carries its label, so a colour-blind reader or a greyscale print
- * loses nothing. Semantic colours are reserved: violet is in progress, mint is
- * done, coral is a problem. They are never borrowed for a chart series.
+ * loses nothing. Semantic colours are reserved: brand is in progress, mint is
+ * done, alert is a problem. They are never borrowed for a chart series.
  */
 const ORDER_TONES: Record<OrderStatus, string> = {
   pending: "bg-paper-sunken text-smoke",
-  paid: "bg-violet-mist text-violet-deep",
-  processing: "bg-violet-mist text-violet-deep",
-  packed: "bg-violet-mist text-violet-deep",
-  shipped: "bg-violet/12 text-violet-deep",
-  "out-for-delivery": "bg-violet/12 text-violet-deep",
+  paid: "bg-brand-mist text-brand-deep",
+  processing: "bg-brand-mist text-brand-deep",
+  packed: "bg-brand-mist text-brand-deep",
+  shipped: "bg-brand/12 text-brand-deep",
+  "out-for-delivery": "bg-brand/12 text-brand-deep",
   delivered: "bg-mint/12 text-mint",
-  cancelled: "bg-coral/12 text-coral",
+  cancelled: "bg-alert/12 text-alert",
   refunded: "bg-sand text-ink-muted",
 };
 
@@ -188,8 +188,8 @@ export function OrderStatusPill({ status, className }: { status: OrderStatus; cl
 export { ORDER_LABELS };
 
 const TICKET_TONES: Record<TicketStatus, string> = {
-  open: "bg-coral/12 text-coral",
-  pending: "bg-violet-mist text-violet-deep",
+  open: "bg-alert/12 text-alert",
+  pending: "bg-brand-mist text-brand-deep",
   resolved: "bg-mint/12 text-mint",
   closed: "bg-paper-sunken text-smoke",
 };
@@ -210,8 +210,8 @@ export function TicketStatusPill({ status }: { status: TicketStatus }) {
 const PRIORITY_TONES: Record<TicketPriority, string> = {
   low: "text-mist",
   normal: "text-smoke",
-  high: "text-violet-deep",
-  urgent: "text-coral",
+  high: "text-brand-deep",
+  urgent: "text-alert",
 };
 
 export function PriorityFlag({ priority }: { priority: TicketPriority }) {
@@ -225,7 +225,7 @@ export function PriorityFlag({ priority }: { priority: TicketPriority }) {
 
 const INVOICE_TONES: Record<InvoiceStatus, string> = {
   draft: "bg-paper-sunken text-smoke",
-  issued: "bg-violet-mist text-violet-deep",
+  issued: "bg-brand-mist text-brand-deep",
   paid: "bg-mint/12 text-mint",
   credited: "bg-sand text-ink-muted",
 };

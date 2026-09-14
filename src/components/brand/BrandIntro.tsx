@@ -50,7 +50,7 @@ export function BrandIntro() {
             // A slight upward lift makes the curtain feel like it is leaving
             // rather than dissolving.
             y: "-3%",
-            transition: { duration: 0.6, ease: EASE.jo },
+            transition: { duration: 0.6, ease: EASE.brand },
           }}
         >
           <motion.div
@@ -63,14 +63,14 @@ export function BrandIntro() {
               className="font-display text-eyebrow text-smoke uppercase"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.65, duration: 0.5, ease: EASE.jo }}
+              transition={{ delay: 0.65, duration: 0.5, ease: EASE.brand }}
             >
-              The Jo · ذاجو
+              net sale · نت سيل
             </motion.span>
 
             {/* Progress hairline — gives the wait a visible end point. */}
             <motion.span
-              className="h-px w-24 origin-left bg-violet"
+              className="h-px w-24 origin-left bg-brand"
               initial={{ scaleX: 0 }}
               animate={{ scaleX: 1 }}
               transition={{ delay: 0.3, duration: 1.15, ease: EASE.silk }}

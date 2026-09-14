@@ -17,7 +17,7 @@ import {
 } from "@/lib/firebase/orders";
 import { StatusChip } from "./AccountPanel";
 import { Button } from "@/components/ui/Button";
-import { JoWave } from "@/components/brand/JoWave";
+import { BrandWave } from "@/components/brand/BrandWave";
 import type { Locale, Order } from "@/types";
 
 /**
@@ -56,18 +56,18 @@ export function OrderTracking({
 
   if (order === null) {
     return (
-      <div className="jo-container pb-24">
-        <div className="jo-shimmer rounded-xl h-64" />
+      <div className="ns-container pb-24">
+        <div className="ns-shimmer rounded-xl h-64" />
       </div>
     );
   }
 
   if (order === "missing") {
     return (
-      <div className="jo-container pb-24">
+      <div className="ns-container pb-24">
         <div className="border-line rounded-xl flex flex-col items-center border border-dashed py-20 text-center">
           <div className="h-24 w-24 opacity-70">
-            <JoWave rings={3} color="var(--color-violet)" speed={8} />
+            <BrandWave rings={3} color="var(--color-brand)" speed={8} />
           </div>
           <h2 className="font-display text-ink mt-6 text-xl font-semibold">
             {rtl ? "لم نجد هذا الطلب" : "We could not find that order"}
@@ -92,7 +92,7 @@ export function OrderTracking({
   const currentIndex = FULFILMENT_STEPS.indexOf(order.status);
 
   return (
-    <div className="jo-container grid gap-8 pb-24 lg:grid-cols-[1.5fr_1fr] lg:gap-12">
+    <div className="ns-container grid gap-8 pb-24 lg:grid-cols-[1.5fr_1fr] lg:gap-12">
       <div className="space-y-6">
         {/* Header card */}
         <div className="bg-paper-raised border-line rounded-xl border p-6 md:p-7">
@@ -117,10 +117,10 @@ export function OrderTracking({
               <div className="mt-8">
                 <div className="bg-line relative h-1 rounded-full">
                   <motion.div
-                    className="bg-violet absolute inset-y-0 start-0 rounded-full"
+                    className="bg-brand absolute inset-y-0 start-0 rounded-full"
                     initial={{ width: 0 }}
                     animate={{ width: `${progress * 100}%` }}
-                    transition={{ duration: 1, ease: EASE.jo }}
+                    transition={{ duration: 1, ease: EASE.brand }}
                   />
                 </div>
 
@@ -133,8 +133,8 @@ export function OrderTracking({
                         <motion.span
                           className={cn(
                             "mx-auto grid h-6 w-6 place-items-center rounded-full text-[0.625rem]",
-                            done ? "bg-violet text-white" : "bg-paper-sunken text-mist",
-                            current && "ring-violet/30 ring-4",
+                            done ? "bg-brand text-white" : "bg-paper-sunken text-mist",
+                            current && "ring-brand/30 ring-4",
                           )}
                           initial={{ scale: 0.6, opacity: 0 }}
                           animate={{ scale: 1, opacity: 1 }}
@@ -157,7 +157,7 @@ export function OrderTracking({
               </div>
 
               {order.estimatedDeliveryAt && (
-                <p className="bg-violet-veil text-ink rounded-md mt-6 p-4 text-[0.875rem]">
+                <p className="bg-brand-veil text-ink rounded-md mt-6 p-4 text-[0.875rem]">
                   {rtl ? "الوصول المتوقع" : "Estimated arrival"}:{" "}
                   <strong className="font-medium">
                     {formatDate(order.estimatedDeliveryAt, locale)}
@@ -207,12 +207,12 @@ export function OrderTracking({
                   className="relative"
                   initial={{ opacity: 0, x: -8 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.06, duration: 0.4, ease: EASE.jo }}
+                  transition={{ delay: index * 0.06, duration: 0.4, ease: EASE.brand }}
                 >
                   <span
                     className={cn(
                       "absolute -start-6 top-1.5 h-2.5 w-2.5 rounded-full",
-                      index === 0 ? "bg-violet ring-violet/25 ring-4" : "bg-line-strong",
+                      index === 0 ? "bg-brand ring-brand/25 ring-4" : "bg-line-strong",
                     )}
                     aria-hidden="true"
                   />

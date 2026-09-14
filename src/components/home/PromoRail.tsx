@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { EASE } from "@/lib/motion";
 import { countdownParts, pad2, t } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
-import { JoWave } from "@/components/brand/JoWave";
+import { BrandWave } from "@/components/brand/BrandWave";
 import type { Banner, BannerTone, Locale } from "@/types";
 
 /**
@@ -32,17 +32,17 @@ import type { Banner, BannerTone, Locale } from "@/types";
 
 const TONES: Record<
   BannerTone,
-  { shell: string; eyebrow: string; title: string; body: string; button: "primary" | "secondary" | "violet" }
+  { shell: string; eyebrow: string; title: string; body: string; button: "primary" | "secondary" | "brand" }
 > = {
   ink: {
     shell: "bg-ink text-white",
-    eyebrow: "text-violet-bright",
+    eyebrow: "text-brand-bright",
     title: "text-white",
     body: "text-white/60",
-    button: "violet",
+    button: "brand",
   },
-  violet: {
-    shell: "bg-violet text-white",
+  brand: {
+    shell: "bg-brand text-white",
     eyebrow: "text-white/70",
     title: "text-white",
     body: "text-white/75",
@@ -50,14 +50,14 @@ const TONES: Record<
   },
   sand: {
     shell: "bg-sand text-ink",
-    eyebrow: "text-violet-deep",
+    eyebrow: "text-brand-deep",
     title: "text-ink",
     body: "text-ink-muted",
     button: "primary",
   },
   paper: {
     shell: "bg-paper-raised text-ink border border-line",
-    eyebrow: "text-violet",
+    eyebrow: "text-brand",
     title: "text-ink",
     body: "text-ink-muted",
     button: "primary",
@@ -111,7 +111,7 @@ function PromoCard({
       initial={reduced ? undefined : { opacity: 0, y: 28 }}
       whileInView={reduced ? undefined : { opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-10%" }}
-      transition={{ duration: 0.6, ease: EASE.jo, delay: index * 0.08 }}
+      transition={{ duration: 0.6, ease: EASE.brand, delay: index * 0.08 }}
       whileHover={reduced ? undefined : { y: -4 }}
     >
       {/* Media plate — scales inside the frame on hover. */}
@@ -120,7 +120,7 @@ function PromoCard({
           className="absolute inset-0 -z-10"
           animate={{ scale: 1 }}
           whileHover={reduced ? undefined : { scale: 1.06 }}
-          transition={{ duration: 0.8, ease: EASE.jo }}
+          transition={{ duration: 0.8, ease: EASE.brand }}
         >
           <Image
             src={banner.media.url}
@@ -132,7 +132,7 @@ function PromoCard({
           <div
             className={cn(
               "absolute inset-0",
-              banner.tone === "ink" || banner.tone === "violet"
+              banner.tone === "ink" || banner.tone === "brand"
                 ? "bg-gradient-to-t from-black/70 via-black/25 to-transparent"
                 : "bg-gradient-to-t from-white/80 via-white/35 to-transparent",
             )}
@@ -143,7 +143,7 @@ function PromoCard({
       {/* Brand ripple in the corner of feature announcements. */}
       {banner.tone === "paper" && (
         <div className="pointer-events-none absolute -end-10 -top-10 h-44 w-44 opacity-30">
-          <JoWave rings={3} color="var(--color-violet)" speed={10} />
+          <BrandWave rings={3} color="var(--color-brand)" speed={10} />
         </div>
       )}
 
@@ -216,7 +216,7 @@ function Countdown({
 
   if (!parts || parts.expired) return null;
 
-  const dark = tone === "ink" || tone === "violet";
+  const dark = tone === "ink" || tone === "brand";
   const units: [number, string][] = [
     [parts.days, locale === "ar" ? "ي" : "d"],
     [parts.hours, locale === "ar" ? "س" : "h"],

@@ -92,7 +92,7 @@ export default async function ShopPage({
         locale={locale}
       />
 
-      <div className="jo-container py-10 md:py-16">
+      <div className="ns-container py-10 md:py-16">
         <ProductGrid
           products={products}
           locale={locale}

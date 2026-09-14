@@ -74,7 +74,7 @@ export async function exportToExcel<T>({
   const ExcelJS = (await import("exceljs")).default;
 
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "THE JO";
+  workbook.creator = "net sale";
   workbook.created = new Date();
 
   const sheet = workbook.addWorksheet(sheetName, {
@@ -83,11 +83,11 @@ export async function exportToExcel<T>({
 
   if (title) {
     const titleRow = sheet.addRow([title]);
-    titleRow.font = { bold: true, size: 14, color: { argb: "FF0B0B0F" } };
+    titleRow.font = { bold: true, size: 14, color: { argb: "FF1B1717" } };
     sheet.mergeCells(1, 1, 1, columns.length);
     sheet.addRow([`Generated ${new Date().toLocaleString("en-GB")}`]).font = {
       size: 9,
-      color: { argb: "FF6B6B76" },
+      color: { argb: "FF6F6765" },
     };
     sheet.mergeCells(2, 1, 2, columns.length);
     sheet.addRow([]);
@@ -96,9 +96,9 @@ export async function exportToExcel<T>({
   const header = sheet.addRow(columns.map((c) => c.header));
   header.eachCell((cell) => {
     cell.font = { bold: true, size: 10, color: { argb: "FFFFFFFF" } };
-    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF703BEC" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFCE1212" } };
     cell.alignment = { vertical: "middle" };
-    cell.border = { bottom: { style: "thin", color: { argb: "FF4B21B0" } } };
+    cell.border = { bottom: { style: "thin", color: { argb: "FF810000" } } };
   });
   header.height = 22;
 
@@ -197,11 +197,11 @@ export function printToPdf() {
  * never loses the page they were on.
  */
 export function printRoute(href: string) {
-  const existing = document.getElementById("jo-print-frame");
+  const existing = document.getElementById("ns-print-frame");
   existing?.remove();
 
   const frame = document.createElement("iframe");
-  frame.id = "jo-print-frame";
+  frame.id = "ns-print-frame";
   frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
   frame.src = href;
 

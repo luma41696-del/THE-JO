@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 
 import { useAuth } from "@/components/providers/AuthProvider";
 import { Button } from "@/components/ui/Button";
-import { JoWave } from "@/components/brand/JoWave";
+import { BrandWave } from "@/components/brand/BrandWave";
 import type { Locale } from "@/types";
 
 /**
@@ -40,9 +40,9 @@ export function RequireAuth({
 
   if (status === "loading") {
     return (
-      <div className="jo-container flex min-h-[50vh] items-center justify-center pb-24">
+      <div className="ns-container flex min-h-[50vh] items-center justify-center pb-24">
         <div className="h-20 w-20 opacity-60">
-          <JoWave rings={3} color="var(--color-violet)" speed={5} />
+          <BrandWave rings={3} color="var(--color-brand)" speed={5} />
         </div>
         <span className="sr-only">{rtl ? "جارٍ التحميل" : "Loading"}</span>
       </div>
@@ -51,10 +51,10 @@ export function RequireAuth({
 
   if (status === "anonymous") {
     return (
-      <div className="jo-container pb-24">
+      <div className="ns-container pb-24">
         <div className="border-line rounded-xl mx-auto flex max-w-md flex-col items-center border border-dashed py-16 text-center">
           <div className="h-24 w-24 opacity-70">
-            <JoWave rings={3} color="var(--color-violet)" speed={8} />
+            <BrandWave rings={3} color="var(--color-brand)" speed={8} />
           </div>
           <h2 className="font-display text-ink mt-6 text-xl font-semibold">
             {rtl ? "سجّل الدخول للمتابعة" : "Sign in to continue"}
@@ -66,7 +66,7 @@ export function RequireAuth({
           </p>
           <div className="mt-7 flex flex-wrap justify-center gap-3">
             <Link href={`/login?next=${encodeURIComponent(pathname)}`}>
-              <Button variant="violet" size="lg" magnetic>
+              <Button variant="brand" size="lg" magnetic>
                 {rtl ? "تسجيل الدخول" : "Sign in"}
               </Button>
             </Link>

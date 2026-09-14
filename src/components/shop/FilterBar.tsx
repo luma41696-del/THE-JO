@@ -125,12 +125,12 @@ export function FilterBar({ categories, products, resultCount, locale = "en" }: 
   return (
     <div
       className={cn(
-        "jo-container transition-opacity duration-300",
+        "ns-container transition-opacity duration-300",
         isPending && "pointer-events-none opacity-60",
       )}
     >
       {/* Category rail — always visible; it is the primary navigation. */}
-      <div className="jo-no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5 pb-4 md:mx-0 md:flex-wrap md:px-0">
+      <div className="ns-no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5 pb-4 md:mx-0 md:flex-wrap md:px-0">
         <Chip active={!active.category} onClick={() => setSingle("category", null)}>
           {rtl ? "الكل" : "All"}
         </Chip>
@@ -165,7 +165,7 @@ export function FilterBar({ categories, products, resultCount, locale = "en" }: 
             <FilterIcon />
             {rtl ? "تصفية" : "Filters"}
             {activeCount > 0 && (
-              <span className="bg-violet grid h-4.5 min-w-4.5 place-items-center rounded-full px-1 text-[0.625rem] tabular-nums">
+              <span className="bg-brand grid h-4.5 min-w-4.5 place-items-center rounded-full px-1 text-[0.625rem] tabular-nums">
                 {activeCount}
               </span>
             )}
@@ -353,7 +353,7 @@ function Toggle({
         onClick={() => onChange(!checked)}
         className={cn(
           "relative h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-300",
-          checked ? "bg-violet" : "bg-line-strong",
+          checked ? "bg-brand" : "bg-line-strong",
         )}
         data-cursor="hover"
       >

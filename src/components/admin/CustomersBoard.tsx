@@ -75,7 +75,7 @@ export function CustomersBoard({
         <span className="tabular-nums">
           <span className="text-ink font-medium">{c.orders}</span>
           {c.orders > 1 && (
-            <span className="bg-violet-mist text-violet-deep rounded-xs ms-2 px-1.5 py-0.5 text-[0.625rem]">
+            <span className="bg-brand-mist text-brand-deep rounded-xs ms-2 px-1.5 py-0.5 text-[0.625rem]">
               repeat
             </span>
           )}
@@ -104,7 +104,7 @@ export function CustomersBoard({
             <span
               className={cn(
                 "block text-[0.6875rem] tabular-nums",
-                days > 90 ? "text-coral" : "text-mist",
+                days > 90 ? "text-alert" : "text-mist",
               )}
             >
               {days}d ago
@@ -133,8 +133,8 @@ export function CustomersBoard({
               { header: "First order", value: (c) => new Date(c.firstOrderAt), format: "date", width: 18 },
               { header: "Last order", value: (c) => new Date(c.lastOrderAt), format: "date", width: 18 },
             ]}
-            filename="the-jo-customers"
-            title="THE JO — customers"
+            filename="net-sale-customers"
+            title="net sale — customers"
           />
         }
       />
@@ -165,7 +165,7 @@ export function CustomersBoard({
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Name, email, city…"
-              className="border-line focus:border-violet bg-paper text-ink placeholder:text-mist w-56 rounded-pill border px-4 py-1.5 text-[0.8125rem] outline-none transition-colors"
+              className="border-line focus:border-brand bg-paper text-ink placeholder:text-mist w-56 rounded-pill border px-4 py-1.5 text-[0.8125rem] outline-none transition-colors"
             />
           </label>
         </div>

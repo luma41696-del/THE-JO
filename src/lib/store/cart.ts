@@ -145,7 +145,7 @@ export const useCart = create<CartState>()(
       has: (key) => get().items.some((i) => i.key === key),
     }),
     {
-      name: "the-jo:cart",
+      name: "net-sale:cart",
       // v2: the store moved from SAR to JOD.
       version: 2,
       storage: createJSONStorage(() => localStorage),

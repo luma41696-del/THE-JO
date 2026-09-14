@@ -38,7 +38,7 @@ export function CategoryGrid({
             initial={reduced ? undefined : { opacity: 0, y: 24 }}
             whileInView={reduced ? undefined : { opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-8%" }}
-            transition={{ duration: 0.55, ease: EASE.jo, delay: index * 0.06 }}
+            transition={{ duration: 0.55, ease: EASE.brand, delay: index * 0.06 }}
           >
             <Link
               href={`/shop?category=${category.slug}`}

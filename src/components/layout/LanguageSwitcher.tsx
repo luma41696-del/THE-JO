@@ -78,7 +78,7 @@ export function LanguageSwitcher({ className }: { className?: string }) {
         // arriving rather than as a static toggle state.
         initial={{ opacity: 0, y: 4 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.25, ease: EASE.jo }}
+        transition={{ duration: 0.25, ease: EASE.brand }}
         className={cn(
           "text-[0.8125rem] font-semibold",
           target === "ar" ? "font-arabic text-[1rem]" : "font-ui tracking-[0.08em]",

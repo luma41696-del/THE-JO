@@ -19,7 +19,7 @@ import { getFirestore, type Firestore } from "firebase-admin/firestore";
  *   - setting the `role` custom claim
  */
 
-const ADMIN_APP = "the-jo-admin";
+const ADMIN_APP = "net-sale-admin";
 
 function credentials() {
   const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
@@ -29,7 +29,7 @@ function credentials() {
 
   if (!projectId || !clientEmail || !privateKey) {
     throw new Error(
-      "[THE JO] Firebase Admin is not configured. Set FIREBASE_ADMIN_PROJECT_ID, " +
+      "[net sale] Firebase Admin is not configured. Set FIREBASE_ADMIN_PROJECT_ID, " +
         "FIREBASE_ADMIN_CLIENT_EMAIL and FIREBASE_ADMIN_PRIVATE_KEY in .env.local " +
         "(Firebase console > Project settings > Service accounts).",
     );

@@ -6,7 +6,6 @@ import { motion } from "motion/react";
 
 import { Link, useLocalizedRouter } from "@/components/ui/Link";
 import { cn } from "@/lib/utils";
-import { EASE } from "@/lib/motion";
 import { formatDate, formatDeliveryWindow, formatPrice, t as pick } from "@/lib/format";
 import { getIdToken } from "@/lib/firebase/auth";
 import { AdminPageHeader } from "./AdminShell";
@@ -134,7 +133,7 @@ export function OrderDetail({ order: initial }: { order: Order }) {
                 value={tracking}
                 onChange={(event) => setTracking(event.target.value)}
                 placeholder="Tracking number"
-                className="border-line focus:border-violet bg-paper text-ink placeholder:text-mist w-44 rounded-pill border px-4 py-2 text-[0.8125rem] outline-none transition-colors"
+                className="border-line focus:border-brand bg-paper text-ink placeholder:text-mist w-44 rounded-pill border px-4 py-2 text-[0.8125rem] outline-none transition-colors"
               />
             )}
 
@@ -144,7 +143,7 @@ export function OrderDetail({ order: initial }: { order: Order }) {
               next.map((status) => (
                 <Button
                   key={status}
-                  variant={status === "cancelled" ? "ghost" : "violet"}
+                  variant={status === "cancelled" ? "ghost" : "brand"}
                   size="sm"
                   loading={busy === status}
                   onClick={() => void advance(status)}
@@ -159,7 +158,7 @@ export function OrderDetail({ order: initial }: { order: Order }) {
         {error && (
           <motion.p
             role="alert"
-            className="bg-coral/10 text-coral mt-4 rounded-md p-3 text-[0.8125rem]"
+            className="bg-alert/10 text-alert mt-4 rounded-md p-3 text-[0.8125rem]"
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
           >
@@ -212,7 +211,7 @@ export function OrderDetail({ order: initial }: { order: Order }) {
                   <span
                     className={cn(
                       "absolute -start-6 top-1.5 h-2.5 w-2.5 rounded-full",
-                      index === 0 ? "bg-violet ring-violet/25 ring-4" : "bg-line-strong",
+                      index === 0 ? "bg-brand ring-brand/25 ring-4" : "bg-line-strong",
                     )}
                     aria-hidden="true"
                   />
@@ -300,7 +299,7 @@ export function OrderDetail({ order: initial }: { order: Order }) {
             <p className="text-smoke mt-0.5 text-[0.75rem]">{order.email}</p>
             <Link
               href={`/admin/customers?q=${encodeURIComponent(order.email)}`}
-              className="text-violet mt-3 inline-block text-[0.75rem]"
+              className="text-brand mt-3 inline-block text-[0.75rem]"
             >
               Order history →
             </Link>

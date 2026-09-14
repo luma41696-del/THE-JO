@@ -41,11 +41,11 @@ export default async function CategoriesPage({
         description={t.categories.body}
       />
 
-      <div className="jo-container">
+      <div className="ns-container">
         <CategoryGrid categories={categories} locale={locale} />
       </div>
 
-      <section className="jo-container py-20 md:py-28">
+      <section className="ns-container py-20 md:py-28">
         <SectionHeading
           locale={locale}
           eyebrow={t.categories.acrossEyebrow}

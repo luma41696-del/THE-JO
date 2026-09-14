@@ -42,7 +42,7 @@ export async function generateMetadata({
     title,
     description,
     openGraph: {
-      title: `${title} · THE JO`,
+      title: `${title} · net sale`,
       description: product.subtitle ? pick(product.subtitle, locale) : description,
       type: "website",
       images: image
@@ -85,7 +85,7 @@ export default async function ProductPage({
     description: pick(product.description, locale),
     image: product.images.map((i) => i.url),
     sku: product.id,
-    brand: { "@type": "Brand", name: "THE JO" },
+    brand: { "@type": "Brand", name: "net sale" },
     offers: {
       "@type": "Offer",
       price: product.price,
@@ -117,7 +117,7 @@ export default async function ProductPage({
       <ProductDetail product={product} locale={locale} />
 
       {related.length > 0 && (
-        <section className="jo-container pb-20 md:pb-28">
+        <section className="ns-container pb-20 md:pb-28">
           <SectionHeading
             locale={locale}
             eyebrow={t.product.wearItWith}

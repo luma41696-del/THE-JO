@@ -1,39 +1,39 @@
 @import "tailwindcss";
 
 /* ===========================================================================
-   THE JO | ذاجو — design tokens
+   net sale | نت سيل — design tokens
    Everything visual resolves to a token here. Components never hard-code a
    hex value, a radius, or an easing curve.
    ========================================================================= */
 
 @theme {
   /* --- Core palette ------------------------------------------------------
-     Violet is the brand signature, lifted straight from the logo artwork.
+     Brand is the brand signature, lifted straight from the logo artwork.
      The neutrals are deliberately *warm* — bone rather than white — because a
      pure #FFF ground makes fashion product photography look clinical. */
-  --color-violet: #703bec;
-  --color-violet-deep: #4b21b0;
-  --color-violet-bright: #8b5cf6;
-  --color-violet-mist: #f0eaff;
-  --color-violet-veil: #faf7ff;
+  --color-brand: #ce1212;
+  --color-brand-deep: #810000;
+  --color-brand-bright: #ee4b47;
+  --color-brand-mist: #fbe7e5;
+  --color-brand-veil: #fdf6f4;
 
-  --color-ink: #0b0b0f;
-  --color-ink-soft: #1a1a22;
-  --color-ink-muted: #4a4a55;
-  --color-smoke: #6b6b76;
-  --color-mist: #9d9da8;
+  --color-ink: #1b1717;
+  --color-ink-soft: #2b2424;
+  --color-ink-muted: #514949;
+  --color-smoke: #6f6765;
+  --color-mist: #9c9490;
 
-  --color-paper: #faf8f4;
-  --color-paper-raised: #ffffff;
-  --color-paper-sunken: #f2efe9;
-  --color-line: #e6e2da;
-  --color-line-strong: #d5d0c5;
+  --color-paper: #eeebdd;
+  --color-paper-raised: #fbfaf3;
+  --color-paper-sunken: #e3dfcc;
+  --color-line: #d9d4c0;
+  --color-line-strong: #c5bda5;
 
   /* Supporting accents — used sparingly, never as surfaces. */
-  --color-sand: #e9dfd2;
-  --color-clay: #c8a68a;
-  --color-coral: #ff4f3d; /* sale / urgency only */
-  --color-mint: #14a07a; /* in stock / success only */
+  --color-sand: #ded6bd;
+  --color-clay: #b08a68;
+  --color-alert: #8a0f0f; /* errors, destructive, scarcity — never a series */
+  --color-mint: #157f5b; /* in stock / success only */
 
   /* --- Typography --------------------------------------------------------
      Four roles, two scripts.
@@ -74,25 +74,25 @@
 
   /* --- Elevation --------------------------------------------------------
      Wide, low-opacity, warm-tinted. Never a hard grey drop shadow. */
-  --shadow-lift: 0 1px 2px rgb(11 11 15 / 0.04), 0 8px 24px -12px rgb(11 11 15 / 0.12);
-  --shadow-float: 0 2px 6px rgb(11 11 15 / 0.04), 0 18px 48px -20px rgb(11 11 15 / 0.18);
-  --shadow-hover: 0 4px 10px rgb(11 11 15 / 0.05), 0 32px 64px -28px rgb(11 11 15 / 0.26);
-  --shadow-violet: 0 12px 40px -12px rgb(112 59 236 / 0.45);
+  --shadow-lift: 0 1px 2px rgb(27 23 23 / 0.04), 0 8px 24px -12px rgb(27 23 23 / 0.12);
+  --shadow-float: 0 2px 6px rgb(27 23 23 / 0.04), 0 18px 48px -20px rgb(27 23 23 / 0.18);
+  --shadow-hover: 0 4px 10px rgb(27 23 23 / 0.05), 0 32px 64px -28px rgb(27 23 23 / 0.26);
+  --shadow-brand: 0 12px 40px -12px rgb(206 18 18 / 0.42);
 
   /* --- Motion -----------------------------------------------------------
      Three curves, used everywhere. `jo` is the house curve: a confident
      settle with no bounce. `silk` is for opacity/colour. `spring` for play. */
-  --ease-jo: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-brand: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-silk: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   --animate-wave: wave 9s var(--ease-silk) infinite;
   --animate-drift: drift 14s var(--ease-silk) infinite;
   --animate-shimmer: shimmer 2.2s linear infinite;
-  --animate-ripple: ripple 2.8s var(--ease-jo) infinite;
+  --animate-ripple: ripple 2.8s var(--ease-brand) infinite;
 
   /* --- Data visualisation ------------------------------------------------
-     The admin's categorical series palette. Brand violet leads; the remaining
+     The admin's categorical series palette. Brand brand leads; the remaining
      four hues were chosen for separation rather than for looks, then checked:
      worst adjacent pair ΔE 9.1 under protanopia and 22.9 at normal vision on a
      white surface (target ≥8 and ≥15).
@@ -104,11 +104,11 @@
      Assign slots in fixed order and never cycle: a ninth series folds into
      "Other" rather than inventing a hue, and colour follows the entity so a
      filter that drops a series never repaints the survivors. */
-  --color-chart-1: #703bec;
-  --color-chart-2: #eb6834;
+  --color-chart-1: #ce1212;
+  --color-chart-2: #2a78d6;
   --color-chart-3: #1baf7a;
   --color-chart-4: #eda100;
-  --color-chart-5: #2a78d6;
+  --color-chart-5: #7a3fb8;
 
   /* --- Layout ------------------------------------------------------------ */
   --spacing-gutter: 1.25rem;
@@ -234,12 +234,12 @@
   }
 
   ::selection {
-    background: var(--color-violet);
+    background: var(--color-brand);
     color: #fff;
   }
 
   :focus-visible {
-    outline: 2px solid var(--color-violet);
+    outline: 2px solid var(--color-brand);
     outline-offset: 3px;
     border-radius: var(--radius-xs);
   }
@@ -247,8 +247,8 @@
   /* Hide the OS pointer only when our canvas cursor is actually mounted and
      the device has a real pointer. Touch and keyboard users keep defaults. */
   @media (hover: hover) and (pointer: fine) {
-    html[data-jo-cursor="on"],
-    html[data-jo-cursor="on"] * {
+    html[data-ns-cursor="on"],
+    html[data-ns-cursor="on"] * {
       cursor: none !important;
     }
   }
@@ -264,8 +264,8 @@
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
     }
-    html[data-jo-cursor="on"],
-    html[data-jo-cursor="on"] * {
+    html[data-ns-cursor="on"],
+    html[data-ns-cursor="on"] * {
       cursor: auto !important;
     }
   }
@@ -276,14 +276,14 @@
    ========================================================================= */
 @layer components {
   /* Frosted panel — the floating control-surface language of the site. */
-  .jo-glass {
+  .ns-glass {
     background: color-mix(in oklab, var(--color-paper-raised) 72%, transparent);
     backdrop-filter: blur(20px) saturate(1.6);
     -webkit-backdrop-filter: blur(20px) saturate(1.6);
     border: 1px solid color-mix(in oklab, #fff 60%, var(--color-line));
   }
 
-  .jo-glass-dark {
+  .ns-glass-dark {
     background: color-mix(in oklab, var(--color-ink) 62%, transparent);
     backdrop-filter: blur(20px) saturate(1.4);
     -webkit-backdrop-filter: blur(20px) saturate(1.4);
@@ -291,20 +291,20 @@
   }
 
   /* The organic pebble silhouette, as a CSS shape for imagery. */
-  .jo-blob {
+  .ns-blob {
     border-radius: 58% 42% 47% 53% / 52% 48% 52% 48%;
   }
 
-  .jo-blob-alt {
+  .ns-blob-alt {
     border-radius: 44% 56% 62% 38% / 45% 60% 40% 55%;
   }
 
   /* Skeleton / loading shimmer used by every async surface. */
-  .jo-shimmer {
+  .ns-shimmer {
     background: linear-gradient(
       100deg,
       var(--color-paper-sunken) 30%,
-      color-mix(in oklab, var(--color-violet-mist) 60%, var(--color-paper-sunken)) 50%,
+      color-mix(in oklab, var(--color-brand-mist) 60%, var(--color-paper-sunken)) 50%,
       var(--color-paper-sunken) 70%
     );
     background-size: 200% 100%;
@@ -312,23 +312,23 @@
   }
 
   /* Editorial underline that draws in on hover. */
-  .jo-underline {
+  .ns-underline {
     background-image: linear-gradient(currentColor, currentColor);
     background-size: 0% 1px;
     background-position: 0 100%;
     background-repeat: no-repeat;
-    transition: background-size 0.45s var(--ease-jo);
+    transition: background-size 0.45s var(--ease-brand);
   }
-  .jo-underline:hover {
+  .ns-underline:hover {
     background-size: 100% 1px;
   }
-  [dir="rtl"] .jo-underline {
+  [dir="rtl"] .ns-underline {
     background-position: 100% 100%;
   }
 }
 
 @layer utilities {
-  .jo-container {
+  .ns-container {
     width: 100%;
     max-width: var(--container-shell);
     margin-inline: auto;
@@ -336,12 +336,12 @@
   }
 
   @media (min-width: 768px) {
-    .jo-container {
+    .ns-container {
       padding-inline: 2.5rem;
     }
   }
 
-  .jo-edge-fade {
+  .ns-edge-fade {
     mask-image: linear-gradient(
       to right,
       transparent,
@@ -356,10 +356,10 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .jo-no-scrollbar::-webkit-scrollbar {
+  .ns-no-scrollbar::-webkit-scrollbar {
     display: none;
   }
-  .jo-no-scrollbar {
+  .ns-no-scrollbar {
     scrollbar-width: none;
   }
 }

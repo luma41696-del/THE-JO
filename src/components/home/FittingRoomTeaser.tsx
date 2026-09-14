@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { EASE } from "@/lib/motion";
 import { t } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
-import { JoLottie } from "@/components/brand/JoLottie";
+import { BrandLottie } from "@/components/brand/BrandLottie";
 import type { Locale, Product } from "@/types";
 
 /**
@@ -68,14 +68,14 @@ export function FittingRoomTeaser({
   return (
     <section className="bg-ink rounded-2xl relative overflow-hidden text-white">
       <div className="pointer-events-none absolute -end-20 -top-20 h-[30rem] w-[30rem] opacity-25">
-        <JoLottie className="h-full w-full" fallbackColor="var(--color-violet-bright)" />
+        <BrandLottie className="h-full w-full" fallbackColor="var(--color-brand-bright)" />
       </div>
 
       <div className="relative grid gap-10 p-7 md:p-12 lg:grid-cols-[1fr_1.1fr] lg:gap-16 lg:p-16">
         {/* Copy */}
         <div className="flex flex-col justify-center">
-          <p className="text-eyebrow font-display text-violet-bright mb-5 flex items-center gap-3 uppercase">
-            <span className="bg-violet-bright inline-block h-1.5 w-1.5 animate-pulse rounded-full" />
+          <p className="text-eyebrow font-display text-brand-bright mb-5 flex items-center gap-3 uppercase">
+            <span className="bg-brand-bright inline-block h-1.5 w-1.5 animate-pulse rounded-full" />
             {rtl ? "غرفة القياس الذكية" : "AI Fitting Room"}
           </p>
 
@@ -96,7 +96,7 @@ export function FittingRoomTeaser({
               { en: "Recommended pieces that actually pair", ar: "قطع مقترحة تتناسق فعلاً" },
             ].map((item) => (
               <li key={item.en} className="flex items-start gap-3 text-[0.875rem] text-white/70">
-                <span className="text-violet-bright mt-0.5" aria-hidden="true">
+                <span className="text-brand-bright mt-0.5" aria-hidden="true">
                   ✓
                 </span>
                 {item[locale]}
@@ -106,7 +106,7 @@ export function FittingRoomTeaser({
 
           <div className="mt-9 flex flex-wrap gap-3">
             <Link href="/fitting-room">
-              <Button variant="violet" size="lg" magnetic>
+              <Button variant="brand" size="lg" magnetic>
                 {rtl ? "ادخل غرفة القياس" : "Enter the fitting room"}
               </Button>
             </Link>
@@ -119,7 +119,7 @@ export function FittingRoomTeaser({
         </div>
 
         {/* Live panel */}
-        <div className="jo-glass-dark rounded-xl p-4 md:p-6">
+        <div className="ns-glass-dark rounded-xl p-4 md:p-6">
           {/* Slot chips */}
           <div className="mb-4 flex flex-wrap gap-2">
             {(Object.keys(SLOT_LABELS) as Slot[]).map((key) => (
@@ -134,7 +134,7 @@ export function FittingRoomTeaser({
                 className={cn(
                   "rounded-pill cursor-pointer px-4 py-2 text-[0.75rem] transition-all duration-300",
                   slot === key
-                    ? "bg-violet text-white"
+                    ? "bg-brand text-white"
                     : "bg-white/8 text-white/60 hover:bg-white/15 hover:text-white",
                 )}
                 data-cursor="hover"
@@ -155,7 +155,7 @@ export function FittingRoomTeaser({
                     initial={reduced ? undefined : { opacity: 0, scale: 1.04, filter: "blur(6px)" }}
                     animate={reduced ? undefined : { opacity: 1, scale: 1, filter: "blur(0px)" }}
                     exit={reduced ? undefined : { opacity: 0, scale: 0.98 }}
-                    transition={{ duration: 0.45, ease: EASE.jo }}
+                    transition={{ duration: 0.45, ease: EASE.brand }}
                   >
                     <Image
                       src={active.images[0].url}
@@ -172,7 +172,7 @@ export function FittingRoomTeaser({
                 <button
                   type="button"
                   onClick={() => setIndex((i) => i + 1)}
-                  className="jo-glass absolute end-3 bottom-3 rounded-pill cursor-pointer px-3.5 py-2 text-[0.6875rem] tracking-[0.12em] text-ink uppercase"
+                  className="ns-glass absolute end-3 bottom-3 rounded-pill cursor-pointer px-3.5 py-2 text-[0.6875rem] tracking-[0.12em] text-ink uppercase"
                   data-cursor="hover"
                 >
                   {rtl ? "التالي" : "Swap"}
@@ -197,12 +197,12 @@ export function FittingRoomTeaser({
               {recommendation && (
                 <motion.div
                   key={recommendation.size + (active?.id ?? "")}
-                  className="rounded-md bg-violet/18 border border-violet/30 p-4"
+                  className="rounded-md bg-brand/18 border border-brand/30 p-4"
                   initial={reduced ? undefined : { opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.35, ease: EASE.jo }}
+                  transition={{ duration: 0.35, ease: EASE.brand }}
                 >
-                  <p className="text-eyebrow text-violet-bright uppercase">
+                  <p className="text-eyebrow text-brand-bright uppercase">
                     {rtl ? "مقاسك" : "Your size"}
                   </p>
                   <p className="font-display mt-1.5 text-3xl font-semibold text-white">

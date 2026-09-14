@@ -20,7 +20,7 @@ import { EASE, transition } from "@/lib/motion";
  * does it instantly.
  */
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "violet" | "quiet";
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "brand" | "quiet";
 export type ButtonSize = "sm" | "md" | "lg" | "xl";
 
 const VARIANTS: Record<ButtonVariant, string> = {
@@ -30,8 +30,8 @@ const VARIANTS: Record<ButtonVariant, string> = {
   secondary: "bg-paper-raised text-ink border border-line hover:border-ink/30 shadow-lift",
   /** No chrome until hover. Tertiary. */
   ghost: "bg-transparent text-ink hover:bg-ink/5",
-  /** Brand violet. Reserved for checkout and the single primary CTA on a page. */
-  violet: "bg-violet text-white hover:bg-violet-deep shadow-violet",
+  /** Brand brand. Reserved for checkout and the single primary CTA on a page. */
+  brand: "bg-brand text-white hover:bg-brand-deep shadow-brand",
   /** Text-only, inline. */
   quiet: "bg-transparent text-smoke hover:text-ink underline-offset-4 hover:underline",
 };
@@ -164,7 +164,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
             initial={{ width: 0, height: 0, opacity: 0.28, x: "-50%", y: "-50%" }}
             animate={{ width: 420, height: 420, opacity: 0 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.6, ease: EASE.jo }}
+            transition={{ duration: 0.6, ease: EASE.brand }}
           />
         ))}
       </AnimatePresence>
@@ -236,7 +236,7 @@ function CheckMark() {
         strokeLinejoin="round"
         initial={{ pathLength: 0 }}
         animate={{ pathLength: 1 }}
-        transition={{ duration: 0.36, ease: EASE.jo }}
+        transition={{ duration: 0.36, ease: EASE.brand }}
       />
     </svg>
   );

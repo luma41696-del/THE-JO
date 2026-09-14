@@ -10,12 +10,12 @@ const LABELS: Record<ProductBadge, Record<Locale, string>> = {
   restocked: { en: "Back in stock", ar: "عاد للمخزون" },
 };
 
-/** Tone is meaning, not decoration: coral is always scarcity, violet always brand. */
+/** Tone is meaning, not decoration: alert is always scarcity, brand always brand. */
 const TONES: Record<ProductBadge, string> = {
   new: "bg-ink text-white",
-  bestseller: "bg-violet text-white",
-  limited: "bg-violet-mist text-violet-deep",
-  "last-pieces": "bg-coral text-white",
+  bestseller: "bg-brand text-white",
+  limited: "bg-brand-mist text-brand-deep",
+  "last-pieces": "bg-alert text-white",
   exclusive: "bg-sand text-ink",
   restocked: "bg-mint/12 text-mint",
 };

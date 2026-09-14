@@ -37,7 +37,7 @@ export function Testimonials({
           initial={reduced ? undefined : { opacity: 0, y: 22 }}
           whileInView={reduced ? undefined : { opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-8%" }}
-          transition={{ duration: 0.55, ease: EASE.jo, delay: index * 0.07 }}
+          transition={{ duration: 0.55, ease: EASE.brand, delay: index * 0.07 }}
         >
           <Stars rating={item.rating} />
 
@@ -71,7 +71,7 @@ function Stars({ rating }: { rating: number }) {
         <svg key={star} width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
           <path
             d="M7 1.2 8.6 5h4.1l-3.3 2.5 1.2 3.9L7 9.1l-3.6 2.3 1.2-3.9L1.3 5h4.1L7 1.2Z"
-            fill={star <= rating ? "var(--color-violet)" : "var(--color-line-strong)"}
+            fill={star <= rating ? "var(--color-brand)" : "var(--color-line-strong)"}
           />
         </svg>
       ))}

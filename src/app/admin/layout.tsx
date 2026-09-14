@@ -50,7 +50,7 @@ const baloo = localFont({
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
 export const metadata: Metadata = {
-  title: { default: "Operations · THE JO", template: "%s · THE JO Operations" },
+  title: { default: "Operations · net sale", template: "%s · net sale Operations" },
   // Internal tooling must never be indexed, and the link must not leak either.
   robots: { index: false, follow: false, nocache: true },
   referrer: "no-referrer",

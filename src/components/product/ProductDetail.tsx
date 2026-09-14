@@ -77,7 +77,7 @@ export function ProductDetail({ product, locale = "en" }: { product: Product; lo
   }
 
   return (
-    <div className="jo-container pt-28 pb-16 md:pt-40 md:pb-24">
+    <div className="ns-container pt-28 pb-16 md:pt-40 md:pb-24">
       <nav aria-label="Breadcrumb" className="text-mist mb-6 flex items-center gap-2 text-[0.75rem]">
         <Link href="/shop" className="hover:text-ink transition-colors">
           {rtl ? "المتجر" : "Shop"}
@@ -96,7 +96,7 @@ export function ProductDetail({ product, locale = "en" }: { product: Product; lo
         {/* ---------------------------------------------------------------- */}
         <div className="flex flex-col-reverse gap-4 md:flex-row md:gap-5">
           {gallery.length > 1 && (
-            <div className="jo-no-scrollbar flex gap-3 overflow-x-auto md:flex-col md:overflow-visible">
+            <div className="ns-no-scrollbar flex gap-3 overflow-x-auto md:flex-col md:overflow-visible">
               {gallery.map((shot, index) => (
                 <button
                   key={shot.url}
@@ -126,7 +126,7 @@ export function ProductDetail({ product, locale = "en" }: { product: Product; lo
                   initial={reduced ? undefined : { opacity: 0, scale: 1.03 }}
                   animate={reduced ? undefined : { opacity: 1, scale: 1 }}
                   exit={reduced ? undefined : { opacity: 0 }}
-                  transition={{ duration: 0.4, ease: EASE.jo }}
+                  transition={{ duration: 0.4, ease: EASE.brand }}
                 >
                   <Image
                     src={image.url}
@@ -172,7 +172,7 @@ export function ProductDetail({ product, locale = "en" }: { product: Product; lo
             />
             {product.rating && (
               <span className="text-smoke flex items-center gap-1.5 text-[0.8125rem]">
-                <span className="text-violet">★</span>
+                <span className="text-brand">★</span>
                 <span className="tabular-nums">{product.rating.average.toFixed(1)}</span>
                 <span className="text-mist">({product.rating.count})</span>
               </span>
@@ -247,7 +247,7 @@ export function ProductDetail({ product, locale = "en" }: { product: Product; lo
                     sizeId === option.id
                       ? "border-ink bg-ink text-white"
                       : "border-line text-ink hover:border-ink/45",
-                    sizeError && !sizeId && "border-coral",
+                    sizeError && !sizeId && "border-alert",
                   )}
                   data-cursor="hover"
                 >
@@ -260,7 +260,7 @@ export function ProductDetail({ product, locale = "en" }: { product: Product; lo
               {sizeError && !sizeId && (
                 <motion.p
                   role="alert"
-                  className="text-coral mt-3 text-[0.8125rem]"
+                  className="text-alert mt-3 text-[0.8125rem]"
                   initial={{ opacity: 0, y: -6 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
@@ -272,7 +272,7 @@ export function ProductDetail({ product, locale = "en" }: { product: Product; lo
 
             {/* Fit intelligence — the thing that actually reduces returns. */}
             {product.fit && (
-              <div className="bg-violet-veil rounded-md mt-4 p-4">
+              <div className="bg-brand-veil rounded-md mt-4 p-4">
                 <p className="text-ink text-[0.8125rem]">
                   <strong className="font-medium">
                     {product.fit.scale === 0
@@ -297,7 +297,7 @@ export function ProductDetail({ product, locale = "en" }: { product: Product; lo
                 </p>
                 <Link
                   href={`/fitting-room?product=${product.slug}`}
-                  className="text-violet mt-2 inline-flex items-center gap-1.5 text-[0.8125rem] font-medium"
+                  className="text-brand mt-2 inline-flex items-center gap-1.5 text-[0.8125rem] font-medium"
                   data-cursor="hover"
                 >
                   {rtl ? "جرّبها في غرفة القياس" : "Try it in the fitting room"}
@@ -312,7 +312,7 @@ export function ProductDetail({ product, locale = "en" }: { product: Product; lo
           {/* Actions */}
           <div className="mt-8 flex items-center gap-3">
             <Button
-              variant="violet"
+              variant="brand"
               size="lg"
               fullWidth
               magnetic
@@ -332,7 +332,7 @@ export function ProductDetail({ product, locale = "en" }: { product: Product; lo
               aria-label={wished ? "Remove from wishlist" : "Add to wishlist"}
               className={cn(
                 "grid h-13 w-13 shrink-0 cursor-pointer place-items-center rounded-full border transition-all duration-300",
-                wished ? "border-violet bg-violet-mist text-violet" : "border-line text-ink hover:border-ink/40",
+                wished ? "border-brand bg-brand-mist text-brand" : "border-line text-ink hover:border-ink/40",
               )}
               data-cursor="hover"
             >
@@ -392,7 +392,7 @@ export function StickyBuyBar({ product, locale = "en" }: { product: Product; loc
   const rtl = locale === "ar";
   return (
     <motion.div
-      className="jo-glass fixed inset-x-0 bottom-0 z-[100] flex items-center justify-between gap-4 px-5 py-3 lg:hidden"
+      className="ns-glass fixed inset-x-0 bottom-0 z-[100] flex items-center justify-between gap-4 px-5 py-3 lg:hidden"
       initial={{ y: "100%" }}
       animate={{ y: 0 }}
       transition={transition.drawer}
@@ -402,7 +402,7 @@ export function StickyBuyBar({ product, locale = "en" }: { product: Product; loc
         <Price value={product.price} compareAt={product.compareAtPrice} size="sm" />
       </div>
       <Button
-        variant="violet"
+        variant="brand"
         size="md"
         onClick={() => document.getElementById("size-rail")?.scrollIntoView({ behavior: "smooth" })}
       >

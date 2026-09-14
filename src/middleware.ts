@@ -55,7 +55,7 @@ export function middleware(request: NextRequest) {
         sameSite: "lax",
       });
     }
-    response.headers.set("x-jo-locale", first);
+    response.headers.set("x-ns-locale", first);
     return response;
   }
 

@@ -6,7 +6,7 @@ import { Link } from "@/components/ui/Link";
 import { useWishlist } from "@/lib/store/wishlist";
 import { ProductGrid, ProductGridSkeleton } from "@/components/product/ProductGrid";
 import { Button } from "@/components/ui/Button";
-import { JoWave } from "@/components/brand/JoWave";
+import { BrandWave } from "@/components/brand/BrandWave";
 import type { Locale, Product } from "@/types";
 
 /**
@@ -33,7 +33,7 @@ export function WishlistClient({
 
   if (!mounted) {
     return (
-      <div className="jo-container pb-20">
+      <div className="ns-container pb-20">
         <ProductGridSkeleton count={4} />
       </div>
     );
@@ -45,10 +45,10 @@ export function WishlistClient({
 
   if (saved.length === 0) {
     return (
-      <div className="jo-container pb-24">
+      <div className="ns-container pb-24">
         <div className="border-line rounded-xl flex flex-col items-center border border-dashed py-20 text-center">
           <div className="h-28 w-28 opacity-70">
-            <JoWave rings={3} color="var(--color-violet)" speed={8} />
+            <BrandWave rings={3} color="var(--color-brand)" speed={8} />
           </div>
           <h2 className="font-display text-ink mt-6 text-xl font-semibold">
             {rtl ? "لا توجد قطع محفوظة" : "Nothing saved yet"}
@@ -69,7 +69,7 @@ export function WishlistClient({
   }
 
   return (
-    <div className="jo-container pb-24">
+    <div className="ns-container pb-24">
       <div className="border-line mb-10 flex items-center justify-between border-b pb-4">
         <p className="text-smoke text-[0.875rem] tabular-nums">
           {saved.length} {rtl ? "قطعة محفوظة" : saved.length === 1 ? "piece saved" : "pieces saved"}
@@ -77,7 +77,7 @@ export function WishlistClient({
         <button
           type="button"
           onClick={clear}
-          className="text-smoke hover:text-coral cursor-pointer text-[0.8125rem] underline-offset-4 transition-colors hover:underline"
+          className="text-smoke hover:text-alert cursor-pointer text-[0.8125rem] underline-offset-4 transition-colors hover:underline"
           data-cursor="hover"
         >
           {rtl ? "مسح الكل" : "Clear all"}

@@ -1,7 +1,7 @@
 rules_version = '2';
 
 // ============================================================================
-// THE JO | ذاجو — Cloud Storage Security Rules
+// net sale | نت سيل — Cloud Storage Security Rules
 //
 // Two rules do most of the work here:
 //   1. Product imagery is world-readable and staff-writable.

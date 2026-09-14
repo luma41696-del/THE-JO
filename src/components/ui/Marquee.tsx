@@ -41,7 +41,7 @@ export function Marquee({
 
   if (reduced) {
     return (
-      <div className={cn("jo-no-scrollbar overflow-x-auto", className)}>
+      <div className={cn("ns-no-scrollbar overflow-x-auto", className)}>
         <div className="flex w-max items-center gap-6 px-4">
           {items.map((item, index) => (
             <span key={index} className="whitespace-nowrap">
@@ -54,7 +54,7 @@ export function Marquee({
   }
 
   return (
-    <div className={cn("jo-edge-fade overflow-hidden", className)}>
+    <div className={cn("ns-edge-fade overflow-hidden", className)}>
       <motion.div
         className="flex w-max items-center gap-6"
         animate={{ x: reverse ? ["-50%", "0%"] : ["0%", "-50%"] }}

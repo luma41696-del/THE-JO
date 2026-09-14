@@ -80,7 +80,7 @@ async function readOrFallback<T>(
   } catch (error) {
     if (process.env.NODE_ENV !== "production") {
       console.warn(
-        `[THE JO] Firestore read "${label}" failed — serving the demo catalogue.`,
+        `[net sale] Firestore read "${label}" failed — serving the demo catalogue.`,
         error instanceof Error ? error.message : error,
       );
     }

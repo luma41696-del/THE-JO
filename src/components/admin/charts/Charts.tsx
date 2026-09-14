@@ -15,7 +15,7 @@ import type { CurrencyCode } from "@/types";
  * the hover layer can be built the way this product wants it rather than the
  * way a library's defaults want it.
  *
- * The palette is the brand violet plus four hues, validated for colour-vision
+ * The palette is the brand brand plus four hues, validated for colour-vision
  * deficiency separation (worst adjacent pair ΔE 9.1 protan, normal-vision 22.9)
  * on a white surface. Two of the five sit below 3:1 contrast, so every chart
  * that uses them ships **visible labels and a table view** — that is the relief
@@ -207,7 +207,7 @@ export function RevenueChart({
 
       {active && hover !== null && (
         <div
-          className="jo-glass shadow-float pointer-events-none absolute top-2 rounded-md px-3 py-2 text-[0.75rem]"
+          className="ns-glass shadow-float pointer-events-none absolute top-2 rounded-md px-3 py-2 text-[0.75rem]"
           style={{
             left: `${(x(hover) / W) * 100}%`,
             transform: `translateX(${hover > points.length / 2 ? "-105%" : "5%"})`,
@@ -407,11 +407,11 @@ export function CompositionDonut({
 
 export function Sparkline({
   values,
-  tone = "violet",
+  tone = "brand",
   height = 34,
 }: {
   values: number[];
-  tone?: "violet" | "mint" | "coral";
+  tone?: "brand" | "mint" | "alert";
   height?: number;
 }) {
   if (values.length < 2) return null;
@@ -423,7 +423,7 @@ export function Sparkline({
   const span = max - min || 1;
 
   const stroke =
-    tone === "mint" ? "var(--color-mint)" : tone === "coral" ? "var(--color-coral)" : "var(--chart-1)";
+    tone === "mint" ? "var(--color-mint)" : tone === "alert" ? "var(--color-alert)" : "var(--chart-1)";
 
   const d = values
     .map((v, i) => {

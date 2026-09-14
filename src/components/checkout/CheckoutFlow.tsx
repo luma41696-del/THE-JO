@@ -14,7 +14,7 @@ import { useAuth } from "@/components/providers/AuthProvider";
 import { getIdToken } from "@/lib/firebase/auth";
 import { Button } from "@/components/ui/Button";
 import { AnimatedLogo } from "@/components/brand/AnimatedLogo";
-import { JoWave } from "@/components/brand/JoWave";
+import { BrandWave } from "@/components/brand/BrandWave";
 import type { Address, Locale, Offer, PaymentMethod, ShippingMethod } from "@/types";
 
 /**
@@ -172,15 +172,15 @@ export function CheckoutFlow({
 
   if (placed) {
     return (
-      <div className="jo-container pt-32 pb-24 md:pt-44">
+      <div className="ns-container pt-32 pb-24 md:pt-44">
         <motion.div
           className="mx-auto max-w-lg text-center"
           initial={reduced ? undefined : { opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: EASE.jo }}
+          transition={{ duration: 0.6, ease: EASE.brand }}
         >
           <div className="mx-auto h-32 w-32">
-            <JoWave rings={4} solidCore color="var(--color-violet)" speed={6} />
+            <BrandWave rings={4} solidCore color="var(--color-brand)" speed={6} />
           </div>
 
           <h1 className="font-display text-ink mt-8 text-3xl font-semibold tracking-tight md:text-4xl">
@@ -217,7 +217,7 @@ export function CheckoutFlow({
 
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link href={`/orders/${placed.reference}`}>
-              <Button variant="violet" size="lg" magnetic>
+              <Button variant="brand" size="lg" magnetic>
                 {rtl ? "تتبّع الطلب" : "Track your order"}
               </Button>
             </Link>
@@ -238,7 +238,7 @@ export function CheckoutFlow({
 
   if (items.length === 0) {
     return (
-      <div className="jo-container pt-32 pb-24 text-center md:pt-44">
+      <div className="ns-container pt-32 pb-24 text-center md:pt-44">
         <h1 className="font-display text-ink text-2xl font-semibold">
           {rtl ? "حقيبتك فارغة" : "There is nothing to check out"}
         </h1>
@@ -262,12 +262,12 @@ export function CheckoutFlow({
   ];
 
   return (
-    <div className="jo-container pt-28 pb-24 md:pt-40">
+    <div className="ns-container pt-28 pb-24 md:pt-40">
       <div className="mb-10 flex items-center justify-between gap-6">
-        <Link href="/" className="flex items-center gap-2.5" aria-label="THE JO — home">
+        <Link href="/" className="flex items-center gap-2.5" aria-label="net sale — home">
           <AnimatedLogo className="h-9 w-9" intro={false} title={null} />
           <span className="font-display text-ink text-[0.9375rem] font-semibold tracking-[0.16em] uppercase">
-            The&nbsp;Jo
+            net&nbsp;sale
           </span>
         </Link>
         <span className="text-mist flex items-center gap-2 text-[0.75rem]">
@@ -292,7 +292,7 @@ export function CheckoutFlow({
                     className={cn(
                       "flex items-center gap-2.5 text-[0.8125rem] transition-colors",
                       index < step && "cursor-pointer",
-                      current ? "text-ink font-medium" : done ? "text-violet" : "text-mist",
+                      current ? "text-ink font-medium" : done ? "text-brand" : "text-mist",
                     )}
                     data-cursor={index < step ? "hover" : undefined}
                   >
@@ -302,7 +302,7 @@ export function CheckoutFlow({
                         current
                           ? "bg-ink text-white"
                           : done
-                            ? "bg-violet text-white"
+                            ? "bg-brand text-white"
                             : "bg-paper-sunken text-mist",
                       )}
                     >
@@ -314,7 +314,7 @@ export function CheckoutFlow({
                     <span
                       className={cn(
                         "h-px flex-1 transition-colors duration-500",
-                        done ? "bg-violet" : "bg-line",
+                        done ? "bg-brand" : "bg-line",
                       )}
                     />
                   )}
@@ -418,7 +418,7 @@ export function CheckoutFlow({
                           className={cn(
                             "flex cursor-pointer items-start gap-4 rounded-lg border p-5 transition-all duration-200",
                             methodId === option.id
-                              ? "border-violet bg-violet-veil shadow-lift"
+                              ? "border-brand bg-brand-veil shadow-lift"
                               : "border-line hover:border-ink/30",
                           )}
                         >
@@ -427,7 +427,7 @@ export function CheckoutFlow({
                             name="shippingMethod"
                             checked={methodId === option.id}
                             onChange={() => setMethodId(option.id)}
-                            className="accent-violet mt-1"
+                            className="accent-brand mt-1"
                           />
                           <span className="flex-1">
                             <span className="flex items-center justify-between gap-3">
@@ -476,7 +476,7 @@ export function CheckoutFlow({
                         className={cn(
                           "flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-all duration-200",
                           payment === option.id
-                            ? "border-violet bg-violet-veil shadow-lift"
+                            ? "border-brand bg-brand-veil shadow-lift"
                             : "border-line hover:border-ink/30",
                         )}
                       >
@@ -485,7 +485,7 @@ export function CheckoutFlow({
                           name="payment"
                           checked={payment === option.id}
                           onChange={() => setPayment(option.id as PaymentMethod)}
-                          className="accent-violet mt-0.5"
+                          className="accent-brand mt-0.5"
                         />
                         <span>
                           <span className="text-ink block text-[0.9375rem] font-medium">
@@ -516,7 +516,7 @@ export function CheckoutFlow({
                   {serverError && (
                     <motion.p
                       role="alert"
-                      className="bg-coral/10 text-coral rounded-md mt-5 p-4 text-[0.875rem]"
+                      className="bg-alert/10 text-alert rounded-md mt-5 p-4 text-[0.875rem]"
                       initial={{ opacity: 0, y: -8 }}
                       animate={{ opacity: 1, y: 0 }}
                     >
@@ -557,7 +557,7 @@ export function CheckoutFlow({
               </Button>
             ) : (
               <Button
-                variant="violet"
+                variant="brand"
                 size="xl"
                 magnetic
                 loading={submitting}
@@ -686,11 +686,11 @@ function Field({
         className={cn(
           "bg-paper-raised text-ink rounded-md w-full border px-4 py-3 text-[0.9375rem] outline-none",
           "transition-colors duration-200",
-          error ? "border-coral" : "border-line focus:border-violet",
+          error ? "border-alert" : "border-line focus:border-brand",
         )}
       />
       {error ? (
-        <p id={`${id}-error`} role="alert" className="text-coral mt-1.5 text-[0.75rem]">
+        <p id={`${id}-error`} role="alert" className="text-alert mt-1.5 text-[0.75rem]">
           {error}
         </p>
       ) : hint ? (

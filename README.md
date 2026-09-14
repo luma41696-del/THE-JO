@@ -1,7 +1,13 @@
-# THE JO | ذاجو
+# net sale | نت سيل
 
 Live site: [the-jo-shop.vercel.app](https://the-jo-shop.vercel.app/ar).
 Deployment and administrator access: [DEPLOYMENT.md](DEPLOYMENT.md).
+
+> The Firebase project id, the Vercel host and this directory are still
+> `the-jo-shop` — they predate the rename to **net sale** and are deliberately
+> left alone. A Firebase project id is immutable, and changing the identifiers
+> that reference it would break authentication, Firestore and the deployment.
+> Nothing user-facing carries the old name.
 
 A premium fashion storefront — **bilingual (English / العربية)**, priced in
 Jordanian dinar. Next.js 15 (App Router), TypeScript, Tailwind CSS v4, Firebase,
@@ -229,7 +235,7 @@ lines. Sales tax is 16%.
 public/brand              logo SVGs generated from the master artwork
 public/demo               generated product + campaign placeholders
 public/fonts              Quadrillion (logo face) + Baloo Bhaijaan 2 (5 weights)
-public/lottie             jo-bubble-wave.json — generated from the logo geometry
+public/lottie             net-sale-wave.json — generated from the logo geometry
 scripts/                  brand asset generator, Firestore seeder
 src/middleware.ts         locale negotiation and redirect
 src/app/layout.tsx        passthrough — the real shell is under [locale]
@@ -258,9 +264,9 @@ npm run brand
 
 generates:
 
-- `public/brand/jo-mark.svg`, `-light`, `-violet`, `jo-icon.svg`
+- `public/brand/net-sale-mark.svg`, `-light`, `-ink`, `net-sale-icon.svg`
 - `src/components/brand/paths.ts` — typed constants for React/Motion
-- `public/lottie/jo-bubble-wave.json` — a real bodymovin v5 file, 8 layers,
+- `public/lottie/net-sale-wave.json` — a real bodymovin v5 file, 7 layers,
   built by converting the SVG cubics to Lottie bezier data
 
 **Do not hand-edit the outputs.** The four `BLOB_WAVES` variants must keep an

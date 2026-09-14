@@ -93,7 +93,7 @@ export function OffersBoard({
             {offer.usageLimit && (
               <span className="bg-paper-sunken h-1 w-20 overflow-hidden rounded-full">
                 <span
-                  className={cn("block h-full rounded-full", share > 0.9 ? "bg-coral" : "bg-violet")}
+                  className={cn("block h-full rounded-full", share > 0.9 ? "bg-alert" : "bg-brand")}
                   style={{ width: `${Math.min(100, share * 100)}%` }}
                 />
               </span>
@@ -117,7 +117,7 @@ export function OffersBoard({
             <span
               className={cn(
                 "block text-[0.6875rem]",
-                parts.expired ? "text-mist" : running ? "text-mint" : "text-violet-deep",
+                parts.expired ? "text-mist" : running ? "text-mint" : "text-brand-deep",
               )}
             >
               {parts.expired
@@ -154,10 +154,10 @@ export function OffersBoard({
                 { header: "Ends", value: (o) => new Date(o.endsAt), format: "date", width: 18 },
                 { header: "Active", value: (o) => (o.active ? "yes" : "no") },
               ]}
-              filename="the-jo-offers"
-              title="THE JO — offers"
+              filename="net-sale-offers"
+              title="net sale — offers"
             />
-            <Button variant="violet" size="sm">
+            <Button variant="brand" size="sm">
               New {tab === "codes" ? "offer" : "campaign"}
             </Button>
           </>

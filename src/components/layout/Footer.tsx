@@ -1,7 +1,7 @@
 import { Link } from "@/components/ui/Link";
 
-import { JoLockup } from "@/components/brand/JoLockup";
-import { JoWave } from "@/components/brand/JoWave";
+import { NetSaleLockup } from "@/components/brand/NetSaleLockup";
+import { BrandWave } from "@/components/brand/BrandWave";
 import { Reveal } from "@/components/ui/Reveal";
 import type { Locale } from "@/types";
 
@@ -58,15 +58,15 @@ export function Footer({ locale = "en" }: { locale?: Locale }) {
     <footer className="bg-ink relative mt-24 overflow-hidden text-white md:mt-32">
       {/* Ambient ripple, clipped by the footer. Purely decorative. */}
       <div className="pointer-events-none absolute -end-24 -top-32 h-[32rem] w-[32rem] opacity-[0.13]">
-        <JoWave rings={4} color="var(--color-violet-bright)" speed={14} />
+        <BrandWave rings={4} color="var(--color-brand-bright)" speed={14} />
       </div>
 
-      <div className="jo-container relative py-16 md:py-24">
+      <div className="ns-container relative py-16 md:py-24">
         <div className="grid gap-14 lg:grid-cols-[1.2fr_2fr]">
           {/* Brand block */}
           <Reveal>
             <div className="max-w-sm">
-              <JoLockup tone="light" variant="full" markClassName="h-11 w-11" />
+              <NetSaleLockup tone="onDark" variant="full" markClassName="h-11 w-11" />
               <p className="text-white/55 mt-6 text-[0.9375rem] leading-relaxed">
                 {rtl
                   ? "قطع مصنوعة لتبقى. من مصانع مختارة في إيطاليا والبرتغال، وتصل إليك خلال أيام."
@@ -103,7 +103,7 @@ export function Footer({ locale = "en" }: { locale?: Locale }) {
                       <li key={link.href}>
                         <Link
                           href={link.href}
-                          className="jo-underline text-[0.875rem] text-white/75 transition-colors hover:text-white"
+                          className="ns-underline text-[0.875rem] text-white/75 transition-colors hover:text-white"
                           data-cursor="hover"
                         >
                           {link.label[locale]}
@@ -142,7 +142,7 @@ export function Footer({ locale = "en" }: { locale?: Locale }) {
 
         <div className="mt-10 flex flex-col gap-3 border-t border-white/10 pt-8 text-[0.75rem] text-white/40 sm:flex-row sm:items-center sm:justify-between">
           <p>
-            © {year} THE JO — ذاجو. {rtl ? "جميع الحقوق محفوظة." : "All rights reserved."}
+            © {year} net sale — نت سيل. {rtl ? "جميع الحقوق محفوظة." : "All rights reserved."}
           </p>
           <p className="tracking-[0.1em] uppercase">
             {rtl ? "صُمّم ونُفّذ بعناية" : "Designed and built with care"}

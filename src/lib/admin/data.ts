@@ -70,7 +70,7 @@ async function readCollection<T>(
     return { rows, live: true };
   } catch (error) {
     if (!ALLOW_DEMO) throw error;
-    console.warn(`[THE JO admin] read "${name}" failed — serving generated data.`);
+    console.warn(`[net sale admin] read "${name}" failed — serving generated data.`);
   }
   return { rows: ALLOW_DEMO ? fallback() : [], live: false };
 }

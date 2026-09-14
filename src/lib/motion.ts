@@ -1,10 +1,10 @@
 import type { Transition, Variants } from "motion/react";
 
 /**
- * THE JO — motion system.
+ * net sale — motion system.
  *
  * Three rules the whole site obeys:
- *  1. One house curve. `EASE.jo` is used for anything that moves in space.
+ *  1. One house curve. `EASE.brand` is used for anything that moves in space.
  *     Bounce is reserved for deliberate play (the cart bump, the mark intro).
  *  2. Distance scales with surface size. A chip travels 6px, a card 16px, a
  *     section 28px. Nothing slides further than it is tall.
@@ -13,7 +13,7 @@ import type { Transition, Variants } from "motion/react";
 
 export const EASE = {
   /** Confident settle, no overshoot. The default for transform + layout. */
-  jo: [0.22, 1, 0.36, 1] as const,
+  brand: [0.22, 1, 0.36, 1] as const,
   /** Material-standard. Opacity, colour, blur. */
   silk: [0.4, 0, 0.2, 1] as const,
   /** Light overshoot. Success ticks, cart badge, add-to-bag. */
@@ -29,9 +29,9 @@ export const DURATION = {
 } as const;
 
 export const transition = {
-  base: { duration: DURATION.base, ease: EASE.jo },
+  base: { duration: DURATION.base, ease: EASE.brand },
   quick: { duration: DURATION.quick, ease: EASE.silk },
-  slow: { duration: DURATION.slow, ease: EASE.jo },
+  slow: { duration: DURATION.slow, ease: EASE.brand },
   /** Physical spring for drag, drawers and anything the finger controls. */
   drawer: { type: "spring", stiffness: 380, damping: 40, mass: 0.9 },
   pop: { type: "spring", stiffness: 520, damping: 22, mass: 0.6 },
@@ -67,7 +67,7 @@ export const stagger = (stepSeconds = 0.07, delay = 0.05): Variants => ({
 /** Editorial line-by-line headline entrance. Each line is clipped by a mask. */
 export const lineMask: Variants = {
   hidden: { y: "110%" },
-  show: { y: "0%", transition: { duration: 0.75, ease: EASE.jo } },
+  show: { y: "0%", transition: { duration: 0.75, ease: EASE.brand } },
 };
 
 /** Drawer / side panel. `x` is set by the caller to respect RTL. */
@@ -86,7 +86,7 @@ export const backdrop: Variants = {
 /** Crossfade for switching product galleries / tab panels. */
 export const swap: Variants = {
   hidden: { opacity: 0, scale: 1.02 },
-  show: { opacity: 1, scale: 1, transition: { duration: 0.4, ease: EASE.jo } },
+  show: { opacity: 1, scale: 1, transition: { duration: 0.4, ease: EASE.brand } },
   exit: { opacity: 0, scale: 0.99, transition: { duration: 0.2, ease: EASE.silk } },
 };
 

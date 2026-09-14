@@ -114,7 +114,7 @@ export function ProductsBoard({
         const off = discountPercent(product.price, product.compareAtPrice);
         return (
           <span className="tabular-nums">
-            <span className={cn("font-medium", off > 0 ? "text-coral" : "text-ink")}>
+            <span className={cn("font-medium", off > 0 ? "text-alert" : "text-ink")}>
               {formatPrice(product.price, product.currency)}
             </span>
             {off > 0 && <span className="text-mist ms-2 text-[0.6875rem]">−{off}%</span>}
@@ -132,9 +132,9 @@ export function ProductsBoard({
           className={cn(
             "font-medium tabular-nums",
             product.totalStock === 0
-              ? "text-coral"
+              ? "text-alert"
               : product.totalStock <= LOW_STOCK
-                ? "text-violet-deep"
+                ? "text-brand-deep"
                 : "text-ink",
           )}
         >
@@ -204,11 +204,11 @@ export function ProductsBoard({
                 { header: "Status", value: (p) => p.status },
                 { header: "Rating", value: (p) => p.rating?.average ?? "" },
               ]}
-              filename="the-jo-catalogue"
-              title="THE JO — catalogue"
+              filename="net-sale-catalogue"
+              title="net sale — catalogue"
             />
             <Link href="/admin/products/new">
-              <Button variant="violet" size="sm">
+              <Button variant="brand" size="sm">
                 New product
               </Button>
             </Link>
@@ -225,7 +225,7 @@ export function ProductsBoard({
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Title, slug, tag…"
-            className="border-line focus:border-violet bg-paper-raised text-ink placeholder:text-mist w-56 rounded-pill border py-2 ps-4 pe-4 text-[0.8125rem] outline-none transition-colors"
+            className="border-line focus:border-brand bg-paper-raised text-ink placeholder:text-mist w-56 rounded-pill border py-2 ps-4 pe-4 text-[0.8125rem] outline-none transition-colors"
           />
         </label>
       </div>

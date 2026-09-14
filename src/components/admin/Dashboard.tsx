@@ -129,8 +129,8 @@ export function Dashboard({
                 { header: "Orders", value: (p) => p.orders, format: "number" },
                 { header: "Units", value: (p) => p.units, format: "number" },
               ]}
-              filename="the-jo-sales"
-              title={`THE JO — sales, ${RANGES[range].label.toLowerCase()}`}
+              filename="net-sale-sales"
+              title={`net sale — sales, ${RANGES[range].label.toLowerCase()}`}
               currency={currency}
             />
           </>
@@ -280,7 +280,7 @@ export function Dashboard({
                 { header: "Units", value: (p) => p.units, format: "number" },
                 { header: "Revenue", value: (p) => p.revenue, format: "currency" },
               ]}
-              filename="the-jo-best-sellers"
+              filename="net-sale-best-sellers"
               currency={currency}
               label="Export"
             />

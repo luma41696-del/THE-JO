@@ -1,5 +1,30 @@
 import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { extendTailwindMerge } from "tailwind-merge";
+
+/**
+ * tailwind-merge only knows Tailwind's *stock* scales. Our `@theme` block in
+ * `globals.css` adds font sizes and shadows with word-shaped names, and
+ * tailwind-merge's fallback for an unrecognised `text-*` / `shadow-*` word is
+ * "it must be a colour" — so it filed `text-display` in the same group as
+ * `text-ink` and silently dropped whichever came first.
+ *
+ * That is not a cosmetic detail: every section heading on the site lost its
+ * font size, collapsed to 16px, and then never appeared at all, because the
+ * masked `Reveal` wrapper shrank to the collapsed height and clipped the
+ * element out of the viewport — so the IntersectionObserver that was supposed
+ * to fade it in never saw it intersect.
+ *
+ * Listing the custom names here files them in the right group. Any new
+ * `--text-*` or `--shadow-*` token in `@theme` must be added here too.
+ */
+const twMerge = extendTailwindMerge({
+  extend: {
+    classGroups: {
+      "font-size": [{ text: ["hero", "display", "eyebrow"] }],
+      shadow: [{ shadow: ["brand", "lift", "float", "hover"] }],
+    },
+  },
+});
 
 /**
  * Merge Tailwind classes so that a caller-supplied `className` always wins over
@@ -49,7 +74,7 @@ export function orderReference(seed = Date.now()) {
     out += alphabet[(n + Math.floor(Math.random() * alphabet.length)) % alphabet.length];
     n = Math.floor(n / alphabet.length);
   }
-  return `JO-${out}`;
+  return `NS-${out}`;
 }
 
 export function slugify(input: string) {

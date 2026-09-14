@@ -12,7 +12,7 @@ import { recommendSize, type BodyProfile } from "@/lib/fitting";
 import { useCart } from "@/lib/store/cart";
 import { useUI } from "@/lib/store/ui";
 import { Button } from "@/components/ui/Button";
-import { JoWave } from "@/components/brand/JoWave";
+import { BrandWave } from "@/components/brand/BrandWave";
 import type { Locale, OutfitSlot, Product } from "@/types";
 
 /**
@@ -122,21 +122,21 @@ export function FittingRoom({
   }
 
   return (
-    <div className="jo-container pb-24">
+    <div className="ns-container pb-24">
       <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr] lg:gap-10">
         {/* ------------------------------------------------------------------ */}
         {/* Stage                                                              */}
         {/* ------------------------------------------------------------------ */}
         <div className="bg-ink rounded-2xl relative overflow-hidden">
           <div className="pointer-events-none absolute -end-16 -top-16 h-96 w-96 opacity-25">
-            <JoWave rings={4} color="var(--color-violet-bright)" speed={13} />
+            <BrandWave rings={4} color="var(--color-brand-bright)" speed={13} />
           </div>
 
           <div className="relative flex h-full flex-col p-6 md:p-8">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-eyebrow font-display text-violet-bright flex items-center gap-2 uppercase">
-                  <span className="bg-violet-bright h-1.5 w-1.5 animate-pulse rounded-full" />
+                <p className="text-eyebrow font-display text-brand-bright flex items-center gap-2 uppercase">
+                  <span className="bg-brand-bright h-1.5 w-1.5 animate-pulse rounded-full" />
                   {rtl ? "غرفة القياس" : "Fitting room"}
                 </p>
                 <h2 className="font-display mt-2 text-xl font-semibold text-white">
@@ -161,7 +161,7 @@ export function FittingRoom({
               {chosen.length === 0 ? (
                 <div className="flex h-full min-h-80 flex-col items-center justify-center text-center">
                   <div className="h-24 w-24 opacity-50">
-                    <JoWave rings={3} color="#ffffff" speed={7} />
+                    <BrandWave rings={3} color="#ffffff" speed={7} />
                   </div>
                   <p className="mt-5 max-w-[24ch] text-[0.9375rem] text-white/50">
                     {rtl
@@ -219,7 +219,7 @@ export function FittingRoom({
             {/* Look summary */}
             {chosen.length > 0 && (
               <motion.div
-                className="jo-glass-dark rounded-xl mt-6 p-5"
+                className="ns-glass-dark rounded-xl mt-6 p-5"
                 initial={reduced ? undefined : { opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={transition.base}
@@ -238,7 +238,7 @@ export function FittingRoom({
                   </div>
 
                   <Button
-                    variant="violet"
+                    variant="brand"
                     size="lg"
                     magnetic
                     loading={adding}
@@ -260,7 +260,7 @@ export function FittingRoom({
         <div className="flex flex-col gap-5">
           {/* Slot tabs */}
           <div
-            className="jo-no-scrollbar flex gap-2 overflow-x-auto"
+            className="ns-no-scrollbar flex gap-2 overflow-x-auto"
             role="tablist"
             aria-label={rtl ? "خانات الإطلالة" : "Outfit slots"}
           >
@@ -286,7 +286,7 @@ export function FittingRoom({
                     <span
                       className={cn(
                         "absolute -end-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2",
-                        active ? "border-ink bg-violet-bright" : "border-paper bg-violet",
+                        active ? "border-ink bg-brand-bright" : "border-paper bg-brand",
                       )}
                     />
                   )}
@@ -315,7 +315,7 @@ export function FittingRoom({
               </span>
               <motion.span
                 animate={{ rotate: showMeasurements ? 180 : 0 }}
-                transition={{ duration: 0.3, ease: EASE.jo }}
+                transition={{ duration: 0.3, ease: EASE.brand }}
                 className="text-mist"
                 aria-hidden="true"
               >
@@ -404,8 +404,8 @@ export function FittingRoom({
 
           {/* Fit readout for the current look */}
           {recommendations.length > 0 && (
-            <div className="bg-violet-veil rounded-xl p-5">
-              <h3 className="text-eyebrow font-display text-violet mb-3 uppercase">
+            <div className="bg-brand-veil rounded-xl p-5">
+              <h3 className="text-eyebrow font-display text-brand mb-3 uppercase">
                 {rtl ? "المقاسات المقترحة" : "Your sizes"}
               </h3>
               <ul className="space-y-2.5">
@@ -421,7 +421,7 @@ export function FittingRoom({
                         <span
                           className={cn(
                             "rounded-xs px-2 py-1 text-[0.75rem] font-semibold",
-                            unsure ? "bg-sand text-ink" : "bg-violet text-white",
+                            unsure ? "bg-sand text-ink" : "bg-brand text-white",
                           )}
                         >
                           {unsure
@@ -464,7 +464,7 @@ export function FittingRoom({
                     className={cn(
                       "rounded-lg group relative cursor-pointer overflow-hidden text-start transition-all duration-300",
                       "ring-offset-paper ring-offset-2",
-                      selected ? "ring-violet ring-2" : "ring-transparent hover:ring-line-strong ring-1",
+                      selected ? "ring-brand ring-2" : "ring-transparent hover:ring-line-strong ring-1",
                     )}
                     data-cursor="hover"
                   >
@@ -480,7 +480,7 @@ export function FittingRoom({
                       )}
                       {selected && (
                         <motion.span
-                          className="bg-violet absolute end-2 top-2 grid h-6 w-6 place-items-center rounded-full text-[0.75rem] text-white"
+                          className="bg-brand absolute end-2 top-2 grid h-6 w-6 place-items-center rounded-full text-[0.75rem] text-white"
                           initial={{ scale: 0 }}
                           animate={{ scale: 1 }}
                           transition={{ duration: 0.3, ease: EASE.spring }}
@@ -555,9 +555,9 @@ function Slider({
         max={max}
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="accent-violet bg-line h-1 w-full cursor-pointer appearance-none rounded-full"
+        className="accent-brand bg-line h-1 w-full cursor-pointer appearance-none rounded-full"
         style={{
-          background: `linear-gradient(to right, var(--color-violet) ${
+          background: `linear-gradient(to right, var(--color-brand) ${
             ((value - min) / (max - min)) * 100
           }%, var(--color-line) ${((value - min) / (max - min)) * 100}%)`,
         }}
