@@ -10,11 +10,9 @@ import { EASE } from "@/lib/motion";
 import { formatPrice, minorUnits } from "@/lib/format";
 import { getIdToken } from "@/lib/firebase/auth";
 import { gtinKind, isValidGtin } from "@/lib/product";
-import {
-  ACCEPT_ATTRIBUTE,
-  deleteProductImage,
-  uploadProductImage,
-} from "@/lib/firebase/upload";
+import { ACCEPT_ATTRIBUTE, uploadProductImage } from "@/lib/firebase/upload";
+import { MediaLibrary } from "./MediaLibrary";
+import { sameAsset, storagePathFromUrl } from "@/lib/media";
 import { AdminPageHeader } from "./AdminShell";
 import { useAdminLocale } from "./AdminLocale";
 import { Panel } from "./AdminUI";
@@ -43,6 +41,39 @@ import type {
  * so the browser's number control cannot produce a value the store cannot
  * represent.
  */
+
+/**
+ * One file's journey through the uploader.
+ *
+ * Tracked per file rather than behind a single "uploading" flag, because the
+ * merchant drops eight photographs at once and the fourth one fails. One flag
+ * turns that into "upload failed" — with three images already uploaded that
+ * they cannot see, and five they now have to find again on disk. Each file
+ * keeps its own state and its own `File` handle, so the one that failed can be
+ * retried on its own.
+ */
+interface QueuedUpload {
+  id: string;
+  file: File;
+  name: string;
+  state: "waiting" | "uploading" | "done" | "failed";
+  progress: number;
+  error?: string;
+}
+
+/**
+ * A file the merchant has taken off this product but which is still in Storage.
+ *
+ * Held until the save lands. Deleting at the moment the × is pressed — which
+ * is what this did — breaks a published product the instant the merchant
+ * changes their mind, closes the tab, or hits a save conflict: the file is
+ * gone and the stored document still points at it.
+ */
+interface PendingRemoval {
+  url: string;
+  /** Shown so the merchant can see what is queued to go. */
+  alt: string;
+}
 
 type Draft = {
   titleEn: string;
@@ -141,8 +172,15 @@ export function ProductEditor({
    */
   const [images, setImages] = useState<ProductImage[]>(product?.images ?? []);
   const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [queue, setQueue] = useState<QueuedUpload[]>([]);
+  const [dragging, setDragging] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  /*
+   * Files taken off this product but not yet deleted. Emptied by the save —
+   * never by the ×, which is the whole point. See `removeImage`.
+   */
+  const [pendingRemovals, setPendingRemovals] = useState<PendingRemoval[]>([]);
 
   /*
    * Variant stock, edited as a grid.
@@ -273,44 +311,128 @@ export function ProductEditor({
   }
 
   /**
-   * Take the files now, ask for the words after.
+   * Upload one queued file, and put whatever happens back on its own row.
    *
-   * Two things changed here. It no longer requires a saved product — uploading
-   * into a folder named for a draft is fine, because the product stores the
-   * resulting *URL* and nothing depends on the folder matching an id. Making a
-   * merchant save an empty shell before they can add a photograph was an
-   * ordering problem, not a technical one.
-   *
-   * And it no longer interrogates them through `window.prompt`, once per file,
-   * modally, with no way back. Alt text is still required — it is required at
-   * *publish*, in a field beside the picture where the merchant can see what
-   * they are describing. A blocking prompt asking someone to describe a file
-   * they have not looked at yet produces "IMG_4821", which is worse than
-   * nothing: a screen reader announces it in full and the listener learns
-   * less than from silence.
+   * A failure leaves the `File` handle in the queue. That is the whole reason
+   * the queue exists: the browser will not hand a file back once the input has
+   * been cleared, so a failed upload without a retained handle means the
+   * merchant has to go and find the photograph again. With it, Retry is one
+   * click and no trip to the file manager.
    */
-  async function handleFiles(list: FileList | null) {
-    if (!list || list.length === 0) return;
-    setUploadError(null);
-    setUploading(true);
+  async function runUpload(item: QueuedUpload) {
+    setQueue((current) =>
+      current.map((q) =>
+        q.id === item.id ? { ...q, state: "uploading", progress: 0, error: undefined } : q,
+      ),
+    );
 
     try {
-      const files = Array.from(list);
-      for (let i = 0; i < files.length; i += 1) {
-        const file = files[i]!;
-        const uploaded = await uploadProductImage(uploadFolder, file, "", {
-          onProgress: (fraction) => setUploadProgress((i + fraction) / files.length),
-        });
-        setImages((current) => [...current, uploaded]);
-      }
-    } catch (error) {
-      setUploadError(
-        error instanceof Error ? error.message : "That image could not be uploaded.",
+      const uploaded = await uploadProductImage(uploadFolder, item.file, "", {
+        onProgress: (fraction) =>
+          setQueue((current) =>
+            current.map((q) => (q.id === item.id ? { ...q, progress: fraction } : q)),
+          ),
+      });
+
+      setImages((current) => [...current, uploaded]);
+      setQueue((current) =>
+        current.map((q) => (q.id === item.id ? { ...q, state: "done", progress: 1 } : q)),
       );
-    } finally {
-      setUploading(false);
-      setUploadProgress(0);
+
+      /*
+       * Record it in the library — after the image is on the product, never
+       * before, and never as a condition of success. The file is already
+       * uploaded and already attached by this point; a library that is one
+       * entry behind is a smaller problem than an upload that reports failure
+       * after succeeding.
+       */
+      void registerInLibrary(uploaded, item.file);
+    } catch (error) {
+      setQueue((current) =>
+        current.map((q) =>
+          q.id === item.id
+            ? {
+                ...q,
+                state: "failed",
+                error: error instanceof Error ? error.message : "That image could not be uploaded.",
+              }
+            : q,
+        ),
+      );
     }
+  }
+
+  /** Tell the library a file exists. Best effort, by design — see `runUpload`. */
+  async function registerInLibrary(image: ProductImage, file: File) {
+    try {
+      const token = await getIdToken().catch(() => null);
+      await fetch("/api/admin/media", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          url: image.url,
+          alt: image.alt,
+          width: image.width,
+          height: image.height,
+          bytes: file.size,
+          contentType: file.type,
+          filename: file.name,
+        }),
+      });
+    } catch {
+      /* The image is on the product either way. */
+    }
+  }
+
+  /**
+   * Take the files now, ask for the words after.
+   *
+   * Two things changed here earlier. It no longer requires a saved product —
+   * uploading into a folder named for a draft is fine, because the product
+   * stores the resulting *URL* and nothing depends on the folder matching an
+   * id. Making a merchant save an empty shell before they can add a photograph
+   * was an ordering problem, not a technical one.
+   *
+   * And it no longer interrogates them through `window.prompt`, once per file,
+   * modally, with no way back. Alt text is still required — at *publish*, in a
+   * field beside the picture where the merchant can see what they are
+   * describing. A blocking prompt asking someone to describe a file they have
+   * not looked at yet produces "IMG_4821", which is worse than nothing: a
+   * screen reader announces it in full and the listener learns less than from
+   * silence.
+   */
+  async function handleFiles(list: FileList | File[] | null) {
+    const files = list ? Array.from(list) : [];
+    if (files.length === 0) return;
+
+    const queued: QueuedUpload[] = files.map((file, index) => ({
+      id: `${Date.now().toString(36)}-${index}-${file.name}`,
+      file,
+      name: file.name,
+      state: "waiting",
+      progress: 0,
+    }));
+
+    setQueue((current) => [...current, ...queued]);
+    setUploading(true);
+
+    // One at a time: eight parallel uploads on a shop's connection make all
+    // eight slow and the progress bars meaningless.
+    for (const item of queued) await runUpload(item);
+
+    setUploading(false);
+  }
+
+  /** Retry the ones that failed, keeping the ones that did not. */
+  async function retryFailed() {
+    const failed = queue.filter((item) => item.state === "failed");
+    if (failed.length === 0) return;
+    setUploading(true);
+    for (const item of failed) await runUpload(item);
+    setUploading(false);
   }
 
   /** Alt text, edited in place against the picture it describes. */
@@ -328,16 +450,73 @@ export function ProductEditor({
     });
   }
 
-  /*
-   * Removed from the product immediately, deleted from Storage in the
-   * background. If the delete fails the product is still correct — an orphaned
-   * object costs pennies, whereas blocking the edit on a storage hiccup costs
-   * the merchant their afternoon.
+  /**
+   * Take an image off this product. Do not delete the file.
+   *
+   * These were one action, and that was a bug with two faces. Remove an image
+   * from a published product, then close the tab without saving or hit a save
+   * conflict: the file was already gone from Storage while the stored document
+   * still listed its URL — a hole in a live product page, discovered by a
+   * customer. And a photograph shared with another product — a size chart, a
+   * fabric swatch — was deleted out from under it without a word.
+   *
+   * Removing is now a change to *this form*, queued like every other change
+   * and undoable by not saving. The file is dealt with after the save lands,
+   * by a server that can see the whole catalogue — see `reapRemovedFiles`.
    */
   function removeImage(index: number) {
     const image = images[index];
     setImages((current) => current.filter((_, i) => i !== index));
-    if (image) void deleteProductImage(image.url).catch(() => {});
+    if (!image) return;
+    // Nothing to reap for a seeded asset: there is no object behind it.
+    if (!storagePathFromUrl(image.url)) return;
+    setPendingRemovals((current) =>
+      current.some((pending) => sameAsset(pending.url, image.url))
+        ? current
+        : [...current, { url: image.url, alt: image.alt }],
+    );
+  }
+
+  /**
+   * Once the save has landed, deal with the files that were taken off.
+   *
+   * Two guards, in this order. A file the merchant removed and then put back
+   * during the same session is not removed at all — the saved document points
+   * at it. And the route refuses to delete anything another product still
+   * shows, which is a check only the server can make: this form has no idea
+   * what the rest of the catalogue holds.
+   *
+   * A refusal is reported as information, not as a save failure. The save
+   * succeeded; the file simply stayed, because something needs it.
+   */
+  async function reapRemovedFiles(kept: ProductImage[], savedProductId: string | undefined) {
+    const queuedForRemoval = pendingRemovals.filter(
+      (pending) => !kept.some((image) => sameAsset(image.url, pending.url)),
+    );
+    setPendingRemovals([]);
+    if (queuedForRemoval.length === 0) return;
+
+    const token = await getIdToken().catch(() => null);
+    let keptElsewhere = 0;
+
+    for (const pending of queuedForRemoval) {
+      try {
+        const response = await fetch("/api/admin/media", {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ url: pending.url, ignoreProductId: savedProductId }),
+        });
+        if (response.status === 409) keptElsewhere += 1;
+      } catch {
+        // The product is saved and correct. An object nobody references costs
+        // pennies; failing the save over it would cost the merchant the edit.
+      }
+    }
+
+    if (keptElsewhere > 0) setUploadError(t("up.keptElsewhere"));
   }
   const [saved, setSaved] = useState(false);
 
@@ -578,6 +757,13 @@ export function ProductEditor({
       setLastSavedAt(Date.now());
       discardDraft();
 
+      /*
+       * Only now are the removed files dealt with — after the document that
+       * stopped referencing them is actually stored. Doing it any earlier is
+       * the bug this replaced.
+       */
+      void reapRemovedFiles(images, product?.id ?? data.id);
+
       if (isNew && data.id) {
         router.push(`/admin/products/${data.id}`);
       } else {
@@ -729,11 +915,60 @@ export function ProductEditor({
             </div>
           </Panel>
 
-          {product && (
-            <Panel
+          {/*
+            No longer gated on a saved product.
+
+            The panel used to render only once the product existed, so a
+            merchant creating one was told to save an empty shell first and
+            come back for the photographs. Nothing technical required that:
+            uploads go to a draft folder and the document stores the resulting
+            URL. It was an ordering rule imposed by the form, and it made the
+            most natural way to build a product — pictures first — impossible.
+          */}
+          <Panel
               title={t("pe.imagery")}
               description={t("pe.firstImageHint")}
+              actions={
+                <button
+                  type="button"
+                  onClick={() => setLibraryOpen(true)}
+                  className="border-line text-ink-muted hover:border-ink hover:text-ink rounded-pill cursor-pointer border px-3 py-1.5 text-[0.75rem] transition-colors"
+                  data-cursor="hover"
+                >
+                  {t("media.open")}
+                </button>
+              }
             >
+              {/*
+                A drop target around the whole gallery.
+
+                `dragCounter` is not needed because `dragleave` on the
+                container fires when the pointer crosses a child, which makes
+                the highlight flicker; checking that the pointer actually left
+                the element's bounds is steadier than counting events.
+              */}
+              <div
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  if (!dragging) setDragging(true);
+                }}
+                onDragLeave={(event) => {
+                  const next = event.relatedTarget as Node | null;
+                  if (!next || !event.currentTarget.contains(next)) setDragging(false);
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  setDragging(false);
+                  const dropped = Array.from(event.dataTransfer.files).filter((file) =>
+                    file.type.startsWith("image/"),
+                  );
+                  void handleFiles(dropped);
+                }}
+                className={cn(
+                  "rounded-lg border-2 border-dashed p-3 transition-colors",
+                  dragging ? "border-brand bg-brand-mist/40" : "border-transparent",
+                )}
+              >
               <div className="flex flex-wrap gap-3">
                 {images.map((image, index) => (
                   <div key={image.url} className="w-24">
@@ -811,22 +1046,109 @@ export function ProductEditor({
 
                 <label
                   className={cn(
-                    "border-line hover:border-brand text-mist hover:text-brand grid h-32 w-24 place-items-center rounded-md border border-dashed text-[0.75rem] transition-colors",
+                    "border-line hover:border-brand text-mist hover:text-brand grid h-32 w-24 place-items-center rounded-md border border-dashed text-center text-[0.75rem] leading-tight transition-colors",
                     uploading ? "cursor-wait opacity-60" : "cursor-pointer",
                   )}
                 >
-                  <span className="text-center leading-tight">
-                    {uploading ? `${Math.round(uploadProgress * 100)}%` : <>+<br />{t("pe.add")}</>}
+                  <span>
+                    +<br />
+                    {t("pe.add")}
+                    <br />
+                    <span className="text-[0.625rem] opacity-70">{t("up.drop")}</span>
                   </span>
                   <input
                     type="file"
                     accept={ACCEPT_ATTRIBUTE}
                     multiple
                     disabled={uploading}
-                    onChange={(event) => handleFiles(event.target.files)}
+                    onChange={(event) => {
+                      void handleFiles(event.target.files);
+                      // Cleared so picking the same file again still fires a
+                      // change event — the usual case after a failed upload.
+                      event.target.value = "";
+                    }}
                     className="sr-only"
                   />
                 </label>
+              </div>
+
+              {/*
+                The queue, one row per file.
+
+                Shown while anything is in flight and kept afterwards only for
+                the failures, because those are the rows that still need a
+                decision. A bare percentage over the whole batch cannot say
+                which of eight photographs is the one that did not make it.
+              */}
+              {queue.some((item) => item.state !== "done") && (
+                <ul className="mt-3 grid gap-1.5">
+                  {queue
+                    .filter((item) => item.state !== "done")
+                    .map((item) => (
+                      <li
+                        key={item.id}
+                        className="border-line flex items-center gap-3 rounded-md border px-3 py-2 text-[0.75rem]"
+                      >
+                        <span className="text-ink min-w-0 flex-1 truncate">{item.name}</span>
+
+                        {item.state === "uploading" && (
+                          <span className="text-mist tabular-nums">
+                            {Math.round(item.progress * 100)}%
+                          </span>
+                        )}
+                        {item.state === "waiting" && (
+                          <span className="text-mist">{t("common.loading")}</span>
+                        )}
+                        {item.state === "failed" && (
+                          <>
+                            <span className="text-alert min-w-0 flex-1 truncate" title={item.error}>
+                              {item.error}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => void runUpload(item)}
+                              className="border-line hover:border-ink text-ink rounded-pill cursor-pointer border px-2.5 py-1 transition-colors"
+                              data-cursor="hover"
+                            >
+                              {t("up.retry")}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setQueue((current) => current.filter((q) => q.id !== item.id))
+                              }
+                              className="text-mist hover:text-ink cursor-pointer"
+                              data-cursor="hover"
+                            >
+                              {t("up.dismiss")}
+                            </button>
+                          </>
+                        )}
+                      </li>
+                    ))}
+                </ul>
+              )}
+
+              {queue.filter((item) => item.state === "failed").length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => void retryFailed()}
+                  className="border-line hover:border-ink text-ink rounded-pill mt-2 cursor-pointer border px-3 py-1.5 text-[0.75rem] transition-colors"
+                  data-cursor="hover"
+                >
+                  {t("up.retryAll")}
+                </button>
+              )}
+
+              {/*
+                What will happen to the removed files, stated before the save
+                rather than discovered after it.
+              */}
+              {pendingRemovals.length > 0 && (
+                <p className="text-mist mt-3 text-[0.75rem]">
+                  {t("up.pendingRemoval").replace("{n}", String(pendingRemovals.length))}
+                </p>
+              )}
               </div>
 
               {uploadError && (
@@ -842,7 +1164,6 @@ export function ProductEditor({
                 </p>
               )}
             </Panel>
-          )}
 
           {/*
             Designs — the artwork axis.
@@ -851,7 +1172,7 @@ export function ProductEditor({
             embroidery picker on it would promise a choice the order cannot
             carry.
           */}
-          {product && draft.type === "variable" && (
+          {draft.type === "variable" && (
             <Panel
               title={t("pe.designs")}
               description={t("pe.designsHint")}
@@ -1325,6 +1646,24 @@ export function ProductEditor({
           )}
         </div>
       </div>
+
+      <MediaLibrary
+        open={libraryOpen}
+        onClose={() => setLibraryOpen(false)}
+        alreadyUsed={images.map((image) => image.url)}
+        ignoreProductId={product?.id}
+        onPick={(picked) =>
+          setImages((current) => [
+            ...current,
+            // Guarded, because the picker can be reopened and the same file
+            // chosen twice — two identical entries in a gallery is a bug the
+            // merchant then has to find and undo.
+            ...picked.filter(
+              (image) => !current.some((existing) => sameAsset(existing.url, image.url)),
+            ),
+          ])
+        }
+      />
     </>
   );
 }

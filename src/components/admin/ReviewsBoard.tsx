@@ -48,6 +48,17 @@ export function ReviewsBoard({
   const [error, setError] = useState<string | null>(null);
   const [replyFor, setReplyFor] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
+  /*
+   * Hiding a review is moderation, and the note is the record of why.
+   *
+   * It used to be collected through a `window.prompt`, which loses whatever
+   * was typed if the pointer slips outside it, cannot show the review being
+   * judged, and gives a moderator writing a reason in Arabic a box with no
+   * text direction. This is the same field the reply uses, under the review
+   * it is about.
+   */
+  const [hideFor, setHideFor] = useState<string | null>(null);
+  const [hideNote, setHideNote] = useState("");
 
   const counts = useMemo(() => {
     const out: Record<ReviewStatus, number> = { published: 0, pending: 0, hidden: 0 };
@@ -97,13 +108,19 @@ export function ReviewsBoard({
     }
   }
 
-  function hide(review: Review) {
-    const note = window.prompt(
-      t("reviews.hideReason"),
-      "",
-    );
-    if (!note || note.trim().length < 3) return;
-    void patch(review.id, { status: "hidden", moderationNote: note.trim() });
+  /** Hide a review, with the reason recorded against it. */
+  async function confirmHide(id: string) {
+    const note = hideNote.trim();
+    // Three characters is not a standard — it is the shortest thing that is
+    // not an accidental keystroke. "Spam" is a fine reason; "a" is not one.
+    if (note.length < 3) {
+      setError(t("reviews.hideReasonRequired"));
+      return;
+    }
+    setError(null);
+    await patch(id, { status: "hidden", moderationNote: note });
+    setHideFor(null);
+    setHideNote("");
   }
 
   return (
@@ -236,6 +253,39 @@ export function ReviewsBoard({
                     </div>
                   )}
 
+                  {hideFor === review.id && (
+                    <div className="mt-3">
+                      <textarea
+                        value={hideNote}
+                        onChange={(e) => setHideNote(e.target.value)}
+                        rows={2}
+                        autoFocus
+                        placeholder={t("reviews.hideReason")}
+                        aria-label={t("reviews.hideReason")}
+                        className="border-line focus:border-brand bg-paper text-ink w-full rounded-md border px-3 py-2 text-[0.8125rem] outline-none"
+                      />
+                      <div className="mt-2 flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setHideFor(null);
+                            setHideNote("");
+                          }}
+                          className="text-smoke hover:text-ink cursor-pointer text-[0.75rem]"
+                        >
+                          {t("common.cancel")}
+                        </button>
+                        <Button
+                          size="sm"
+                          loading={busy}
+                          onClick={() => void confirmHide(review.id)}
+                        >
+                          {t("reviews.hideAction")}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
                   {replyFor === review.id && (
                     <div className="mt-3">
                       <textarea
@@ -275,7 +325,14 @@ export function ReviewsBoard({
                       </Action>
                     )}
                     {review.status !== "hidden" && (
-                      <Action busy={busy} danger onClick={() => hide(review)}>
+                      <Action
+                        busy={busy}
+                        danger
+                        onClick={() => {
+                          setHideFor(review.id);
+                          setHideNote("");
+                        }}
+                      >
                         {t("reviews.hideAction")}
                       </Action>
                     )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 
 import { Link, useLocalizedRouter } from "@/components/ui/Link";
@@ -12,6 +12,13 @@ import { useAdminLocale } from "./AdminLocale";
 import { getIdToken } from "@/lib/firebase/auth";
 import { storefrontState, type StorefrontState } from "@/lib/visibility";
 import { ACTION_LABELS, type ProductAction } from "@/lib/product-state";
+import {
+  FIELD_LABELS,
+  editProblems,
+  type Edit,
+  type EditField,
+  type EditMode,
+} from "@/lib/bulk-edit";
 import type { AdminKey } from "@/lib/i18n/admin";
 
 /** The same tones and words the warehouse uses, so one product reads the same on both screens. */
@@ -49,6 +56,22 @@ type Filter = "all" | "low-stock" | "on-sale" | "draft" | "archived" | string;
 
 const LOW_STOCK = 8;
 
+/**
+ * The state changes offered on a selection.
+ *
+ * Archive and restore are deliberately absent: retiring thirty products at
+ * once is not something to do from a chip on a toolbar, and the warehouse
+ * screen — where the consequences are spelled out — is the place for it.
+ */
+const BULK_ACTIONS: ProductAction[] = [
+  "publish",
+  "draft",
+  "warehouse",
+  "shopfront",
+  "sold-out",
+  "restock",
+];
+
 export function ProductsBoard({
   products,
   categories,
@@ -69,9 +92,100 @@ export function ProductsBoard({
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
 
-  /** Apply one state action to one product, and say what happened. */
-  async function runAction(id: string, action: ProductAction) {
-    setBusyId(id);
+  /*
+   * The selection lives here rather than in the table, so it survives a
+   * re-render of the rows and so the bar that acts on it, the count it shows
+   * and the clearing after a write are all one piece of state.
+   */
+  const [selected, setSelected] = useState<string[]>([]);
+  const [quickId, setQuickId] = useState<string | null>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [applying, setApplying] = useState(false);
+
+  /*
+   * The product the quick-edit row belongs to, resolved against the rows
+   * currently on screen. Held as an id rather than an object so a refresh
+   * after a save reopens it on the *new* values instead of the stale ones.
+   */
+  const quickTarget = useMemo(
+    () => products.find((product) => product.id === quickId) ?? null,
+    [products, quickId],
+  );
+
+  /**
+   * Send an edit to the bulk route — for one product or for the selection.
+   *
+   * Quick edit is not a different operation. It is this one with a single id,
+   * which is why it goes through the same validation and produces the same
+   * per-product refusals.
+   */
+  async function sendEdits(ids: string[], edits: Edit[]) {
+    if (ids.length === 0 || edits.length === 0) return false;
+    setApplying(true);
+    setStateError(null);
+    setStateNotice(null);
+    try {
+      const token = await getIdToken().catch(() => null);
+      const response = await fetch("/api/admin/products/bulk", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ ids, edits }),
+      });
+      const data = (await response.json()) as {
+        ok?: boolean;
+        error?: string;
+        changed?: number;
+        refused?: { reason?: string; reasonAr?: string; title?: string }[];
+      };
+      if (!response.ok || !data.ok) throw new Error(data.error ?? t("qe.failed"));
+
+      const changed = data.changed ?? 0;
+      const refused = data.refused ?? [];
+
+      /*
+       * Both halves are reported. "26 updated, 4 refused" with the first
+       * reason is what a merchant can act on; a bare success count hides the
+       * four products that did not move, and a bare failure hides the 26 that
+       * did.
+       */
+      const parts: string[] = [];
+      if (changed > 0) parts.push(t("qe.changed").replace("{n}", String(changed)));
+      else parts.push(t("qe.noneChanged"));
+      if (refused.length > 0) parts.push(t("qe.refused").replace("{n}", String(refused.length)));
+      setStateNotice(parts.join(" "));
+
+      if (refused.length > 0) {
+        const first = refused[0]!;
+        setStateError(
+          [first.title, (locale === "ar" ? first.reasonAr : first.reason) ?? ""]
+            .filter(Boolean)
+            .join(" — "),
+        );
+      }
+
+      if (changed > 0) router.refresh();
+      return refused.length === 0;
+    } catch (error) {
+      setStateError(error instanceof Error ? error.message : t("qe.failed"));
+      return false;
+    } finally {
+      setApplying(false);
+    }
+  }
+
+  /**
+   * Apply one state action to one product or to the whole selection.
+   *
+   * One function for both, because the route already takes a list and already
+   * answers per product. A separate single-row path would be a second place
+   * for the refusal handling to drift out of step.
+   */
+  async function runAction(ids: string[], action: ProductAction) {
+    if (ids.length === 0) return;
+    setBusyId(ids[0]!);
     setStateError(null);
     setStateNotice(null);
     try {
@@ -82,22 +196,36 @@ export function ProductsBoard({
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ ids: [id], action }),
+        body: JSON.stringify({ ids, action }),
       });
       const data = (await response.json()) as {
         ok?: boolean;
         error?: string;
         changed?: number;
-        refused?: { reason?: string }[];
+        refused?: { reason?: string; title?: string }[];
       };
       if (!response.ok || !data.ok) throw new Error(data.error ?? t("wh.updateFailed"));
 
+      const changed = data.changed ?? 0;
+      const refused = data.refused ?? [];
+
       // A refusal is the useful answer, not a failure — it carries the reason.
-      if ((data.changed ?? 0) === 0) {
-        setStateError(data.refused?.[0]?.reason ?? t("wh.updateFailed"));
-      } else {
-        setStateNotice(ACTION_LABELS[action][locale]);
+      if (refused.length > 0) {
+        const first = refused[0]!;
+        setStateError([first.title, first.reason].filter(Boolean).join(" — "));
+      }
+      if (changed > 0) {
+        setStateNotice(
+          ids.length > 1
+            ? `${ACTION_LABELS[action][locale]} · ${t("qe.changed").replace("{n}", String(changed))}`
+            : ACTION_LABELS[action][locale],
+        );
         router.refresh();
+        // Cleared only on a change, so a selection that was entirely refused
+        // is still there to look at and fix.
+        if (refused.length === 0) setSelected([]);
+      } else if (refused.length === 0) {
+        setStateError(t("wh.updateFailed"));
       }
     } catch (error) {
       setStateError(error instanceof Error ? error.message : t("wh.updateError"));
@@ -283,20 +411,48 @@ export function ProductsBoard({
                   : "sold-out";
 
         return (
-          <button
-            type="button"
-            disabled={busyId === product.id}
-            onClick={(event) => {
-              event.stopPropagation();
-              void runAction(product.id, action);
-            }}
-            className="border-line text-ink-muted hover:border-ink hover:text-ink rounded-pill cursor-pointer border px-2.5 py-1 text-[0.6875rem] whitespace-nowrap transition-colors disabled:opacity-40"
-            data-cursor="hover"
-          >
-            {ACTION_LABELS[action][locale]}
-          </button>
+          <span className="flex items-center justify-end gap-1.5">
+            {/*
+              Quick edit opens under this row rather than navigating.
+
+              Changing one price used to mean opening the product, changing it,
+              saving, and coming back to a list that had forgotten the filter
+              and the scroll position that led there. For a repricing pass down
+              a column of twenty products that is twenty round trips.
+            */}
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                setQuickId((current) => (current === product.id ? null : product.id));
+              }}
+              className={cn(
+                "rounded-pill cursor-pointer border px-2.5 py-1 text-[0.6875rem] whitespace-nowrap transition-colors",
+                quickId === product.id
+                  ? "border-ink text-ink"
+                  : "border-line text-ink-muted hover:border-ink hover:text-ink",
+              )}
+              data-cursor="hover"
+            >
+              {t("qe.quickEdit")}
+            </button>
+
+            <button
+              type="button"
+              disabled={busyId === product.id}
+              onClick={(event) => {
+                event.stopPropagation();
+                void runAction([product.id], action);
+              }}
+              className="border-line text-ink-muted hover:border-ink hover:text-ink rounded-pill cursor-pointer border px-2.5 py-1 text-[0.6875rem] whitespace-nowrap transition-colors disabled:opacity-40"
+              data-cursor="hover"
+            >
+              {ACTION_LABELS[action][locale]}
+            </button>
+          </span>
         );
       },
+      align: "end",
     },
   ];
 
@@ -373,6 +529,67 @@ export function ProductsBoard({
         </label>
       </div>
 
+      {/*
+        The bar only exists when something is selected.
+
+        A permanently visible bulk panel invites a click before a selection,
+        and "apply to nothing" is a worse answer than the control not being
+        there at all.
+      */}
+      {selected.length > 0 && (
+        <div className="border-line bg-paper-raised mb-3 rounded-lg border px-4 py-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-ink text-[0.8125rem] font-medium tabular-nums">
+              {t("qe.selected").replace("{n}", String(selected.length))}
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelected([])}
+              className="text-mist hover:text-ink cursor-pointer text-[0.75rem]"
+              data-cursor="hover"
+            >
+              {t("qe.clear")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setBulkOpen((open) => !open)}
+              className="border-line hover:border-ink text-ink rounded-pill cursor-pointer border px-3 py-1.5 text-[0.75rem] transition-colors"
+              data-cursor="hover"
+            >
+              {t("qe.bulkEdit")}
+            </button>
+
+            {/* The state actions the warehouse offers, on the same selection. */}
+            {BULK_ACTIONS.map((action) => (
+              <button
+                key={action}
+                type="button"
+                disabled={applying || busyId !== null}
+                onClick={() => void runAction(selected, action)}
+                className="border-line text-ink-muted hover:border-ink hover:text-ink rounded-pill cursor-pointer border px-2.5 py-1 text-[0.6875rem] transition-colors disabled:opacity-40"
+                data-cursor="hover"
+              >
+                {ACTION_LABELS[action][locale]}
+              </button>
+            ))}
+          </div>
+
+          {bulkOpen && (
+            <EditForm
+              categories={categories}
+              busy={applying}
+              onApply={async (edits) => {
+                const clean = await sendEdits(selected, edits);
+                if (clean) {
+                  setBulkOpen(false);
+                  setSelected([]);
+                }
+              }}
+            />
+          )}
+        </div>
+      )}
+
       <DataTable
         rows={rows}
         columns={columns}
@@ -380,7 +597,219 @@ export function ProductsBoard({
         onRowClick={(product) => router.push(`/admin/products/${product.id}`)}
         initialSort={{ key: "stock", dir: "asc" }}
         empty={search ? t("common.noMatch") : t("products.empty")}
+        selection={{ selected, onChange: setSelected, label: t("qe.selectAll") }}
+        expanded={
+          quickTarget
+            ? {
+                key: quickTarget.id,
+                render: () => (
+                  <EditForm
+                    categories={categories}
+                    busy={applying}
+                    product={quickTarget}
+                    onApply={async (edits) => {
+                      const clean = await sendEdits([quickTarget.id], edits);
+                      if (clean) setQuickId(null);
+                    }}
+                    onCancel={() => setQuickId(null)}
+                  />
+                ),
+              }
+            : undefined
+        }
       />
     </>
+  );
+}
+
+/**
+ * One instruction: what to change, how, and to what.
+ *
+ * The same form for quick edit and for bulk edit, because they send the same
+ * request. What differs is how many ids go with it — and the list of modes,
+ * since a percentage change against a single product is a roundabout way of
+ * typing a number.
+ *
+ * `product` is passed for quick edit so the inputs start at the values that
+ * are actually stored. A blank form beside a product's row invites somebody to
+ * fill one box, press apply, and then wonder why the others were cleared.
+ */
+function EditForm({
+  categories,
+  onApply,
+  onCancel,
+  busy,
+  product,
+}: {
+  categories: Category[];
+  onApply: (edits: Edit[]) => void | Promise<void>;
+  onCancel?: () => void;
+  busy: boolean;
+  product?: Product;
+}) {
+  const { t, locale } = useAdminLocale();
+  const single = Boolean(product);
+
+  const [field, setField] = useState<EditField>("price");
+  const [mode, setMode] = useState<EditMode>("set");
+  const [value, setValue] = useState("");
+  const [problem, setProblem] = useState<string | null>(null);
+
+  const modes = useMemo<EditMode[]>(() => {
+    if (field === "price") return single ? ["set"] : ["set", "increase", "decrease"];
+    if (field === "compareAtPrice") {
+      return single ? ["set", "clear"] : ["set", "increase", "decrease", "clear"];
+    }
+    if (field === "tags") return ["add", "remove", "set"];
+    return ["set"];
+  }, [field, single]);
+
+  /*
+   * Starting values, re-read whenever the chosen field changes.
+   *
+   * Quick edit is "change this to that", and showing what it currently is makes
+   * it an edit rather than a form somebody has to remember the answer to.
+   */
+  useEffect(() => {
+    if (!product) {
+      setValue("");
+      return;
+    }
+    const current: Record<EditField, string> = {
+      price: String(product.price),
+      compareAtPrice: product.compareAtPrice ? String(product.compareAtPrice) : "",
+      totalStock: String(product.totalStock),
+      categoryId: product.categoryId,
+      shippingClassId: product.shippingClassId ?? "",
+      tags: (product.tags ?? []).join(", "),
+      slug: product.slug,
+    };
+    setValue(current[field] ?? "");
+  }, [product, field]);
+
+  // A mode that does not apply to the newly chosen field would otherwise be
+  // sent and refused for something the form could have prevented.
+  useEffect(() => {
+    setMode((current) => (modes.includes(current) ? current : modes[0]!));
+  }, [modes]);
+
+  const fields: EditField[] = single
+    ? ["price", "compareAtPrice", "totalStock", "categoryId", "tags", "slug"]
+    : ["price", "compareAtPrice", "totalStock", "categoryId", "tags"];
+
+  function modeLabel(name: EditMode): string {
+    if (name === "set") return t("qe.mode.set");
+    if (name === "increase") return t("qe.mode.increase");
+    if (name === "decrease") return t("qe.mode.decrease");
+    if (name === "clear") return t("qe.mode.clear");
+    if (name === "add") return t("qe.tagsAdd");
+    return t("qe.tagsRemove");
+  }
+
+  function submit() {
+    const edit: Edit = { field, mode, ...(mode === "clear" ? {} : { value }) };
+    // Checked here too, so an obvious mistake never becomes a round trip. The
+    // server checks again — this is convenience, not the guard.
+    const problems = editProblems(edit, single ? 1 : 2);
+    if (problems.length > 0) {
+      setProblem(problems[0]![locale]);
+      return;
+    }
+    setProblem(null);
+    void onApply([edit]);
+  }
+
+  const selectClass =
+    "border-line focus:border-brand bg-paper text-ink rounded-md border px-2.5 py-1.5 text-[0.75rem] outline-none transition-colors";
+
+  return (
+    <div className="mt-3 grid gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          value={field}
+          onChange={(event) => setField(event.target.value as EditField)}
+          aria-label={t("qe.field")}
+          className={selectClass}
+        >
+          {fields.map((name) => (
+            <option key={name} value={name}>
+              {FIELD_LABELS[name][locale]}
+            </option>
+          ))}
+        </select>
+
+        {modes.length > 1 && (
+          <select
+            value={mode}
+            onChange={(event) => setMode(event.target.value as EditMode)}
+            aria-label={t("qe.mode.set")}
+            className={selectClass}
+          >
+            {modes.map((name) => (
+              <option key={name} value={name}>
+                {modeLabel(name)}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {mode !== "clear" &&
+          (field === "categoryId" ? (
+            <select
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+              aria-label={t("qe.value")}
+              className={selectClass}
+            >
+              <option value="">—</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {pick(category.name, locale)}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+              inputMode={
+                field === "price" || field === "compareAtPrice" || field === "totalStock"
+                  ? "decimal"
+                  : "text"
+              }
+              placeholder={field === "tags" ? t("qe.tagsHint") : t("qe.value")}
+              aria-label={t("qe.value")}
+              className="border-line focus:border-brand bg-paper text-ink placeholder:text-mist w-40 rounded-md border px-2.5 py-1.5 text-[0.75rem] outline-none transition-colors"
+            />
+          ))}
+
+        <button
+          type="button"
+          onClick={submit}
+          disabled={busy}
+          className="bg-ink rounded-pill cursor-pointer px-3 py-1.5 text-[0.75rem] font-medium text-white transition-opacity disabled:opacity-40"
+          data-cursor="hover"
+        >
+          {busy ? t("qe.applying") : t("qe.apply")}
+        </button>
+
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="text-mist hover:text-ink cursor-pointer text-[0.75rem]"
+            data-cursor="hover"
+          >
+            {t("common.cancel")}
+          </button>
+        )}
+      </div>
+
+      {problem && (
+        <p role="alert" className="text-alert text-[0.75rem]">
+          {problem}
+        </p>
+      )}
+    </div>
   );
 }

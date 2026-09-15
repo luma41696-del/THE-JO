@@ -280,6 +280,10 @@ export const ADMIN_STRINGS = {
     ar: "تم التحقق دون تخزين: لم يُهيّأ Firebase Admin هنا.",
   },
   "reviews.updateError": { en: "The review could not be updated.", ar: "تعذّر تحديث التقييم." },
+  "reviews.hideReasonRequired": {
+    en: "Write a reason before hiding it — the author is shown this.",
+    ar: "اكتب سببًا قبل الإخفاء — سيُعرض على كاتب التقييم.",
+  },
   "reviews.hideReason": {
     en: "Why is this being hidden? The author is shown this.",
     ar: "لماذا يُخفى هذا؟ سيُعرض السبب على كاتبه.",
@@ -508,13 +512,13 @@ export const ADMIN_STRINGS = {
   "cat.saveError": { en: "The category could not be saved.", ar: "تعذّر حفظ القسم." },
   "cat.updateFailed": { en: "Update failed", ar: "فشل التحديث" },
   "cat.updateError": { en: "The categories could not be updated.", ar: "تعذّر تحديث الأقسام." },
-  "cat.altPrompt": {
+  "cat.altPlaceholder": {
     en: "Describe this image for screen readers",
     ar: "صف هذه الصورة لقارئات الشاشة",
   },
   "cat.altRequired": {
-    en: "Every image needs alt text. Nothing was uploaded.",
-    ar: "كل صورة تحتاج نصاً بديلاً. لم يُرفع شيء.",
+    en: "Describe the image before saving — a screen reader has nothing else to go on.",
+    ar: "صف الصورة قبل الحفظ — لا شيء آخر لدى قارئ الشاشة.",
   },
   "cat.uploadError": { en: "That image could not be uploaded.", ar: "تعذّر رفع هذه الصورة." },
   "cat.tree": { en: "The tree", ar: "الشجرة" },
@@ -759,13 +763,13 @@ export const ADMIN_STRINGS = {
   },
   "be.liveUntil": { en: "Live now, until", ar: "معروضة الآن، حتى" },
   "be.liveNoEnd": { en: "Live now, with no end date.", ar: "معروضة الآن، بلا تاريخ انتهاء." },
-  "be.altPrompt": {
+  "be.altPlaceholder": {
     en: "Describe this image for screen readers",
     ar: "صف هذه الصورة لقارئات الشاشة",
   },
   "be.altRequired": {
-    en: "Every image needs alt text. Nothing was uploaded.",
-    ar: "كل صورة تحتاج نصاً بديلاً. لم يُرفع شيء.",
+    en: "Describe the banner image before saving — it is the largest thing on the home page.",
+    ar: "صف صورة البانر قبل الحفظ — فهي أكبر عنصر في الصفحة الرئيسية.",
   },
   "be.uploadError": { en: "That image could not be uploaded.", ar: "تعذّر رفع هذه الصورة." },
   "be.titleRequired": {
@@ -1211,9 +1215,81 @@ export const ADMIN_STRINGS = {
   /* ---- shared ---- */
   "common.saved": { en: "Saved", ar: "حُفظ" },
   "common.saving": { en: "Saving…", ar: "يُحفظ…" },
+  "common.loading": { en: "Loading…", ar: "يُحمّل…" },
   "common.notWritten": {
     en: "Validated but not written — Firebase Admin is not configured, so there is nowhere to save to yet.",
     ar: "تم التحقق دون كتابة — لم يُهيّأ Firebase Admin، فلا مكان للحفظ بعد.",
+  },
+  /* ---- media library ---- */
+  "media.title": { en: "Media library", ar: "مكتبة الصور" },
+  "media.subtitle": {
+    en: "Every image the shop has uploaded. Picking one reuses the same file.",
+    ar: "كل صورة رفعها المتجر. اختيار صورة يعيد استخدام الملف نفسه.",
+  },
+  "media.open": { en: "Choose from library", ar: "اختر من المكتبة" },
+  "media.searchLabel": { en: "Search the library", ar: "ابحث في المكتبة" },
+  "media.searchPlaceholder": { en: "Filename, description or tag", ar: "اسم الملف أو الوصف أو الوسم" },
+  "media.empty": {
+    en: "Nothing uploaded yet. Images you add to a product appear here.",
+    ar: "لا شيء مرفوع بعد. الصور التي تضيفها لمنتج تظهر هنا.",
+  },
+  "media.loadFailed": { en: "The library could not be loaded.", ar: "تعذّر تحميل المكتبة." },
+  "media.deleteFailed": { en: "That file could not be deleted.", ar: "تعذّر حذف الملف." },
+  "media.onThisProduct": { en: "Already added", ar: "مضافة" },
+  "media.usedOnce": { en: "On 1 product", ar: "على منتج واحد" },
+  "media.usedMany": { en: "On {n} products", ar: "على {n} منتجات" },
+  "media.selected": { en: "{n} selected", ar: "{n} محددة" },
+  "media.pickHint": { en: "Pick images to add to this product.", ar: "اختر صورًا لإضافتها إلى هذا المنتج." },
+  "media.addSelected": { en: "Add to product", ar: "أضف إلى المنتج" },
+  "media.delete": { en: "Delete file", ar: "حذف الملف" },
+  "media.reallyDelete": { en: "Delete for good", ar: "احذف نهائيًا" },
+  "media.deleting": { en: "Deleting…", ar: "يُحذف…" },
+
+  /* ---- uploading ---- */
+  "up.drop": { en: "Drop images here", ar: "أفلت الصور هنا" },
+  "up.retry": { en: "Retry", ar: "أعد المحاولة" },
+  "up.retryAll": { en: "Retry all failed", ar: "أعد المحاولة للكل" },
+  "up.dismiss": { en: "Dismiss", ar: "تجاهل" },
+  "up.failedOne": { en: "1 image did not upload.", ar: "لم تُرفع صورة واحدة." },
+  "up.failedMany": { en: "{n} images did not upload.", ar: "لم تُرفع {n} صور." },
+  "up.pendingRemoval": {
+    en: "{n} image(s) will be removed from storage when you save.",
+    ar: "ستُحذف {n} صورة من التخزين عند الحفظ.",
+  },
+  "up.keptElsewhere": {
+    en: "Removed here, but kept in storage because another product uses it.",
+    ar: "أُزيلت من هنا، وبقيت في التخزين لأن منتجًا آخر يستخدمها.",
+  },
+
+  /* ---- quick and bulk edit ---- */
+  "qe.quickEdit": { en: "Quick edit", ar: "تحرير سريع" },
+  "qe.selected": { en: "{n} selected", ar: "{n} محدد" },
+  "qe.selectAll": { en: "Select all", ar: "تحديد الكل" },
+  "qe.clear": { en: "Clear", ar: "إلغاء التحديد" },
+  "qe.apply": { en: "Apply", ar: "طبّق" },
+  "qe.applying": { en: "Applying…", ar: "يُطبّق…" },
+  "qe.bulkEdit": { en: "Edit selected", ar: "تحرير المحدد" },
+  "qe.field": { en: "Change", ar: "غيّر" },
+  "qe.price": { en: "Price", ar: "السعر" },
+  "qe.compareAt": { en: "Was-price", ar: "السعر قبل الخصم" },
+  "qe.category": { en: "Category", ar: "الفئة" },
+  "qe.tagsAdd": { en: "Add tags", ar: "أضف وسومًا" },
+  "qe.tagsRemove": { en: "Remove tags", ar: "أزل وسومًا" },
+  "qe.shippingClass": { en: "Shipping class", ar: "فئة الشحن" },
+  "qe.mode.set": { en: "Set to", ar: "اضبط على" },
+  "qe.mode.increase": { en: "Increase by %", ar: "زد بنسبة %" },
+  "qe.mode.decrease": { en: "Decrease by %", ar: "أنقص بنسبة %" },
+  "qe.mode.clear": { en: "Clear it", ar: "امسحه" },
+  "qe.value": { en: "Value", ar: "القيمة" },
+  "qe.tagsHint": { en: "Comma separated", ar: "مفصولة بفواصل" },
+  "qe.changed": { en: "{n} product(s) updated.", ar: "حُدِّث {n} منتج." },
+  "qe.noneChanged": { en: "Nothing changed.", ar: "لم يتغير شيء." },
+  "qe.refused": { en: "{n} refused.", ar: "رُفض {n}." },
+  "qe.failed": { en: "That change could not be applied.", ar: "تعذّر تطبيق التغيير." },
+  "qe.pickField": { en: "Pick what to change first.", ar: "اختر ما تريد تغييره أولًا." },
+  "qe.priceGuard": {
+    en: "A price change of more than 60% is refused here — do it product by product.",
+    ar: "يُرفض تغيير سعر يتجاوز 60% هنا — نفّذه منتجًا منتجًا.",
   },
 } satisfies AdminDict;
 

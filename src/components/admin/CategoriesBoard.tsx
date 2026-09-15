@@ -97,6 +97,9 @@ export function CategoriesBoard({ categories }: { categories: Category[] }) {
     if (!draft.nameEn.trim() || !draft.nameAr.trim()) {
       return setError(t("cat.nameRequired"));
     }
+    // Where the alt-text requirement landed once the prompt went: at the
+    // point it costs something, with the picture on screen beside the field.
+    if (draft.image && !draft.image.alt.trim()) return setError(t("cat.altRequired"));
 
     setSaving(true);
     try {
@@ -190,18 +193,21 @@ export function CategoriesBoard({ categories }: { categories: Category[] }) {
     ]);
   }
 
+  /**
+   * Upload the tile image. Ask for its description afterwards.
+   *
+   * The prompt this replaces ran before the upload and threw the chosen file
+   * away on Cancel. Worse, it asked somebody to describe a picture that was
+   * not on screen yet, which reliably produces the filename typed back in —
+   * a screen reader then reads "IMG underscore four eight two one dot jpeg"
+   * where silence would have told the listener more.
+   */
   async function pickImage(files: FileList | null) {
     if (!files || files.length === 0 || !draft) return;
     setUploading(true);
     setError(null);
     try {
-      const alt =
-        window.prompt(t("cat.altPrompt"), draft.nameEn || "") ?? "";
-      if (!alt.trim()) {
-        setError(t("cat.altRequired"));
-        return;
-      }
-      const uploaded = await uploadMerchandisingImage("categories", files[0]!, alt);
+      const uploaded = await uploadMerchandisingImage("categories", files[0]!, "");
       set("image", uploaded);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("cat.uploadError"));
@@ -389,6 +395,23 @@ export function CategoriesBoard({ categories }: { categories: Category[] }) {
                     </button>
                   )}
                 </div>
+
+                {/* The description, beside the picture, with a red edge
+                    while it is empty. The save refuses until it is filled. */}
+                {draft.image && (
+                  <input
+                    value={draft.image.alt}
+                    onChange={(event) =>
+                      set("image", { ...draft.image!, alt: event.target.value })
+                    }
+                    placeholder={t("cat.altPlaceholder")}
+                    aria-label={t("cat.altPlaceholder")}
+                    className={cn(
+                      "focus:border-brand bg-paper text-ink placeholder:text-mist mt-1.5 w-full rounded-md border px-2 py-1 text-[0.6875rem] outline-none transition-colors",
+                      draft.image.alt.trim() ? "border-line" : "border-alert",
+                    )}
+                  />
+                )}
               </div>
 
               <div className="grid gap-3">

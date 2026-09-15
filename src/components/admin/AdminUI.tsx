@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
 
 import { cn } from "@/lib/utils";
@@ -297,6 +297,8 @@ export function DataTable<T>({
   onRowClick,
   empty,
   initialSort,
+  selection,
+  expanded,
 }: {
   rows: T[];
   columns: Column<T>[];
@@ -304,6 +306,27 @@ export function DataTable<T>({
   onRowClick?: (row: T) => void;
   empty?: ReactNode;
   initialSort?: { key: string; dir: "asc" | "desc" };
+  /**
+   * Optional tick boxes.
+   *
+   * Passed in rather than held here because the selection outlives the table:
+   * the bar that acts on it, the count it shows and the clearing it does after
+   * a successful write all live with the board, and a selection owned by the
+   * table would be silently reset by any re-render that changed the rows.
+   */
+  selection?: {
+    selected: string[];
+    onChange: (next: string[]) => void;
+    /** Header label for the select-all box. */
+    label: string;
+  };
+  /**
+   * An extra row rendered under one row, spanning the table.
+   *
+   * For quick edit: editing a product's price in place, without leaving the
+   * list and losing the filter and scroll position that led there.
+   */
+  expanded?: { key: string; render: () => ReactNode };
 }) {
   const { t } = useAdminLocale();
   const [sort, setSort] = useState(initialSort ?? null);
@@ -344,6 +367,32 @@ export function DataTable<T>({
       <table className="w-full text-[0.8125rem]">
         <thead className="bg-paper-sunken">
           <tr>
+            {selection && (
+              <th scope="col" className="w-10 px-4 py-3">
+                {/*
+                  Select-all covers the rows currently on screen, not the whole
+                  collection. With a filter applied those differ, and a box that
+                  quietly selects things the operator has filtered out is how a
+                  bulk action reaches products nobody was looking at.
+                */}
+                <input
+                  type="checkbox"
+                  aria-label={selection.label}
+                  checked={sorted.length > 0 && sorted.every((row) => selection.selected.includes(rowKey(row)))}
+                  ref={(node) => {
+                    if (!node) return;
+                    const on = sorted.filter((row) => selection.selected.includes(rowKey(row))).length;
+                    node.indeterminate = on > 0 && on < sorted.length;
+                  }}
+                  onChange={(event) =>
+                    selection.onChange(
+                      event.target.checked ? sorted.map((row) => rowKey(row)) : [],
+                    )
+                  }
+                  className="accent-brand h-3.5 w-3.5 cursor-pointer align-middle"
+                />
+              </th>
+            )}
             {columns.map((column) => {
               const sortable = Boolean(column.sortValue);
               const active = sort?.key === column.key;
@@ -381,30 +430,64 @@ export function DataTable<T>({
           </tr>
         </thead>
         <tbody className="divide-line divide-y">
-          {sorted.map((row) => (
-            <tr
-              key={rowKey(row)}
-              onClick={onRowClick ? () => onRowClick(row) : undefined}
-              className={cn(
-                "transition-colors",
-                onRowClick && "hover:bg-paper-sunken/60 cursor-pointer",
-              )}
-              data-cursor={onRowClick ? "hover" : undefined}
-            >
-              {columns.map((column) => (
-                <td
-                  key={column.key}
+          {sorted.map((row) => {
+            const key = rowKey(row);
+            const isExpanded = expanded?.key === key;
+            return (
+              <Fragment key={key}>
+                <tr
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
                   className={cn(
-                    "px-4 py-3 align-middle",
-                    column.align === "end" ? "text-end" : "text-start",
-                    column.className,
+                    "transition-colors",
+                    onRowClick && "hover:bg-paper-sunken/60 cursor-pointer",
+                    isExpanded && "bg-paper-sunken/60",
                   )}
+                  data-cursor={onRowClick ? "hover" : undefined}
                 >
-                  {column.cell(row)}
-                </td>
-              ))}
-            </tr>
-          ))}
+                  {selection && (
+                    <td className="px-4 py-3 align-middle">
+                      <input
+                        type="checkbox"
+                        aria-label={`${selection.label}: ${key}`}
+                        checked={selection.selected.includes(key)}
+                        // The row opens the product; the box selects it. Without
+                        // this the first tick navigates away from the list.
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={(event) =>
+                          selection.onChange(
+                            event.target.checked
+                              ? [...selection.selected, key]
+                              : selection.selected.filter((id) => id !== key),
+                          )
+                        }
+                        className="accent-brand h-3.5 w-3.5 cursor-pointer align-middle"
+                      />
+                    </td>
+                  )}
+                  {columns.map((column) => (
+                    <td
+                      key={column.key}
+                      className={cn(
+                        "px-4 py-3 align-middle",
+                        column.align === "end" ? "text-end" : "text-start",
+                        column.className,
+                      )}
+                    >
+                      {column.cell(row)}
+                    </td>
+                  ))}
+                </tr>
+
+                {isExpanded && (
+                  <tr className="bg-paper-sunken/60">
+                    <td colSpan={columns.length + (selection ? 1 : 0)} className="px-4 py-3">
+                      {expanded.render()}
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            );
+          })}
         </tbody>
       </table>
     </div>

@@ -32,6 +32,16 @@ const AUTH_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST ?? "127.0.0.1:9099";
 
 process.env.FIRESTORE_EMULATOR_HOST = process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = AUTH_HOST;
+/*
+ * The Storage emulator, for the media route.
+ *
+ * Without it, deleting a file reaches the real Cloud Storage API and fails
+ * with `invalid_grant` — a fake project has no service account. That would
+ * leave the one path that actually removes something untested, so the
+ * emulator handles it instead. `STORAGE_EMULATOR_HOST` is what the Admin
+ * SDK reads, and it wants a scheme where the other two do not.
+ */
+process.env.STORAGE_EMULATOR_HOST ??= "http://127.0.0.1:9199";
 process.env.GCLOUD_PROJECT = PROJECT_ID;
 process.env.FIREBASE_ADMIN_PROJECT_ID = PROJECT_ID;
 process.env.FIREBASE_ADMIN_CLIENT_EMAIL = `e2e@${PROJECT_ID}.iam.gserviceaccount.com`;
@@ -154,6 +164,8 @@ let invite: typeof import("../src/app/api/gift/invite/route");
 let warehouse: typeof import("../src/app/api/admin/warehouse/route");
 let productState: typeof import("../src/app/api/admin/products/state/route");
 let products: typeof import("../src/app/api/admin/products/route");
+let media: typeof import("../src/app/api/admin/media/route");
+let bulk: typeof import("../src/app/api/admin/products/bulk/route");
 let adminSdk: typeof import("../src/lib/firebase/admin");
 
 before(async () => {
@@ -166,6 +178,8 @@ before(async () => {
   warehouse = await import("../src/app/api/admin/warehouse/route");
   productState = await import("../src/app/api/admin/products/state/route");
   products = await import("../src/app/api/admin/products/route");
+  media = await import("../src/app/api/admin/media/route");
+  bulk = await import("../src/app/api/admin/products/bulk/route");
   adminSdk = await import("../src/lib/firebase/admin");
 
   customer = await signUp("customer@example.test");
@@ -180,7 +194,7 @@ before(async () => {
 
 after(async () => {
   const db = adminSdk.getAdminDb();
-  for (const name of ["tickets", "auditLog", "giftCampaigns", "products"]) {
+  for (const name of ["tickets", "auditLog", "giftCampaigns", "products", "media", "categories"]) {
     const snap = await db.collection(name).get();
     await Promise.all(snap.docs.map((doc) => doc.ref.delete()));
   }
@@ -1073,5 +1087,426 @@ describe("gift invitation", () => {
     assert.equal(response.reason, "cooldown");
     // No wheel is sent to a browser that cannot spin it.
     assert.equal(response.campaign, undefined);
+  });
+});
+/* -------------------------------------------------------------------------- */
+/*  The media library, and the deletions it refuses                           */
+/* -------------------------------------------------------------------------- */
+
+describe("media library", () => {
+  const BUCKET = "https://firebasestorage.googleapis.com/v0/b/netsale-e2e-test.appspot.com/o";
+  const asUrl = (path: string, token = "t1") =>
+    `${BUCKET}/${encodeURIComponent(path)}?alt=media&token=${token}`;
+
+  const SHARED = asUrl("products/e2e-media/shared-chart.jpg");
+  const SOLO = asUrl("products/e2e-media/solo-shot.jpg");
+
+  const base = {
+    categoryId: "tees",
+    type: "simple",
+    price: 10,
+    status: "draft",
+  };
+
+  const saveProduct = async (id: string, body: Record<string, unknown>) =>
+    json<{ ok: boolean; error?: string }>(
+      await products.POST(
+        request("/api/admin/products", {
+          method: "POST",
+          token: owner.token,
+          body: JSON.stringify({ id, ...base, ...body }),
+        }),
+      ),
+    );
+
+  const registerAsset = (url: string, token: string) =>
+    media.POST(
+      request("/api/admin/media", {
+        method: "POST",
+        token,
+        body: JSON.stringify({
+          url,
+          alt: "a size chart",
+          width: 1200,
+          height: 1600,
+          bytes: 90_000,
+          contentType: "image/jpeg",
+          filename: "Shared-Chart.JPG",
+        }),
+      }),
+    );
+
+  const deleteAsset = (url: string, token: string, ignoreProductId?: string) =>
+    media.DELETE(
+      request("/api/admin/media", {
+        method: "DELETE",
+        token,
+        body: JSON.stringify({ url, ignoreProductId }),
+      }),
+    );
+
+  before(async () => {
+    // Two products sharing one file, which is the situation the old editor
+    // destroyed: removing the image from either one deleted it from Storage
+    // and left the other displaying a URL with nothing behind it.
+    await saveProduct("e2e-media-a", {
+      slug: "e2e-media-a",
+      title: { en: "Media A", ar: "وسائط أ" },
+      images: [
+        { url: SHARED, alt: "a size chart", width: 1200, height: 1600 },
+        { url: SOLO, alt: "the only one", width: 1200, height: 1600 },
+      ],
+    });
+    await saveProduct("e2e-media-b", {
+      slug: "e2e-media-b",
+      title: { en: "Media B", ar: "وسائط ب" },
+      images: [{ url: SHARED, alt: "a size chart", width: 1200, height: 1600 }],
+    });
+
+    await registerAsset(SHARED, owner.token);
+    await registerAsset(SOLO, owner.token);
+  });
+
+  test("a registered file appears in the library with a real usage count", async () => {
+    const listing = await json<{
+      ok: boolean;
+      assets: { url: string; usageCount: number; usedBy: string[]; filename: string }[];
+    }>(
+      await media.GET(request("/api/admin/media", { token: owner.token })),
+    );
+
+    assert.equal(listing.ok, true);
+    const shared = listing.assets.find((asset) => asset.url === SHARED);
+    assert.ok(shared, "the registered file should be listed");
+    // Counted from the products, never stored — so it cannot go stale.
+    assert.equal(shared.usageCount, 2);
+    assert.deepEqual(shared.usedBy.sort(), ["e2e-media-a", "e2e-media-b"]);
+    assert.equal(shared.filename, "shared-chart.jpg");
+  });
+
+  test("searching finds it by filename and by its description", async () => {
+    const byName = await json<{ assets: { url: string }[] }>(
+      await media.GET(request("/api/admin/media?q=chart", { token: owner.token })),
+    );
+    assert.equal(byName.assets.some((asset) => asset.url === SHARED), true);
+
+    const byNothing = await json<{ assets: { url: string }[] }>(
+      await media.GET(request("/api/admin/media?q=denim", { token: owner.token })),
+    );
+    assert.equal(byNothing.assets.length, 0);
+  });
+
+  test("deleting a file two products use is refused, and says which", async () => {
+    /*
+     * The heart of it. This request is exactly what the editor sends after a
+     * merchant removes the image from product A and saves — and the right
+     * answer is no, because product B still shows it.
+     */
+    const refusal = await json<{
+      ok: boolean;
+      reason?: string;
+      usedBy?: string[];
+      error?: string;
+    }>(await deleteAsset(SHARED, owner.token, "e2e-media-a"));
+
+    assert.equal(refusal.httpStatus, 409);
+    assert.equal(refusal.ok, false);
+    assert.equal(refusal.reason, "in-use");
+    assert.deepEqual(refusal.usedBy, ["e2e-media-b"]);
+
+    // And it is still in the library, because it is still a real file.
+    const listing = await json<{ assets: { url: string }[] }>(
+      await media.GET(request("/api/admin/media", { token: owner.token })),
+    );
+    assert.equal(listing.assets.some((asset) => asset.url === SHARED), true);
+  });
+
+  test("the product that still uses it is untouched", async () => {
+    // The refusal is only worth anything if the other product survived it.
+    const stored = (
+      await adminSdk.getAdminDb().collection("products").doc("e2e-media-b").get()
+    ).data()!;
+    assert.equal(stored.images.length, 1);
+    assert.equal(stored.images[0].url, SHARED);
+  });
+
+  test("a file nobody else uses is deleted, and leaves the library", async () => {
+    await saveProduct("e2e-media-a", {
+      slug: "e2e-media-a",
+      title: { en: "Media A", ar: "وسائط أ" },
+      // SOLO removed — the save the editor makes before it reaps.
+      images: [{ url: SHARED, alt: "a size chart", width: 1200, height: 1600 }],
+    });
+
+    const result = await json<{ ok: boolean; error?: string }>(
+      await deleteAsset(SOLO, owner.token, "e2e-media-a"),
+    );
+    assert.equal(result.ok, true, result.error);
+
+    const listing = await json<{ assets: { url: string }[] }>(
+      await media.GET(request("/api/admin/media", { token: owner.token })),
+    );
+    assert.equal(listing.assets.some((asset) => asset.url === SOLO), false);
+  });
+
+  test("a seeded asset is refused as having no file, not as being in use", async () => {
+    const refusal = await json<{ ok: boolean; reason?: string }>(
+      await deleteAsset("/demo/cotton-tee.jpg", owner.token),
+    );
+    assert.equal(refusal.ok, false);
+    assert.equal(refusal.reason, "not-a-managed-file");
+  });
+
+  test("a customer cannot browse or delete the library", async () => {
+    const read = await json<{ ok: boolean }>(
+      await media.GET(request("/api/admin/media", { token: customer.token })),
+    );
+    assert.equal(read.httpStatus, 403);
+
+    const write = await json<{ ok: boolean }>(await deleteAsset(SHARED, customer.token));
+    assert.equal(write.httpStatus, 403);
+  });
+
+  test("an unsigned request is refused before anything is read", async () => {
+    const anonymous = await json<{ ok: boolean }>(
+      await media.GET(request("/api/admin/media")),
+    );
+    assert.equal(anonymous.httpStatus, 401);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/*  Quick edit and bulk edit                                                  */
+/* -------------------------------------------------------------------------- */
+
+describe("bulk edit", () => {
+  const db = () => adminSdk.getAdminDb();
+
+  const seed = async (id: string, body: Record<string, unknown>) =>
+    json<{ ok: boolean; error?: string }>(
+      await products.POST(
+        request("/api/admin/products", {
+          method: "POST",
+          token: owner.token,
+          body: JSON.stringify({
+            id,
+            categoryId: "tees",
+            type: "simple",
+            status: "draft",
+            ...body,
+          }),
+        }),
+      ),
+    );
+
+  const edit = async (
+    ids: string[],
+    edits: Record<string, unknown>[],
+    token = owner.token,
+  ) =>
+    json<{
+      ok: boolean;
+      error?: string;
+      changed?: number;
+      refused?: { id: string; title?: string; reason?: string }[];
+    }>(
+      await bulk.POST(
+        request("/api/admin/products/bulk", {
+          method: "POST",
+          token,
+          body: JSON.stringify({ ids, edits }),
+        }),
+      ),
+    );
+
+  before(async () => {
+    await seed("e2e-bulk-a", {
+      slug: "e2e-bulk-a",
+      title: { en: "Bulk A", ar: "جملة أ" },
+      price: 20,
+      totalStock: 5,
+      tags: ["cotton"],
+    });
+    await seed("e2e-bulk-b", {
+      slug: "e2e-bulk-b",
+      title: { en: "Bulk B", ar: "جملة ب" },
+      price: 40,
+      totalStock: 2,
+      tags: [],
+    });
+  });
+
+  test("a percentage cut is computed from the stored price, not from the browser's", async () => {
+    /*
+     * The reason the route re-reads. "Reduce by 25%" is relative, and the
+     * board's copy of the price can be minutes old — a colleague may have
+     * repriced it since. Applying the cut to a number the browser remembers
+     * discounts a price that no longer exists.
+     */
+    const result = await edit(["e2e-bulk-a", "e2e-bulk-b"], [
+      { field: "price", mode: "decrease", value: 25 },
+    ]);
+    assert.equal(result.ok, true, result.error);
+    assert.equal(result.changed, 2);
+
+    const a = (await db().collection("products").doc("e2e-bulk-a").get()).data()!;
+    const b = (await db().collection("products").doc("e2e-bulk-b").get()).data()!;
+    assert.equal(a.price, 15);
+    assert.equal(b.price, 30);
+  });
+
+  test("a change large enough to be a typo is refused before anything is read", async () => {
+    const result = await edit(["e2e-bulk-a", "e2e-bulk-b"], [
+      { field: "price", mode: "decrease", value: 95 },
+    ]);
+    assert.equal(result.httpStatus, 400);
+    assert.equal(result.ok, false);
+
+    // Nothing moved — the refusal is up front, not per product.
+    const a = (await db().collection("products").doc("e2e-bulk-a").get()).data()!;
+    assert.equal(a.price, 15);
+  });
+
+  test("tags are added without losing the ones already there", async () => {
+    const result = await edit(["e2e-bulk-a", "e2e-bulk-b"], [
+      { field: "tags", mode: "add", value: "sale, summer" },
+    ]);
+    assert.equal(result.ok, true, result.error);
+
+    const a = (await db().collection("products").doc("e2e-bulk-a").get()).data()!;
+    assert.deepEqual(a.tags.sort(), ["cotton", "sale", "summer"]);
+  });
+
+  test("a was-price below the price is refused for that product, and the rest go through", async () => {
+    /*
+     * The per-product refusal. A selection of two where one cannot take the
+     * change should apply to the other and name the one it did not — not fail
+     * as a whole and roll back the product that was fine.
+     */
+    await db().collection("products").doc("e2e-bulk-a").set({ price: 15 }, { merge: true });
+    await db().collection("products").doc("e2e-bulk-b").set({ price: 60 }, { merge: true });
+
+    const result = await edit(["e2e-bulk-a", "e2e-bulk-b"], [
+      { field: "compareAtPrice", mode: "set", value: 50 },
+    ]);
+    assert.equal(result.ok, true, result.error);
+    assert.equal(result.changed, 1);
+    assert.equal(result.refused?.length, 1);
+    assert.equal(result.refused?.[0]?.id, "e2e-bulk-b");
+    assert.equal(result.refused?.[0]?.reason?.includes("negative discount"), true);
+
+    const a = (await db().collection("products").doc("e2e-bulk-a").get()).data()!;
+    assert.equal(a.compareAtPrice, 50);
+  });
+
+  test("clearing the was-price removes the field rather than storing a null", async () => {
+    const result = await edit(["e2e-bulk-a"], [{ field: "compareAtPrice", mode: "clear" }]);
+    assert.equal(result.ok, true, result.error);
+
+    const a = (await db().collection("products").doc("e2e-bulk-a").get()).data()!;
+    // A stored `null` would read as a was-price of zero somewhere downstream.
+    assert.equal("compareAtPrice" in a, false);
+  });
+
+  test("a variable product's stock is refused, and says where to edit it", async () => {
+    await seed("e2e-bulk-var", {
+      slug: "e2e-bulk-var",
+      title: { en: "Bulk variable", ar: "جملة متغيّر" },
+      type: "variable",
+      price: 12,
+      colors: [{ id: "white", name: { en: "White", ar: "أبيض" }, hex: "#FBFAF3" }],
+      sizes: [{ id: "m", label: "M", system: "alpha" }],
+      variants: [{ sku: "BULK-WHT-M", colorId: "white", sizeId: "m", stock: 4 }],
+    });
+
+    const result = await edit(["e2e-bulk-var"], [
+      { field: "totalStock", mode: "set", value: 99 },
+    ]);
+    assert.equal(result.changed, 0);
+    assert.equal(result.refused?.[0]?.reason?.includes("options"), true);
+
+    // The real count is still the sum of the rows.
+    const stored = (await db().collection("products").doc("e2e-bulk-var").get()).data()!;
+    assert.equal(stored.totalStock, 4);
+  });
+
+  test("moving a category rewrites the denormalised ancestry with it", async () => {
+    /*
+     * `categoryPath` is what every listing filters on. Moving a product
+     * without recomputing it leaves the product filed under its old parent
+     * everywhere it appears — invisible in the admin, wrong on the storefront.
+     */
+    await db().collection("categories").doc("shirts").set({
+      id: "shirts",
+      name: { en: "Shirts", ar: "قمصان" },
+      slug: "shirts",
+      parentId: null,
+      order: 1,
+    });
+
+    const result = await edit(["e2e-bulk-a"], [
+      { field: "categoryId", mode: "set", value: "shirts" },
+    ]);
+    assert.equal(result.ok, true, result.error);
+
+    const a = (await db().collection("products").doc("e2e-bulk-a").get()).data()!;
+    assert.equal(a.categoryId, "shirts");
+    assert.deepEqual(a.categoryPath, ["shirts"]);
+  });
+
+  test("a slug already taken by another product is refused", async () => {
+    // A collision takes a live page down, so this is checked before the write
+    // rather than discovered by a customer.
+    const result = await edit(["e2e-bulk-a"], [
+      { field: "slug", mode: "set", value: "e2e-bulk-b" },
+    ]);
+    assert.equal(result.httpStatus, 409);
+    assert.equal(result.ok, false);
+  });
+
+  test("a slug on more than one product is refused outright", async () => {
+    const result = await edit(["e2e-bulk-a", "e2e-bulk-b"], [
+      { field: "slug", mode: "set", value: "whatever" },
+    ]);
+    assert.equal(result.httpStatus, 400);
+  });
+
+  test("an edit that changes nothing writes nothing, so updatedAt holds still", async () => {
+    /*
+     * A no-op write would move `updatedAt`, which is what every open editor
+     * compares against to detect a conflict — so a bulk action that changed
+     * nothing would make everyone else's next save fail.
+     */
+    const before = (await db().collection("products").doc("e2e-bulk-a").get()).data()!.updatedAt;
+
+    const result = await edit(["e2e-bulk-a"], [{ field: "tags", mode: "add", value: "cotton" }]);
+    assert.equal(result.ok, true);
+    assert.equal(result.changed, 0);
+
+    const after = (await db().collection("products").doc("e2e-bulk-a").get()).data()!.updatedAt;
+    assert.equal(after, before);
+  });
+
+  test("the instruction is recorded in the audit log, not just the outcome", async () => {
+    const log = await db()
+      .collection("auditLog")
+      .where("action", "==", "product.bulkEdit")
+      .get();
+    assert.equal(log.size > 0, true);
+    const entry = log.docs[0]!.data();
+    assert.equal(entry.actorEmail, "owner@example.test");
+    assert.equal(Array.isArray(entry.edits), true);
+  });
+
+  test("a customer cannot bulk edit anything", async () => {
+    const result = await edit(
+      ["e2e-bulk-a"],
+      [{ field: "price", mode: "set", value: 1 }],
+      customer.token,
+    );
+    assert.equal(result.httpStatus, 403);
+
+    const a = (await db().collection("products").doc("e2e-bulk-a").get()).data()!;
+    assert.notEqual(a.price, 1);
   });
 });

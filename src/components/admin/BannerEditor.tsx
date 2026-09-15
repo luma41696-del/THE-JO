@@ -217,24 +217,28 @@ export function BannerEditor({
     return t("be.liveNoEnd");
   }, [draft.startsAt, draft.endsAt, draft.status, t]);
 
+  /**
+   * Upload a campaign image. Ask for its description afterwards.
+   *
+   * This used to open a `window.prompt` *before* the upload started, and
+   * abandon the whole thing if the merchant pressed Cancel — so choosing the
+   * file was wasted, and the only way to proceed was to answer a question
+   * about a picture that was not on screen yet. What that reliably produces is
+   * the filename typed back in, which is worse for a screen reader than no
+   * description at all.
+   *
+   * The description is now a field under the thumbnail, and it is required
+   * where it costs something: at save, before the banner can go live.
+   */
   async function pickImage(files: FileList | null, which: "desktop" | "mobile") {
     if (!files || files.length === 0) return;
     const file = files[0]!;
     setError(null);
     setUploading(which);
     try {
-      const alt =
-        window.prompt(
-          t("be.altPrompt"),
-          draft.titleEn ? `${draft.titleEn} — campaign artwork` : "",
-        ) ?? "";
-      if (!alt.trim()) {
-        setError(t("be.altRequired"));
-        return;
-      }
       // Banners live under `banners/` in Storage; the rules allow staff writes
       // there with the same raster-only restriction as product imagery.
-      const uploaded = await uploadMerchandisingImage("banners", file, alt);
+      const uploaded = await uploadMerchandisingImage("banners", file, "");
       set(which === "desktop" ? "media" : "mediaMobile", uploaded);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("be.uploadError"));
@@ -243,11 +247,27 @@ export function BannerEditor({
     }
   }
 
+  /** Describe an image already on screen. */
+  function setImageAlt(which: "desktop" | "mobile", alt: string) {
+    const current = which === "desktop" ? draft.media : draft.mediaMobile;
+    if (!current) return;
+    set(which === "desktop" ? "media" : "mediaMobile", { ...current, alt });
+  }
+
   async function save() {
     setError(null);
     if (!draft.titleEn.trim() || !draft.titleAr.trim()) {
       return setError(t("be.titleRequired"));
     }
+    /*
+     * Where the alt-text requirement landed once the prompt went.
+     *
+     * A banner is the largest thing on the home page; publishing one that a
+     * screen reader announces as nothing is the accessibility failure most
+     * visible to the people it affects.
+     */
+    if (draft.media && !draft.media.alt.trim()) return setError(t("be.altRequired"));
+    if (draft.mediaMobile && !draft.mediaMobile.alt.trim()) return setError(t("be.altRequired"));
 
     setSaving(true);
     try {
@@ -490,6 +510,7 @@ export function BannerEditor({
                     busy={uploading === "desktop"}
                     onPick={(files) => pickImage(files, "desktop")}
                     onClear={() => set("media", null)}
+                    onAlt={(alt) => setImageAlt("desktop", alt)}
                   />
                   <ImageSlot
                     label={t("be.phoneImage")}
@@ -498,6 +519,7 @@ export function BannerEditor({
                     busy={uploading === "mobile"}
                     onPick={(files) => pickImage(files, "mobile")}
                     onClear={() => set("mediaMobile", null)}
+                    onAlt={(alt) => setImageAlt("mobile", alt)}
                   />
                 </div>
 
@@ -707,6 +729,7 @@ function ImageSlot({
   busy,
   onPick,
   onClear,
+  onAlt,
 }: {
   label: string;
   hint: string;
@@ -714,6 +737,7 @@ function ImageSlot({
   busy: boolean;
   onPick: (files: FileList | null) => void;
   onClear: () => void;
+  onAlt: (alt: string) => void;
 }) {
   const { t } = useAdminLocale();
   return (
@@ -751,6 +775,24 @@ function ImageSlot({
           </button>
         )}
       </div>
+      {/*
+        The description, beside the picture it describes. A red edge where it
+        is missing, and the save refuses until it is filled — the requirement
+        is the same one the prompt enforced, moved to where the merchant can
+        see what they are describing.
+      */}
+      {image && (
+        <input
+          value={image.alt}
+          onChange={(event) => onAlt(event.target.value)}
+          placeholder={t("be.altPlaceholder")}
+          aria-label={`${label} — ${t("be.altPlaceholder")}`}
+          className={cn(
+            "focus:border-brand bg-paper text-ink placeholder:text-mist mt-1.5 w-full rounded-md border px-2 py-1 text-[0.6875rem] outline-none transition-colors",
+            image.alt.trim() ? "border-line" : "border-alert",
+          )}
+        />
+      )}
       <span className="text-mist mt-1 block text-[0.6875rem]">{hint}</span>
     </div>
   );
