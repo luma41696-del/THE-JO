@@ -5,10 +5,11 @@ import {
   getAllProducts,
   getShippingClasses,
   getShippingMethods,
+  getShippingZones,
 } from "@/lib/catalog";
 import { priceCart } from "@/lib/pricing";
 import { designFor, hasDesigns, hasOptions, imagesFor, resolveSelection } from "@/lib/product";
-import { classesInCart } from "@/lib/shipping";
+import { classesInCart, zoneFor } from "@/lib/shipping";
 import { categoryPathsFor, evaluateOffer, redemptionId } from "@/lib/offers";
 import { isPurchasable, unavailableReason } from "@/lib/visibility";
 import { cartKey, orderReference } from "@/lib/utils";
@@ -102,10 +103,11 @@ export async function POST(request: Request) {
 
   /* --- re-price from the catalogue -------------------------------------- */
 
-  const [products, shippingMethods, shippingClasses, offers] = await Promise.all([
+  const [products, shippingMethods, shippingClasses, shippingZones, offers] = await Promise.all([
     getAllProducts(),
     getShippingMethods(),
     getShippingClasses(),
+    getShippingZones(),
     getActiveOffers(),
   ]);
 
@@ -241,7 +243,28 @@ export async function POST(request: Request) {
     ? (offers.find((o) => o.code.toLowerCase() === String(body.offerCode).toLowerCase()) ?? null)
     : null;
 
-  const totals = priceCart({ items: priced, shippingMethod, shippingClasses, offer });
+  /*
+   * The zone is resolved here from the address the order actually carries,
+   * never taken from the request. The browser computed one to show a price;
+   * this one decides what is charged, and the two agreeing is the point of
+   * both calling the same `zoneFor`.
+   */
+  const shippingZone = zoneFor(shippingZones, address);
+
+  if (shippingZone?.excluded) {
+    // The client blocks this at the address step. A direct POST does not go
+    // through that step, and an order the courier cannot deliver is worse
+    // than a refusal the customer can act on.
+    return bad(`We do not deliver to ${shippingZone.name.en} yet.`);
+  }
+
+  const totals = priceCart({
+    items: priced,
+    shippingMethod,
+    shippingClasses,
+    shippingZone,
+    offer,
+  });
 
   /* --- persist ----------------------------------------------------------- */
 

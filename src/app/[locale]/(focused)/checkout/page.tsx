@@ -5,6 +5,7 @@ import {
   getAllProducts,
   getShippingClasses,
   getShippingMethods,
+  getShippingZones,
 } from "@/lib/catalog";
 import { categoryPathsFor } from "@/lib/offers";
 import { CheckoutFlow } from "@/components/checkout/CheckoutFlow";
@@ -26,9 +27,10 @@ export default async function CheckoutPage({ params }: { params: Promise<{ local
   const { locale: raw } = await params;
   const locale: Locale = isLocale(raw) ? raw : "en";
 
-  const [shippingMethods, shippingClasses, offers, products] = await Promise.all([
+  const [shippingMethods, shippingClasses, shippingZones, offers, products] = await Promise.all([
     getShippingMethods(),
     getShippingClasses(),
+    getShippingZones(),
     getActiveOffers(),
     getAllProducts(),
   ]);
@@ -37,6 +39,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ local
     <CheckoutFlow
       shippingMethods={shippingMethods}
       shippingClasses={shippingClasses}
+      shippingZones={shippingZones}
       offers={offers}
       categoryPaths={categoryPathsFor(products)}
       locale={locale}

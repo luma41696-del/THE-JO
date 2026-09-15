@@ -17,6 +17,7 @@ import type {
   ShippingClass,
   ShippingMethod,
   ShippingQuote,
+  ShippingZone,
 } from "@/types";
 import { money } from "@/lib/pricing";
 
@@ -149,4 +150,82 @@ export function amountToFreeShipping(
   if (classesInCart(items, classes).some((c) => c.ignoresFreeThreshold)) return 0;
   const currency = items[0]?.currency ?? "JOD";
   return subtotal >= method.freeAbove ? 0 : money(method.freeAbove - subtotal, currency);
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Zones                                                                     */
+/* -------------------------------------------------------------------------- */
+
+/** Normalise for comparison: customers type their own address. */
+const fold = (value: string) => value.trim().toLowerCase().replace(/\s+/g, " ");
+
+/**
+ * Which zone an address falls in.
+ *
+ * Region first, then city. An address matching nothing returns `undefined`,
+ * and the caller quotes the method's own price — a shopper in a town the
+ * merchant has not listed yet must not hit a wall at checkout over an
+ * omission in a settings table.
+ */
+export function zoneFor(
+  zones: ShippingZone[],
+  address: { city?: string; region?: string } | null | undefined,
+): ShippingZone | undefined {
+  if (!address) return undefined;
+  const region = fold(address.region ?? "");
+  const city = fold(address.city ?? "");
+  if (!region && !city) return undefined;
+
+  const ordered = [...zones].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+  for (const field of [region, city]) {
+    if (!field) continue;
+    const hit = ordered.find((zone) => zone.areas.some((area) => fold(area) === field));
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
+/**
+ * Apply a zone to a quote.
+ *
+ * Kept separate from `quoteShipping` so the cart — which has no address yet —
+ * can show an honest pre-address price, and the checkout can refine it the
+ * moment a city is typed. Quoting a zone surcharge before knowing the address
+ * would be inventing a number.
+ */
+export function applyZone(
+  quote: ShippingQuote,
+  zone: ShippingZone | undefined,
+  subtotal: number,
+): ShippingQuote {
+  if (!zone) return quote;
+
+  const currency = "JOD";
+
+  if (zone.excluded) {
+    return { ...quote, zone, total: quote.total, unavailableReason: "zone-excluded" };
+  }
+
+  const gross = money(quote.base + quote.surcharge + zone.surcharge, currency);
+
+  /*
+   * A zone threshold *replaces* the method's rather than stacking with it, so
+   * a shop can require more in the south without the two rules quietly
+   * cancelling. `freeApplied` is recomputed here for the same reason the
+   * class rule lives in `quoteShipping`: one place decides, or the cart and
+   * the checkout disagree.
+   */
+  const threshold = zone.freeAbove ?? quote.method.freeAbove;
+  const stillFree =
+    quote.freeApplied || (typeof threshold === "number" && subtotal >= threshold);
+  const freeApplied = stillFree && !quote.unavailableReason;
+
+  return {
+    ...quote,
+    zone,
+    surcharge: money(quote.surcharge + zone.surcharge, currency),
+    total: freeApplied ? 0 : gross,
+    freeApplied,
+  };
 }

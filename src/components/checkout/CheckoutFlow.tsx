@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { EASE, transition } from "@/lib/motion";
 import { formatDeliveryWindow, formatPrice, t } from "@/lib/format";
 import { priceCart, subtotalOf } from "@/lib/pricing";
+import { zoneFor } from "@/lib/shipping";
 import { evaluateOffer, findOfferByCode } from "@/lib/offers";
 import { track } from "@/lib/analytics/track";
 import { useCart } from "@/lib/store/cart";
@@ -25,6 +26,7 @@ import type {
   PaymentMethod,
   ShippingClass,
   ShippingMethod,
+  ShippingZone,
 } from "@/types";
 
 /**
@@ -60,6 +62,7 @@ const EMPTY_ADDRESS: Omit<Address, "id" | "isDefault"> = {
 export function CheckoutFlow({
   shippingMethods,
   shippingClasses = [],
+  shippingZones = [],
   offers,
   categoryPaths = {},
   locale = "en",
@@ -67,6 +70,8 @@ export function CheckoutFlow({
   shippingMethods: ShippingMethod[];
   /** Surcharges and speed exclusions, so this quote matches the bag's. */
   shippingClasses?: ShippingClass[];
+  /** Delivery zones, matched against the address as it is typed. */
+  shippingZones?: ShippingZone[];
   offers: Offer[];
   /** Product id → category ancestry, for category-scoped coupons. */
   categoryPaths?: Record<string, string[]>;
@@ -103,6 +108,17 @@ export function CheckoutFlow({
   const [serverError, setServerError] = useState<string | null>(null);
 
   const method = shippingMethods.find((m) => m.id === methodId) ?? null;
+
+  /*
+   * Resolved from the address as it is typed, not guessed beforehand. Before
+   * a city is entered there is no zone and the customer sees the method's own
+   * price — which is honest, and then refines the moment they tell us where
+   * they are rather than surprising them at the last step.
+   */
+  const zone = useMemo(
+    () => zoneFor(shippingZones, address),
+    [shippingZones, address],
+  );
   const offer = useMemo(
     () => (couponCode ? findOfferByCode(offers, couponCode) : null),
     [couponCode, offers],
@@ -133,6 +149,7 @@ export function CheckoutFlow({
       priceCart({
         items,
         shippingMethod: method,
+        shippingZone: zone,
         // Shipping classes were missing here, so the checkout quoted a
         // different delivery price from the bag for any basket with a
         // surcharge — the customer saw one number and paid another.
@@ -140,7 +157,7 @@ export function CheckoutFlow({
         offer,
         offerEvaluation: offerVerdict,
       }),
-    [items, method, shippingClasses, offer, offerVerdict],
+    [items, method, shippingClasses, zone, offer, offerVerdict],
   );
 
   function validateStep(current: Step) {
@@ -163,6 +180,15 @@ export function CheckoutFlow({
       }
       if (address.city.trim().length < 2) {
         next.city = rtl ? "أدخل المدينة." : "Enter your city.";
+      }
+      /*
+       * A zone the shop does not serve stops the order here, at the address,
+       * rather than at the pay button or — worse — after the money moved.
+       */
+      if (zone?.excluded) {
+        next.city = rtl
+          ? `لا نوصل إلى ${t(zone.name, locale)} حالياً.`
+          : `We do not deliver to ${t(zone.name, locale)} yet.`;
       }
     }
 
@@ -746,7 +772,21 @@ export function CheckoutFlow({
                 </div>
               )}
               <div className="flex justify-between">
-                <dt className="text-smoke">{rtl ? "الشحن" : "Delivery"}</dt>
+                <dt className="text-smoke">
+                  {rtl ? "الشحن" : "Delivery"}
+                  {/*
+                    Naming the zone next to the number is the difference
+                    between a surcharge and a surprise. A customer in Aqaba
+                    paying more than a friend in Amman deserves to see why on
+                    the line that charges them, not to find out from the
+                    friend.
+                  */}
+                  {zone && (
+                    <span className="text-mist ms-1.5 text-[0.75rem]">
+                      · {t(zone.name, locale)}
+                    </span>
+                  )}
+                </dt>
                 <dd className="text-ink tabular-nums">
                   {totals.shipping === 0
                     ? rtl
@@ -755,6 +795,15 @@ export function CheckoutFlow({
                     : formatPrice(totals.shipping, totals.currency, locale)}
                 </dd>
               </div>
+
+              {/* A zone the shop does not serve, said before payment. */}
+              {zone?.excluded && (
+                <p role="alert" className="text-alert text-[0.8125rem]">
+                  {rtl
+                    ? `لا نوصل إلى ${t(zone.name, locale)} حالياً. غيّر العنوان أو تواصل معنا.`
+                    : `We do not deliver to ${t(zone.name, locale)} yet. Change the address or contact us.`}
+                </p>
+              )}
               <div className="flex justify-between">
                 <dt className="text-smoke">{rtl ? "ضريبة ١٥٪" : "VAT (15%)"}</dt>
                 <dd className="text-ink tabular-nums">

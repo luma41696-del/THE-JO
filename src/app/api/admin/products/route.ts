@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { FieldValue } from "firebase-admin/firestore";
 
 import { isAdminConfigured, verifyRequest } from "@/lib/firebase/admin";
 import { slugify } from "@/lib/utils";
@@ -374,9 +375,21 @@ export async function POST(request: Request) {
 
     const existing = body.id ? await ref.get() : null;
 
+    // Firestore rejects undefined. Omitted editor fields preserve old values;
+    // explicitly cleared fields must be deleted because this is a merge write.
+    const { subtitle, compareAtPrice, gtin: barcode, maxPerOrder: limit, ...required } = payload;
+
     await ref.set(
       {
-        ...payload,
+        ...required,
+        ...(body.subtitle === undefined ? {} : { subtitle: subtitle ?? FieldValue.delete() }),
+        ...(body.compareAtPrice === undefined
+          ? {}
+          : { compareAtPrice: compareAtPrice ?? FieldValue.delete() }),
+        ...(type === "variable"
+          ? { gtin: FieldValue.delete() }
+          : body.gtin === undefined ? {} : { gtin: barcode ?? FieldValue.delete() }),
+        ...(body.maxPerOrder === undefined ? {} : { maxPerOrder: limit ?? FieldValue.delete() }),
         ...(existing?.exists
           ? {}
           : {

@@ -55,6 +55,7 @@ import type {
   ProductFilters,
   ShippingClass,
   ShippingMethod,
+  ShippingZone,
   Testimonial,
 } from "@/types";
 
@@ -631,9 +632,39 @@ export const getActiveOffers = cache(async (): Promise<Offer[]> => {
 /*  Static-ish config                                                         */
 /* -------------------------------------------------------------------------- */
 
-export async function getShippingMethods(): Promise<ShippingMethod[]> {
-  return demoShippingMethods;
-}
+export const getShippingMethods = cache(async (): Promise<ShippingMethod[]> =>
+  readOrFallback(
+    "shippingMethods",
+    async () => {
+      const snap = await getDocs(
+        query(collection(getDb(), "shippingMethods"), orderBy("price")),
+      );
+      return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as ShippingMethod);
+    },
+    () => demoShippingMethods,
+  ),
+);
+
+/**
+ * Delivery zones.
+ *
+ * The fallback is an **empty list**, not a set of invented Jordanian regions.
+ * With no zones every address quotes the method's own price, which is exactly
+ * what the shop did before zones existed — so adding the feature changes no
+ * customer's total until a merchant deliberately sets one up. Shipping a
+ * guessed rate table would silently start charging people for a decision
+ * nobody made.
+ */
+export const getShippingZones = cache(async (): Promise<ShippingZone[]> =>
+  readOrFallback(
+    "shippingZones",
+    async () => {
+      const snap = await getDocs(query(collection(getDb(), "shippingZones"), orderBy("order")));
+      return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as ShippingZone);
+    },
+    () => [],
+  ),
+);
 
 export async function getTestimonials(): Promise<Testimonial[]> {
   return demoTestimonials;

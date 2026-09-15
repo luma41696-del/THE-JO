@@ -54,7 +54,10 @@ const NAV: { group: string; items: { href: string; label: string; icon: ReactNod
   },
   {
     group: "Shop",
-    items: [{ href: "/admin/settings", label: "Settings", icon: <DocIcon /> }],
+    items: [
+      { href: "/admin/shipping", label: "Delivery", icon: <BoxIcon /> },
+      { href: "/admin/settings", label: "Settings", icon: <DocIcon /> },
+    ],
   },
 ];
 

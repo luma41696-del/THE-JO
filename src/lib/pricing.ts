@@ -14,9 +14,10 @@ import type {
   Offer,
   ShippingClass,
   ShippingMethod,
+  ShippingZone,
 } from "@/types";
 import { minorUnits } from "@/lib/format";
-import { quoteShipping } from "@/lib/shipping";
+import { applyZone, quoteShipping } from "@/lib/shipping";
 import { evaluateOffer, type OfferEvaluation } from "@/lib/offers";
 
 /**
@@ -36,6 +37,14 @@ export interface PriceInput {
    * surcharge that was never configured.
    */
   shippingClasses?: ShippingClass[];
+  /**
+   * The delivery zone the address falls in, once there is an address.
+   *
+   * Omitted before the customer has typed one — the bag has no address, and
+   * quoting a zone surcharge for a city nobody has named would be inventing a
+   * number. The checkout passes it the moment the city is filled in.
+   */
+  shippingZone?: ShippingZone | null;
   offer?: Offer | null;
   /**
    * A pre-computed coupon evaluation.
@@ -117,6 +126,7 @@ export function shippingCostFor(
   items: CartItem[] = [],
   classes: ShippingClass[] = [],
   evaluation?: OfferEvaluation | null,
+  zone?: ShippingZone | null,
 ) {
   if (!method) return 0;
 
@@ -144,7 +154,18 @@ export function shippingCostFor(
   }
 
   if (classes.length > 0 && items.length > 0) {
-    return quoteShipping(method, items, classes, subtotalAfterDiscount).total;
+    const quote = quoteShipping(method, items, classes, subtotalAfterDiscount);
+    return applyZone(quote, zone ?? undefined, subtotalAfterDiscount).total;
+  }
+
+  /*
+   * No classes configured: the method's flat price, still adjusted for the
+   * zone. A shop with no shipping classes is not a shop with no geography.
+   */
+  if (zone) {
+    const threshold = zone.freeAbove ?? method.freeAbove;
+    if (typeof threshold === "number" && subtotalAfterDiscount >= threshold) return 0;
+    return money(method.price + zone.surcharge);
   }
 
   if (method.freeAbove !== undefined && subtotalAfterDiscount >= method.freeAbove) return 0;
@@ -155,6 +176,7 @@ export function priceCart({
   items,
   shippingMethod,
   shippingClasses = [],
+  shippingZone,
   offer,
   offerEvaluation,
   categoryPaths = {},
@@ -185,6 +207,7 @@ export function priceCart({
     items,
     shippingClasses,
     verdict,
+    shippingZone,
   );
   const tax = money(discounted * TAX_RATE, resolvedCurrency);
   const total = money(discounted + shipping + tax, resolvedCurrency);

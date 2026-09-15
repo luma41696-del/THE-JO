@@ -715,6 +715,45 @@ export interface ShippingClass {
   order: number;
 }
 
+/**
+ * A delivery zone — a set of places that share a rate.
+ *
+ * Separate from `ShippingClass`, which is about the *goods*: a rolled coat is
+ * awkward wherever it goes. A zone is about the *address*: Amman is next door,
+ * Aqaba is four hours of road, and a shop that charges both the same is
+ * subsidising one with the other without deciding to.
+ *
+ * Matching is by `region` first and `city` second, case-insensitively, because
+ * customers type their own address. An address that matches nothing falls back
+ * to the method's own price rather than being refused — a shopper in a town
+ * the merchant has not listed should not hit a wall at checkout.
+ */
+export interface ShippingZone {
+  id: string;
+  name: Localized;
+  /**
+   * Region or city names this zone covers, lower-cased on comparison.
+   * Both spellings may be listed — "Amman" and "عمّان" — since the address is
+   * typed in whichever language the customer is using.
+   */
+  areas: string[];
+  /** Added to the quoted method price for addresses in this zone. */
+  surcharge: number;
+  /**
+   * Overrides the method's free-delivery threshold here.
+   *
+   * A shop may give free delivery over 75 JOD in Amman and require 120 in the
+   * south, where the carriage genuinely costs more. Undefined means the
+   * method's own threshold applies.
+   */
+  freeAbove?: number;
+  /** Not delivered to at all. The checkout says so rather than failing later. */
+  excluded?: boolean;
+  /** Extra days on top of the method's window. */
+  extraDays?: number;
+  order?: number;
+}
+
 export interface ShippingMethod {
   id: string;
   speed: ShippingSpeed;
@@ -737,6 +776,8 @@ export interface ShippingMethod {
 /** What a quote actually resolved to, so the UI can explain the number. */
 export interface ShippingQuote {
   method: ShippingMethod;
+  /** The zone the address resolved to, when one matched. */
+  zone?: ShippingZone;
   /** The method's own price after any class override. */
   base: number;
   /** Sum of class surcharges applied. */
@@ -746,8 +787,15 @@ export interface ShippingQuote {
   freeApplied: boolean;
   /** Class ids that contributed a surcharge, for the breakdown tooltip. */
   classIds: string[];
-  /** Set when the method is unavailable for this basket. */
-  unavailableReason?: "class-excluded";
+  /**
+   * Set when the method is unavailable.
+   *
+   * `class-excluded` is about the goods — a rolled coat does not go on a
+   * same-day bike. `zone-excluded` is about the address — the shop does not
+   * deliver there at all. Two different sentences for the customer, so they
+   * are two different reasons rather than one boolean.
+   */
+  unavailableReason?: "class-excluded" | "zone-excluded";
 }
 
 export interface CartTotals {
