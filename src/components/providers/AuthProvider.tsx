@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { onIdTokenChanged, type User } from "firebase/auth";
 
 import { getFirebaseAuth, initAnalytics, initAppCheck } from "@/lib/firebase/client";
+import { analyticsAllowed, useConsent } from "@/lib/analytics/consent";
 import { ensureProfile, fetchProfile } from "@/lib/firebase/auth";
 import { syncAdminSession } from "@/lib/firebase/session-client";
 import { useWishlist } from "@/lib/store/wishlist";
@@ -40,10 +41,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const syncWishlist = useWishlist((s) => s.syncFromServer);
 
   // App Check must initialise before the first Firestore read, so it runs here
-  // rather than inside a page. Analytics is fire-and-forget.
+  // rather than inside a page.
   useEffect(() => {
     void initAppCheck();
-    void initAnalytics();
+  }, []);
+
+  /*
+   * Analytics starts only once consent has been given, and starts *at* the
+   * moment it is given rather than on the next page load — a visitor who
+   * accepts the banner should be counted from then on, not from whenever they
+   * happen to navigate again.
+   *
+   * `initAnalytics` re-checks consent itself and is safe to call twice, so
+   * this subscription needs no bookkeeping of its own.
+   */
+  useEffect(() => {
+    if (analyticsAllowed()) void initAnalytics();
+    return useConsent.subscribe((state, previous) => {
+      if (state.analytics && !previous.analytics) void initAnalytics();
+    });
   }, []);
 
   useEffect(() => {

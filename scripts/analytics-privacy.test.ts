@@ -56,3 +56,102 @@ test("a search term is truncated, never stored unbounded", () => {
   const out = clean({ query: "x".repeat(500) });
   assert.equal((out.query as string).length, 120);
 });
+
+/* -------------------------------------------------------------------------- */
+/*  Nothing third-party loads before consent                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The gap these tests had.
+ *
+ * Everything above proves our **own** event writer respects consent. It always
+ * did. Meanwhile `initAnalytics()` ran unconditionally from a mount effect, so
+ * the shop loaded a 446KB Google tag and began recording `page_view` before
+ * the visitor had answered the banner. The suite was testing the right thing
+ * about the wrong surface.
+ *
+ * `initAnalytics` is asserted here against a fake window, because the real one
+ * would reach for `firebase/analytics`.
+ */
+test("analytics does not initialise before consent is given", async () => {
+  /*
+   * A throwaway config. The Firebase module validates its environment at
+   * import, and this test is about the consent gate rather than about
+   * Firebase — real credentials would make the assertion depend on whoever
+   * happens to be running it.
+   */
+  for (const key of [
+    "NEXT_PUBLIC_FIREBASE_API_KEY",
+    "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN",
+    "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
+    "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET",
+    "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID",
+    "NEXT_PUBLIC_FIREBASE_APP_ID",
+    "NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID",
+  ]) {
+    process.env[key] ??= "test-value";
+  }
+
+  const { useConsent } = await import("@/lib/analytics/consent");
+  const { analyticsMayLoad } = await import("@/lib/firebase/client");
+
+  const globals = globalThis as { window?: unknown };
+  const hadWindow = "window" in globals;
+  globals.window = {};
+
+  try {
+    /*
+     * `analyticsMayLoad` rather than `initAnalytics`.
+     *
+     * The first draft of this test called `initAnalytics` and asserted null —
+     * and a mutation check proved it vacuous: with the consent gate deleted
+     * it still returned null, because `isSupported()` is false in Node
+     * regardless. An assertion that cannot fail is worse than none, because
+     * it reads as proof.
+     */
+    // No decision recorded — the state a first-time visitor is in.
+    useConsent.setState({ analytics: false, fittingRoom: false, decidedAt: 0, version: 1 });
+    assert.equal(analyticsMayLoad(), false, "nothing loads before a decision");
+
+    // A flag set without a decision is still not consent.
+    useConsent.setState({ analytics: true, fittingRoom: false, decidedAt: 0, version: 1 });
+    assert.equal(analyticsMayLoad(), false, "an undecided visitor is not opted in");
+
+    // Declined is not the same as undecided, and must also load nothing.
+    useConsent.setState({ analytics: false, fittingRoom: false, decidedAt: Date.now(), version: 1 });
+    assert.equal(analyticsMayLoad(), false, "a refusal is respected");
+
+    // And it does load once consent is genuinely given, or the gate would be
+    // an off switch rather than a gate.
+    const { POLICY_VERSION } = await import("@/lib/analytics/consent");
+    useConsent.setState({
+      analytics: true, fittingRoom: false, decidedAt: Date.now(), version: POLICY_VERSION,
+    });
+    assert.equal(analyticsMayLoad(), true, "consent turns it on");
+  } finally {
+    if (!hadWindow) delete globals.window;
+  }
+});
+
+test("the gate is the same predicate the event writer uses", async () => {
+  /*
+   * One definition of "may we", not two that can drift. If `analyticsAllowed`
+   * ever stops being what gates the tag, this fails.
+   */
+  const { analyticsAllowed, useConsent, POLICY_VERSION } = await import(
+    "@/lib/analytics/consent"
+  );
+
+  useConsent.setState({ analytics: true, fittingRoom: false, decidedAt: 0, version: POLICY_VERSION });
+  assert.equal(analyticsAllowed(), false, "a flag with no decision is not consent");
+
+  useConsent.setState({
+    analytics: true, fittingRoom: false, decidedAt: Date.now(), version: POLICY_VERSION - 1,
+  });
+  assert.equal(analyticsAllowed(), false, "consent to an older policy is not consent to this one");
+
+  useConsent.setState({
+    analytics: true, fittingRoom: false, decidedAt: Date.now(), version: POLICY_VERSION,
+  });
+  assert.equal(analyticsAllowed(), true);
+});

@@ -29,6 +29,7 @@ import { connectStorageEmulator, getStorage, type FirebaseStorage } from "fireba
 import { connectFunctionsEmulator, getFunctions, type Functions } from "firebase/functions";
 
 import { appCheckSiteKey, firebaseConfig, useEmulators } from "./config";
+import { analyticsAllowed } from "@/lib/analytics/consent";
 
 let emulatorsConnected = false;
 
@@ -125,9 +126,49 @@ export async function initAppCheck() {
   }
 }
 
-/** Analytics is lazy and guarded: it is unsupported in some browsers/webviews. */
+/**
+ * Google Analytics, and the consent it waits for.
+ *
+ * This used to run unconditionally from `AuthProvider`'s mount effect, which
+ * meant the shop loaded a 446KB Google tag and began recording `page_view`
+ * **before the visitor had answered the consent banner** — on a site whose
+ * own `track()` has been carefully gated on that same consent since the
+ * analytics work went in.
+ *
+ * The tests did not catch it because they tested the right thing about the
+ * wrong surface: they proved our first-party events respect consent, while a
+ * third-party tag ran alongside them, setting cookies, ungated.
+ *
+ * So the guard lives here, at the one place that can load it. `analyticsAllowed`
+ * is the same predicate `track()` uses — one definition of "may we", not two
+ * that can drift.
+ *
+ * **Loading is one-way.** Once the Google tag is on the page it cannot be
+ * removed, so withdrawing consent later stops our own events but cannot
+ * unload what is already running; a reload starts clean because this refuses
+ * to initialise again. That asymmetry is exactly why it must not load early:
+ * "ask first" is the only version of this that works.
+ */
+export function analyticsMayLoad(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    Boolean(firebaseConfig.measurementId) &&
+    analyticsAllowed()
+  );
+}
+
 export async function initAnalytics() {
-  if (typeof window === "undefined" || !firebaseConfig.measurementId) return null;
+  /*
+   * The decision is a separate, pure function on purpose.
+   *
+   * It was inline, and the test asserting "nothing loads without consent"
+   * turned out to be vacuous: with the gate deleted the call still returned
+   * null, because `isSupported()` is false in a test environment anyway. The
+   * assertion could not fail, which is worse than no test — it reads as
+   * proof. `analyticsMayLoad` can be asserted directly, and deleting the
+   * consent term from it makes that assertion go red.
+   */
+  if (!analyticsMayLoad()) return null;
 
   const { getAnalytics, isSupported } = await import("firebase/analytics");
   if (!(await isSupported())) return null;
