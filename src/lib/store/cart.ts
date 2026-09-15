@@ -5,7 +5,13 @@ import { persist, createJSONStorage } from "zustand/middleware";
 
 import type { CartItem, CurrencyCode, Product } from "@/types";
 import { cartKey, clamp } from "@/lib/utils";
-import { buildCartItem, hasOptions, resolveSelection } from "@/lib/product";
+import {
+  buildCartItem,
+  designFor,
+  hasDesigns,
+  hasOptions,
+  resolveSelection,
+} from "@/lib/product";
 import { track } from "@/lib/analytics/track";
 
 /**
@@ -22,6 +28,8 @@ type AddArgs = {
   /** Ignored for a simple product, which has no options. */
   colorId?: string;
   sizeId?: string;
+  /** The chosen artwork, on products that offer several. */
+  designId?: string;
   quantity?: number;
 };
 
@@ -83,7 +91,7 @@ export const useCart = create<CartState>()(
       lastAddedKey: null,
       lastRejection: null,
 
-      add: ({ product, colorId = "", sizeId = "", quantity = 1 }) => {
+      add: ({ product, colorId = "", sizeId = "", designId = "", quantity = 1 }) => {
         // A variable product is not purchasable until the choice resolves to a
         // real variant; a simple one has nothing to resolve, so both ids stay
         // empty and the line key is simply `id::`.
@@ -91,13 +99,16 @@ export const useCart = create<CartState>()(
           const color = product.colors.find((c) => c.id === colorId);
           const size = product.sizes.find((s) => s.id === sizeId);
           if (!color || !size) return null;
+          // An unchosen artwork is an unresolved purchase, exactly like an
+          // unchosen size — the bench would not know what to embroider.
+          if (hasDesigns(product) && !designFor(product, designId)) return null;
         } else if (product.type === "variable") {
           // Variable, but with no options left to pick — unbuyable, not "free".
           return null;
         }
 
-        const selection = resolveSelection(product, colorId, sizeId);
-        const key = cartKey(product.id, colorId, sizeId);
+        const selection = resolveSelection(product, colorId, sizeId, designId);
+        const key = cartKey(product.id, colorId, sizeId, designId);
 
         if (!selection.buyable || selection.cap.max < 1) {
           set({
@@ -125,7 +136,7 @@ export const useCart = create<CartState>()(
               maxQuantity: selection.cap.max,
               maxReason: selection.cap.reason,
             }
-          : buildCartItem(product, selection, colorId, sizeId, granted);
+          : buildCartItem(product, selection, colorId, sizeId, granted, designId);
 
         // Recorded here rather than at each button: every path into the bag
         // — product page, cross-sell shelf, fitting room — comes through this

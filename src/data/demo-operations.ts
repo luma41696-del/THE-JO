@@ -2,9 +2,12 @@ import { demoProducts, demoShippingMethods } from "./demo";
 import { priceCart } from "@/lib/pricing";
 import { cartKey } from "@/lib/utils";
 import { resolveSelection } from "@/lib/product";
+import { t } from "@/lib/format";
 import type {
   CartItem,
   Invoice,
+  Locale,
+  Localized,
   Order,
   OrderEvent,
   OrderStatus,
@@ -302,6 +305,27 @@ export const demoOrders: Order[] = buildOrders();
 const TAX_RATE = 0.16;
 
 /**
+ * An invoice line's description: the title plus whatever options resolved it.
+ *
+ * Built in both languages rather than one — the invoice renders either, and a
+ * line that says "Bone · M" in an Arabic document is a document that was only
+ * half translated.
+ */
+function describeLine(item: CartItem): Localized {
+  const parts = (locale: Locale) =>
+    [
+      t(item.title, locale),
+      item.designName ? t(item.designName, locale) : "",
+      t(item.colorName, locale),
+      item.sizeLabel,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
+  return { en: parts("en"), ar: parts("ar") };
+}
+
+/**
  * One invoice per order that reached payment. Numbering is sequential and
  * gapless in issue order — most tax authorities require exactly that, and it is
  * far easier to build in from the start than to retrofit.
@@ -330,7 +354,13 @@ export const demoInvoices: Invoice[] = demoOrders
         countryCode: order.shippingAddress.countryCode,
       },
       lines: order.items.map((item) => ({
-        description: item.title,
+        /*
+         * The options belong in the description, not only on the packing slip.
+         * An invoice line reading "Boxy Cotton Tee" four times over, for four
+         * different embroideries at four different prices, is not a document
+         * anyone can reconcile — least of all a customer querying a charge.
+         */
+        description: describeLine(item),
         sku: item.sku,
         quantity: item.quantity,
         unitPrice: item.unitPrice,

@@ -184,8 +184,22 @@ export function OrderDetail({ order: initial }: { order: Order }) {
                       {pick(item.title, "en")}
                     </Link>
                     <span className="text-smoke mt-0.5 block text-[0.75rem]">
-                      {pick(item.colorName, "en")} · {item.sizeLabel}
+                      {[pick(item.colorName, "en"), item.sizeLabel]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </span>
+                    {/*
+                      The artwork gets its own line, not a third entry after a
+                      dot. Whoever pulls this order has four otherwise
+                      identical bone tees in front of them, and the one thing
+                      that tells them apart must not be the easiest thing on
+                      the slip to skim past.
+                    */}
+                    {item.designName && (
+                      <span className="rounded-xs bg-brand-veil text-brand mt-1 inline-block px-2 py-0.5 text-[0.75rem] font-medium">
+                        {pick(item.designName, "en")}
+                      </span>
+                    )}
                     <span className="text-mist mt-0.5 block font-mono text-[0.6875rem]">
                       {item.sku}
                     </span>

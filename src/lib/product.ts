@@ -11,7 +11,8 @@
  * and the admin all agree on the answer.
  */
 
-import type { CartItem, Product, ProductVariant } from "@/types";
+import { cartKey } from "@/lib/utils";
+import type { CartItem, Product, ProductDesign, ProductVariant } from "@/types";
 
 /* -------------------------------------------------------------------------- */
 /*  Type                                                                      */
@@ -33,15 +34,69 @@ export function hasOptions(product: Product): boolean {
 }
 
 /* -------------------------------------------------------------------------- */
+/*  Designs                                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Artwork options a customer may actually pick.
+ *
+ * A design withdrawn from sale keeps its record — orders that already carry it
+ * must still render its name on the invoice — so it is filtered here rather
+ * than deleted. `available` defaults to true, because a design written before
+ * the flag existed is on sale.
+ */
+export function sellableDesigns(product: Product): ProductDesign[] {
+  return (product.designs ?? [])
+    .filter((d) => d.available !== false)
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+}
+
+/** Does this product ask the customer to choose an artwork? */
+export function hasDesigns(product: Product): boolean {
+  return sellableDesigns(product).length > 0;
+}
+
+export function designFor(product: Product, designId: string): ProductDesign | undefined {
+  return product.designs?.find((d) => d.id === designId);
+}
+
+/**
+ * The gallery for a chosen design, falling back to the product's own shots.
+ *
+ * The fallback is what lets a merchant add a fifth embroidery without
+ * re-photographing the garment: the design shows its thumbnail in the picker
+ * and the product's images in the gallery until its own are uploaded.
+ */
+export function imagesFor(product: Product, designId = "", colorId = "") {
+  const design = designId ? designFor(product, designId) : undefined;
+  const pool = design?.images?.length ? design.images : product.images;
+  if (!colorId) return pool;
+  const forColour = pool.filter((i) => i.colorId === colorId);
+  return forColour.length > 0 ? forColour : pool;
+}
+
+/* -------------------------------------------------------------------------- */
 /*  Variants                                                                  */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * The one permutation a colour, size and design resolve to.
+ *
+ * `designId` is matched loosely against an absent one: a product that gained
+ * designs after its variants were written has rows with no `designId`, and
+ * refusing to match those would make the whole product unbuyable the moment a
+ * design was added. So an unset variant design matches anything, and once the
+ * merchant expands the grid the exact rows take over.
+ */
 export function variantFor(
   product: Product,
   colorId: string,
   sizeId: string,
+  designId = "",
 ): ProductVariant | undefined {
-  return product.variants?.find((v) => v.colorId === colorId && v.sizeId === sizeId);
+  const rows = product.variants?.filter((v) => v.colorId === colorId && v.sizeId === sizeId);
+  if (!rows || rows.length === 0) return undefined;
+  return rows.find((v) => (v.designId ?? "") === designId) ?? rows.find((v) => !v.designId);
 }
 
 /**
@@ -52,25 +107,54 @@ export function variantFor(
  * would advertise the whole product's stock for every size, so it reports 0
  * and the size renders as unavailable — the honest answer when we do not know.
  */
-export function stockFor(product: Product, colorId: string, sizeId: string): number {
+export function stockFor(
+  product: Product,
+  colorId: string,
+  sizeId: string,
+  designId = "",
+): number {
   if (!isVariable(product)) return product.totalStock;
   if (!product.variants) return 0;
-  return variantFor(product, colorId, sizeId)?.stock ?? 0;
+  return variantFor(product, colorId, sizeId, designId)?.stock ?? 0;
 }
 
 /** Colours that have at least one in-stock size. */
-export function availableColorIds(product: Product): string[] {
+export function availableColorIds(product: Product, designId = ""): string[] {
   if (!isVariable(product) || !product.variants) return [];
   const seen = new Set<string>();
-  for (const v of product.variants) if (v.stock > 0) seen.add(v.colorId);
+  for (const v of product.variants) {
+    if (v.stock > 0 && matchesDesign(v, designId)) seen.add(v.colorId);
+  }
   return product.colors.filter((c) => seen.has(c.id)).map((c) => c.id);
 }
 
+/** A variant with no design of its own belongs to every design. */
+function matchesDesign(variant: ProductVariant, designId: string): boolean {
+  return !variant.designId || variant.designId === designId;
+}
+
+/** Designs with at least one permutation in stock. */
+export function availableDesignIds(product: Product): string[] {
+  if (!isVariable(product) || !product.variants) return sellableDesigns(product).map((d) => d.id);
+  const seen = new Set<string>();
+  let unscoped = false;
+  for (const v of product.variants) {
+    if (v.stock <= 0) continue;
+    if (v.designId) seen.add(v.designId);
+    else unscoped = true;
+  }
+  return sellableDesigns(product)
+    .filter((d) => unscoped || seen.has(d.id))
+    .map((d) => d.id);
+}
+
 /** Sizes in stock for one colour — what greys out the size grid. */
-export function availableSizeIds(product: Product, colorId: string): string[] {
+export function availableSizeIds(product: Product, colorId: string, designId = ""): string[] {
   if (!isVariable(product) || !product.variants) return [];
   const seen = new Set<string>();
-  for (const v of product.variants) if (v.colorId === colorId && v.stock > 0) seen.add(v.sizeId);
+  for (const v of product.variants) {
+    if (v.colorId === colorId && v.stock > 0 && matchesDesign(v, designId)) seen.add(v.sizeId);
+  }
   return product.sizes.filter((s) => seen.has(s.id)).map((s) => s.id);
 }
 
@@ -98,9 +182,14 @@ export interface QuantityCap {
  * `per-order`, because a limit the merchant set is the more useful thing to
  * tell the customer and does not expire when stock is replenished.
  */
-export function quantityCap(product: Product, colorId = "", sizeId = ""): QuantityCap {
+export function quantityCap(
+  product: Product,
+  colorId = "",
+  sizeId = "",
+  designId = "",
+): QuantityCap {
   const stock = isVariable(product)
-    ? stockFor(product, colorId, sizeId)
+    ? stockFor(product, colorId, sizeId, designId)
     : product.totalStock;
 
   const limit = product.maxPerOrder;
@@ -128,6 +217,7 @@ export interface Selection {
   stock: number;
   cap: QuantityCap;
   variant?: ProductVariant;
+  design?: ProductDesign;
   /** `false` when a variable product still needs a choice, or stock is zero. */
   buyable: boolean;
 }
@@ -142,6 +232,7 @@ export function resolveSelection(
   product: Product,
   colorId = "",
   sizeId = "",
+  designId = "",
 ): Selection {
   if (!isVariable(product)) {
     const cap = quantityCap(product);
@@ -156,19 +247,33 @@ export function resolveSelection(
     };
   }
 
-  const variant = variantFor(product, colorId, sizeId);
+  const variant = variantFor(product, colorId, sizeId, designId);
   const stock = variant?.stock ?? 0;
-  const cap = quantityCap(product, colorId, sizeId);
+  const cap = quantityCap(product, colorId, sizeId, designId);
+  const design = designId ? designFor(product, designId) : undefined;
+
+  /*
+   * The design's surcharge applies on top of whichever price won — a variant
+   * override is about that permutation, the delta is about the artwork, and
+   * one must not silently cancel the other.
+   */
+  const base = variant?.priceOverride ?? product.price;
 
   return {
     sku: variant?.sku ?? product.sku,
     gtin: variant?.gtin,
-    price: variant?.priceOverride ?? product.price,
+    price: Math.max(0, base + (design?.priceDelta ?? 0)),
     compareAtPrice: product.compareAtPrice,
     stock,
     cap,
     variant,
-    buyable: product.status === "active" && Boolean(variant) && stock > 0,
+    design,
+    // A product that offers artwork is not resolved until one is picked.
+    buyable:
+      product.status === "active" &&
+      Boolean(variant) &&
+      stock > 0 &&
+      (!hasDesigns(product) || Boolean(design)),
   };
 }
 
@@ -243,11 +348,17 @@ export function buildCartItem(
   colorId: string,
   sizeId: string,
   quantity: number,
+  designId = "",
 ): CartItem {
   const color = product.colors.find((c) => c.id === colorId);
   const size = product.sizes.find((s) => s.id === sizeId);
-  const image =
-    product.images.find((i) => i.colorId === colorId) ??
+
+  /*
+   * The design's own shot when it has one, so the bag shows the artwork the
+   * customer chose rather than the garment's stock photograph. Four tees that
+   * differ only by embroidery would otherwise be four identical thumbnails.
+   */
+  const image = imagesFor(product, designId, colorId)[0] ??
     product.images[0] ?? {
       url: "/demo/campaign-bone.svg",
       alt: product.title.en,
@@ -256,7 +367,7 @@ export function buildCartItem(
     };
 
   return {
-    key: `${product.id}:${colorId}:${sizeId}`,
+    key: cartKey(product.id, colorId, sizeId, designId),
     productId: product.id,
     sku: selection.sku,
     gtin: selection.gtin,
@@ -267,6 +378,9 @@ export function buildCartItem(
     colorName: color?.name ?? { en: "", ar: "" },
     sizeId,
     sizeLabel: size?.label ?? "",
+    ...(designId
+      ? { designId, designName: selection.design?.name ?? { en: "", ar: "" } }
+      : {}),
     unitPrice: selection.price,
     compareAtPrice: selection.compareAtPrice,
     currency: product.currency,

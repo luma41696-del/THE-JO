@@ -112,6 +112,14 @@ export const productConverter: FirestoreDataConverter<Product> = {
       sku: typeof raw.sku === "string" && raw.sku ? raw.sku : snapshot.id.toUpperCase(),
       upsellIds: Array.isArray(raw.upsellIds) ? raw.upsellIds : [],
       crossSellIds: Array.isArray(raw.crossSellIds) ? raw.crossSellIds : [],
+      /*
+       * Defaulted, not left undefined. `sellableDesigns` and the picker both
+       * read this on every product, and an absent array reaching a component
+       * that maps over it is the failure mode that took down product routes
+       * once already: it type-checks, because the field is optional, and
+       * throws at render on documents written before the field existed.
+       */
+      designs: Array.isArray(raw.designs) ? raw.designs : [],
       // Falling back to the leaf id keeps ancestry queries working on a
       // pre-tree document — it just cannot match against a parent yet.
       categoryPath: Array.isArray(raw.categoryPath) && raw.categoryPath.length > 0

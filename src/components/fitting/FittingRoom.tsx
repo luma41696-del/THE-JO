@@ -11,7 +11,7 @@ import { formatPrice, t } from "@/lib/format";
 import { recommendSize, type BodyProfile } from "@/lib/fitting";
 import { avatarFromProfile } from "@/lib/fitting/avatar";
 import { SKIP_TEXT, isBuyable, suggestLook, type SkipReason } from "@/lib/fitting/suggest";
-import { resolveSelection } from "@/lib/product";
+import { hasDesigns, resolveSelection } from "@/lib/product";
 import { getIdToken } from "@/lib/firebase/auth";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { useCart } from "@/lib/store/cart";
@@ -296,6 +296,22 @@ export function FittingRoom({
 
       const colorId = colourIdFor(slot, product);
       const sizeId = fit.recommendedSizeId || product.sizes[0]?.id || "";
+
+      /*
+       * A piece sold with several artworks needs one chosen, and the fitting
+       * room has no picker for it — the figure shows silhouette, not
+       * embroidery. Sending the customer to the product page is the honest
+       * answer; adding a design nobody chose would put the wrong garment in
+       * the bag, and letting `add` refuse would report "sold out", which is
+       * simply untrue.
+       */
+      if (hasDesigns(product)) {
+        failures.push({
+          title,
+          why: rtl ? "اختر التصميم من صفحة المنتج" : "choose a design on its product page",
+        });
+        continue;
+      }
 
       // `add` returns null when the variant is unbuyable. The old code
       // ignored that and showed "Added" regardless.

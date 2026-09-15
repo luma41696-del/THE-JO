@@ -9,6 +9,7 @@ import { categoryPathFor } from "@/lib/categories";
 import type {
   Localized,
   Product,
+  ProductDesign,
   ProductImage,
   ProductType,
   ProductVariant,
@@ -46,6 +47,7 @@ interface Body {
 
   images?: ProductImage[];
   variants?: ProductVariant[];
+  designs?: ProductDesign[];
   type?: ProductType;
   sku?: string;
   gtin?: string | null;
@@ -182,6 +184,7 @@ export async function POST(request: Request) {
           sku: String(v.sku),
           colorId: String(v.colorId ?? ""),
           sizeId: String(v.sizeId ?? ""),
+          ...(v.designId ? { designId: String(v.designId) } : {}),
           stock: Math.max(0, Math.floor(Number(v.stock) || 0)),
           ...(v.priceOverride === undefined || v.priceOverride === null
             ? {}
@@ -191,6 +194,79 @@ export async function POST(request: Request) {
         }))
         .slice(0, 400)
     : undefined;
+
+  /*
+   * Artwork options.
+   *
+   * Rebuilt field by field for the same reason as images: a design carries a
+   * thumbnail URL that is rendered through `next/image`, so an off-bucket URL
+   * would be a way to serve an executable SVG from a trusted path. The same
+   * allow-list applies, and a design whose thumbnail fails it is dropped
+   * rather than stored pointing somewhere else.
+   */
+  const designs = Array.isArray(body.designs)
+    ? body.designs
+        .filter(
+          (d): d is ProductDesign =>
+            Boolean(d) && typeof d.id === "string" && Boolean(d.thumbnail?.url),
+        )
+        .filter(
+          (d) =>
+            d.thumbnail.url.startsWith("/demo/") ||
+            d.thumbnail.url.includes("firebasestorage.googleapis.com") ||
+            d.thumbnail.url.includes(".firebasestorage.app"),
+        )
+        .map((d, index) => ({
+          id: String(d.id).slice(0, 64),
+          name: {
+            en: String(d.name?.en ?? "").trim().slice(0, 80),
+            ar: String(d.name?.ar ?? "").trim().slice(0, 80),
+          },
+          thumbnail: {
+            url: d.thumbnail.url,
+            alt: typeof d.thumbnail.alt === "string" ? d.thumbnail.alt.trim().slice(0, 300) : "",
+            width: Number.isFinite(Number(d.thumbnail.width)) ? Math.round(Number(d.thumbnail.width)) : 600,
+            height: Number.isFinite(Number(d.thumbnail.height)) ? Math.round(Number(d.thumbnail.height)) : 600,
+          },
+          ...(d.priceDelta === undefined || d.priceDelta === null || Number(d.priceDelta) === 0
+            ? {}
+            : { priceDelta: money(Number(d.priceDelta), "JOD") }),
+          available: d.available !== false,
+          position: typeof d.position === "number" ? d.position : index,
+        }))
+        .slice(0, 60)
+    : undefined;
+
+  if (designs) {
+    // Both languages or neither, exactly as every other customer-facing name
+    // on this product — a picker labelled in English on the Arabic site is a
+    // half-translated shop.
+    const unnamed = designs.find((d) => !d.name.en || !d.name.ar);
+    if (unnamed) {
+      return bad(`The design "${unnamed.id}" needs a name in both English and Arabic.`);
+    }
+
+    const ids = new Set<string>();
+    const duplicate = designs.find((d) => (ids.has(d.id) ? true : (ids.add(d.id), false)));
+    if (duplicate) {
+      return bad(`Two designs share the id "${duplicate.id}".`);
+    }
+  }
+
+  /*
+   * A variant may only name a design that exists on this product.
+   *
+   * Without this, renaming or re-adding a design leaves orphan rows: stock
+   * that no picker can reach, counted in the product's total, so the
+   * storefront advertises units nobody can buy.
+   */
+  if (variants && designs && designs.length > 0) {
+    const known = new Set(designs.map((d) => d.id));
+    const orphan = variants.find((v) => v.designId && !known.has(v.designId));
+    if (orphan) {
+      return bad(`Variant ${orphan.sku} points at design "${orphan.designId}", which does not exist.`);
+    }
+  }
 
   if (variants) {
     const bad = variants.find((v) => v.gtin && !isValidGtin(v.gtin));
@@ -242,6 +318,7 @@ export async function POST(request: Request) {
     currency: "JOD" as const,
     ...(images ? { images } : {}),
     ...(variants ? { variants } : {}),
+    ...(designs ? { designs } : {}),
     totalStock: derivedStock ?? totalStock,
     // Derived, never trusted from the body.
     inStock: (derivedStock ?? totalStock) > 0,

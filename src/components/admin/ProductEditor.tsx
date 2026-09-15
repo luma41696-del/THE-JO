@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/Button";
 import type {
   Category,
   Product,
+  ProductDesign,
   ProductImage,
   ProductType,
   ProductVariant,
@@ -149,16 +150,89 @@ export function ProductEditor({
    */
   const [variants, setVariants] = useState<ProductVariant[]>(product?.variants ?? []);
 
-  const variantAt = (colorId: string, sizeId: string) =>
-    variants.find((v) => v.colorId === colorId && v.sizeId === sizeId);
+  /*
+   * Artwork options — embroideries, prints, placements.
+   *
+   * A third axis, so the grid below is shown one design at a time rather than
+   * as a colour × size × design cube. A merchant editing stock is looking at
+   * one artwork's table; a flattened cube of forty inputs is not a table
+   * anybody can read, let alone keep correct.
+   */
+  const [designs, setDesigns] = useState<ProductDesign[]>(product?.designs ?? []);
+  const [gridDesignId, setGridDesignId] = useState<string>(product?.designs?.[0]?.id ?? "");
+  const [designBusy, setDesignBusy] = useState(false);
 
-  function setVariantStock(colorId: string, sizeId: string, stock: number) {
+  const variantAt = (colorId: string, sizeId: string, designId: string) => {
+    const rows = variants.filter((v) => v.colorId === colorId && v.sizeId === sizeId);
+    // An unscoped row predates designs and stands for all of them, exactly as
+    // `variantFor` resolves it on the storefront.
+    return rows.find((v) => (v.designId ?? "") === designId) ?? rows.find((v) => !v.designId);
+  };
+
+  function setVariantStock(colorId: string, sizeId: string, designId: string, stock: number) {
     const safe = Math.max(0, Math.floor(Number.isFinite(stock) ? stock : 0));
-    setVariants((current) =>
-      current.map((v) =>
-        v.colorId === colorId && v.sizeId === sizeId ? { ...v, stock: safe } : v,
-      ),
-    );
+    const target = variantAt(colorId, sizeId, designId);
+    if (!target) return;
+    setVariants((current) => current.map((v) => (v.sku === target.sku ? { ...v, stock: safe } : v)));
+  }
+
+  function patchDesign(id: string, patch: Partial<ProductDesign>) {
+    setDesigns((current) => current.map((d) => (d.id === id ? { ...d, ...patch } : d)));
+  }
+
+  function moveDesign(index: number, delta: number) {
+    setDesigns((current) => {
+      const next = [...current];
+      const target = index + delta;
+      if (target < 0 || target >= next.length) return current;
+      [next[index], next[target]] = [next[target]!, next[index]!];
+      return next.map((d, i) => ({ ...d, position: i }));
+    });
+  }
+
+  /**
+   * Withdraw a design rather than delete it.
+   *
+   * Orders already placed carry the design's name on their lines, and the
+   * admin resolves that name from the product. Deleting the record would turn
+   * a customer's invoice into "Boxy Cotton Tee · Bone · M" with the one detail
+   * that identified it missing. `available: false` takes it out of the picker
+   * and leaves the history intact.
+   */
+  function withdrawDesign(id: string) {
+    patchDesign(id, { available: false });
+  }
+
+  async function addDesign(file: File) {
+    if (!product) return;
+    const name = window.prompt("Design name (English)")?.trim();
+    if (!name) return;
+    const nameAr = window.prompt("اسم التصميم (بالعربية)")?.trim() || name;
+    const alt = window.prompt("Describe the thumbnail for screen readers", `${name} — `)?.trim();
+    if (!alt) {
+      setUploadError("A design thumbnail needs alt text. Nothing was uploaded.");
+      return;
+    }
+
+    setDesignBusy(true);
+    setUploadError(null);
+    try {
+      const thumbnail = await uploadProductImage(product.id, file, alt);
+      const id = `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-${Date.now()
+        .toString(36)
+        .slice(-4)}`;
+      setDesigns((current) => [
+        ...current,
+        { id, name: { en: name, ar: nameAr }, thumbnail, available: true, position: current.length },
+      ]);
+      setGridDesignId((current) => current || id);
+    } catch (error) {
+      setUploadError(
+        error instanceof Error ? error.message : "That thumbnail could not be uploaded.",
+      );
+    } finally {
+      setDesignBusy(false);
+    }
   }
 
   async function handleFiles(list: FileList | null) {
@@ -269,6 +343,9 @@ export function ProductEditor({
           images,
           // Only sent for a variable product; a simple one keeps its own total.
           ...(draft.type === "variable" && variants.length > 0 ? { variants } : {}),
+          // Sent even when empty, so removing the last design actually clears
+          // it rather than leaving the old array in place.
+          ...(draft.type === "variable" ? { designs } : {}),
           status: draft.status,
           tags: draft.tags.split(",").map((t) => t.trim()).filter(Boolean),
           type: draft.type,
@@ -495,11 +572,189 @@ export function ProductEditor({
             </Panel>
           )}
 
+          {/*
+            Designs — the artwork axis.
+
+            Variable products only: a simple product is one trade item, and an
+            embroidery picker on it would promise a choice the order cannot
+            carry.
+          */}
+          {product && draft.type === "variable" && (
+            <Panel
+              title="Designs"
+              description="Embroideries or prints, chosen separately from colour."
+            >
+              {designs.length === 0 && (
+                <p className="text-mist text-[0.8125rem]">
+                  None. Add one only if this product genuinely sells several
+                  artworks — a single-design product needs no picker.
+                </p>
+              )}
+
+              {designs.length > 0 && (
+                <ul className="divide-line divide-y">
+                  {designs.map((design, index) => (
+                    <li key={design.id} className="flex items-center gap-3 py-3">
+                      <span className="bg-paper-sunken rounded-sm relative h-12 w-12 shrink-0 overflow-hidden">
+                        <Image
+                          src={design.thumbnail.url}
+                          alt=""
+                          fill
+                          sizes="48px"
+                          className="object-cover"
+                        />
+                      </span>
+
+                      <span className="grid min-w-0 flex-1 gap-1.5 sm:grid-cols-2">
+                        <input
+                          value={design.name.en}
+                          onChange={(e) =>
+                            patchDesign(design.id, {
+                              name: { ...design.name, en: e.target.value },
+                            })
+                          }
+                          aria-label={`English name for design ${index + 1}`}
+                          className="border-line focus:border-brand bg-paper rounded-sm border px-2 py-1 text-[0.8125rem] outline-none"
+                        />
+                        <input
+                          value={design.name.ar}
+                          dir="rtl"
+                          onChange={(e) =>
+                            patchDesign(design.id, {
+                              name: { ...design.name, ar: e.target.value },
+                            })
+                          }
+                          aria-label={`Arabic name for design ${index + 1}`}
+                          className="border-line focus:border-brand bg-paper rounded-sm border px-2 py-1 text-[0.8125rem] outline-none"
+                        />
+                      </span>
+
+                      <label className="shrink-0 text-center">
+                        <span className="text-mist block text-[0.625rem] tracking-[0.1em] uppercase">
+                          +/- JOD
+                        </span>
+                        <input
+                          type="number"
+                          step={step}
+                          value={design.priceDelta ?? 0}
+                          onChange={(e) =>
+                            patchDesign(design.id, { priceDelta: Number(e.target.value) || 0 })
+                          }
+                          className="border-line focus:border-brand bg-paper w-20 rounded-sm border px-2 py-1 text-center text-[0.75rem] tabular-nums outline-none"
+                        />
+                      </label>
+
+                      <span className="flex shrink-0 items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => moveDesign(index, -1)}
+                          disabled={index === 0}
+                          aria-label="Move up"
+                          className="text-mist hover:text-ink cursor-pointer px-1 disabled:opacity-25"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveDesign(index, 1)}
+                          disabled={index === designs.length - 1}
+                          aria-label="Move down"
+                          className="text-mist hover:text-ink cursor-pointer px-1 disabled:opacity-25"
+                        >
+                          ↓
+                        </button>
+                        {design.available === false ? (
+                          <button
+                            type="button"
+                            onClick={() => patchDesign(design.id, { available: true })}
+                            className="text-brand cursor-pointer px-2 text-[0.75rem] underline-offset-4 hover:underline"
+                          >
+                            Restore
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => withdrawDesign(design.id)}
+                            title="Takes it out of the picker; past orders keep the name"
+                            className="text-mist hover:text-alert cursor-pointer px-2 text-[0.75rem] underline-offset-4 hover:underline"
+                          >
+                            Withdraw
+                          </button>
+                        )}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <label
+                className={cn(
+                  "border-line hover:border-brand text-ink-muted hover:text-brand rounded-pill mt-4 inline-block border px-4 py-2 text-[0.8125rem]",
+                  designBusy ? "cursor-wait opacity-60" : "cursor-pointer",
+                )}
+              >
+                {designBusy ? "Uploading…" : "Add a design"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  disabled={designBusy}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (file) void addDesign(file);
+                  }}
+                  className="sr-only"
+                />
+              </label>
+
+              {designs.length > 0 && (
+                <p className="text-mist mt-3 text-[0.75rem]">
+                  Withdrawn designs stay on past orders and invoices. Stock is
+                  per design below — a design with no stock rows reads as sold
+                  out on the storefront.
+                </p>
+              )}
+            </Panel>
+          )}
+
           {/* A simple product has no matrix to show. An empty variants table
               under a "Stock is held per variant" heading reads as data that
               failed to load, rather than a product type that has none. */}
           {product && draft.type === "variable" && (
             <Panel title="Variants" description="Stock is held per variant, not on the product.">
+              {/*
+                One design's table at a time. A colour × size × design cube
+                rendered flat is forty inputs with no headings a person can
+                follow; picking the artwork first turns it back into the grid
+                the merchant already knows.
+              */}
+              {designs.length > 0 && (
+                <div
+                  className="ns-no-scrollbar mb-4 flex gap-2 overflow-x-auto"
+                  role="group"
+                  aria-label="Design being edited"
+                >
+                  {designs.map((design) => (
+                    <button
+                      key={design.id}
+                      type="button"
+                      onClick={() => setGridDesignId(design.id)}
+                      aria-pressed={gridDesignId === design.id}
+                      className={cn(
+                        "rounded-pill shrink-0 cursor-pointer border px-3 py-1.5 text-[0.75rem] transition-colors",
+                        gridDesignId === design.id
+                          ? "border-ink bg-ink text-white"
+                          : "border-line text-ink-muted hover:border-ink/40",
+                        design.available === false && "opacity-45",
+                      )}
+                    >
+                      {design.name.en || design.id}
+                      {design.available === false && " (withdrawn)"}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <div className="overflow-x-auto">
                 <table className="w-full text-[0.8125rem]">
                   <thead>
@@ -525,7 +780,7 @@ export function ProductEditor({
                           </span>
                         </td>
                         {product.sizes.map((size) => {
-                          const variant = variantAt(color.id, size.id);
+                          const variant = variantAt(color.id, size.id, gridDesignId);
                           return (
                             <td key={size.id} className="py-2.5 text-center">
                               <input
@@ -533,10 +788,17 @@ export function ProductEditor({
                                 min={0}
                                 value={variant?.stock ?? 0}
                                 disabled={!variant}
-                                aria-label={`Stock for ${color.name.en} ${size.label}`}
+                                aria-label={`Stock for ${color.name.en} ${size.label}${
+                                  gridDesignId ? ` ${gridDesignId}` : ""
+                                }`}
                                 title={variant ? variant.sku : "This permutation is not sold"}
                                 onChange={(event) =>
-                                  setVariantStock(color.id, size.id, Number(event.target.value))
+                                  setVariantStock(
+                                    color.id,
+                                    size.id,
+                                    gridDesignId,
+                                    Number(event.target.value),
+                                  )
                                 }
                                 className="border-line focus:border-brand bg-paper w-14 rounded-sm border px-2 py-1 text-center text-[0.75rem] tabular-nums outline-none disabled:opacity-30"
                               />
@@ -550,10 +812,13 @@ export function ProductEditor({
               </div>
               <p className="text-mist mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[0.75rem]">
                 <span>
-                  Total across variants:{" "}
+                  Total across all variants:{" "}
                   <strong className="text-ink tabular-nums">
                     {variants.reduce((sum, v) => sum + v.stock, 0)}
                   </strong>
+                  {/* Named explicitly: with designs on screen, an unqualified
+                      "total" reads as the total of the table being looked at,
+                      which it is not. */}
                 </span>
                 <span>
                   {/* The product's own total is derived server-side from these

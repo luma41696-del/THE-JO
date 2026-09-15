@@ -15,7 +15,10 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Price } from "@/components/ui/Price";
 import {
+  availableDesignIds,
   availableSizeIds,
+  imagesFor,
+  sellableDesigns,
   gtinKind,
   hasOptions,
   isSoldIndividually,
@@ -75,17 +78,29 @@ export function ProductDetail({
    * disabled button with no explanation is the worst first frame a product
    * page can have.
    */
+  const designs = useMemo(() => sellableDesigns(product), [product]);
+
   const firstBuyable = useMemo(() => {
-    if (!variable) return { colorId: "", sizeId: null as string | null };
+    const blank = { colorId: "", sizeId: null as string | null, designId: "" };
+    if (!variable) return blank;
+
+    // Same reasoning one axis out: open on an artwork that is actually in
+    // stock, so the page does not greet a customer with a disabled button.
+    const stockedDesigns = availableDesignIds(product);
+    const designId = stockedDesigns[0] ?? designs[0]?.id ?? "";
+
     for (const color of product.colors) {
-      const sizes = availableSizeIds(product, color.id);
-      if (sizes.length > 0) return { colorId: color.id, sizeId: sizes.length === 1 ? sizes[0]! : null };
+      const sizes = availableSizeIds(product, color.id, designId);
+      if (sizes.length > 0) {
+        return { colorId: color.id, sizeId: sizes.length === 1 ? sizes[0]! : null, designId };
+      }
     }
-    return { colorId: product.colors[0]?.id ?? "", sizeId: null as string | null };
-  }, [product, variable]);
+    return { colorId: product.colors[0]?.id ?? "", sizeId: null as string | null, designId };
+  }, [product, variable, designs]);
 
   const [colorId, setColorId] = useState(firstBuyable.colorId);
   const [sizeId, setSizeId] = useState<string | null>(firstBuyable.sizeId);
+  const [designId, setDesignId] = useState(firstBuyable.designId);
   const [quantity, setQuantity] = useState(1);
   const [sizeError, setSizeError] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -94,14 +109,20 @@ export function ProductDetail({
 
   /** The trade item currently selected: SKU, GTIN, price, stock and cap. */
   const selection = useMemo(
-    () => resolveSelection(product, colorId, sizeId ?? ""),
-    [product, colorId, sizeId],
+    () => resolveSelection(product, colorId, sizeId ?? "", designId),
+    [product, colorId, sizeId, designId],
   );
 
   /** Sizes with stock in the chosen colour — everything else greys out. */
   const inStockSizes = useMemo(
-    () => (variable ? new Set(availableSizeIds(product, colorId)) : new Set<string>()),
-    [product, colorId, variable],
+    () => (variable ? new Set(availableSizeIds(product, colorId, designId)) : new Set<string>()),
+    [product, colorId, variable, designId],
+  );
+
+  /** Artworks with stock somewhere — the rest render dimmed, not hidden. */
+  const inStockDesigns = useMemo(
+    () => new Set(availableDesignIds(product)),
+    [product],
   );
 
   const add = useCart((s) => s.add);
@@ -109,12 +130,18 @@ export function ProductDetail({
   const toggleWish = useWishlist((s) => s.toggle);
   const wished = useWishlist((s) => s.has(product.id));
 
-  const gallery = useMemo(() => {
-    const forColor = product.images.filter((i) => i.colorId === colorId);
-    return forColor.length > 0 ? forColor : product.images;
-  }, [product.images, colorId]);
+  /*
+   * The gallery follows the artwork first and the colour second: a customer
+   * who taps an embroidery expects to see that embroidery, and a design with
+   * its own shots falls back to the product's when it has none.
+   */
+  const gallery = useMemo(
+    () => imagesFor(product, designId, colorId),
+    [product, designId, colorId],
+  );
 
   const color = product.colors.find((c) => c.id === colorId);
+  const design = designs.find((d) => d.id === designId);
   const size = product.sizes.find((s) => s.id === sizeId);
   const image = gallery[Math.min(activeImage, gallery.length - 1)];
 
@@ -130,7 +157,7 @@ export function ProductDetail({
     // A beat of deliberate latency: an instant state flip reads as a glitch,
     // and this is where a real stock check would happen.
     await new Promise((resolve) => setTimeout(resolve, 420));
-    add({ product, colorId, sizeId: sizeId ?? "", quantity });
+    add({ product, colorId, sizeId: sizeId ?? "", designId, quantity });
     setAdding(false);
     setAdded(true);
     setTimeout(() => {
@@ -272,6 +299,81 @@ export function ProductDetail({
             )}
           </div>
 
+          {/*
+            Design — thumbnails, above colour.
+
+            Above it on purpose: the artwork is the thing a customer is
+            choosing between when a shop sells one garment with four
+            embroideries, and the colour row underneath answers "in which
+            shade". Reversing them makes the page ask the smaller question
+            first.
+          */}
+          {designs.length > 0 && (
+            <fieldset className="mt-8">
+              <legend className="text-eyebrow font-display text-mist mb-3 uppercase">
+                {rtl ? "التصميم" : "Design"}
+                <span className="text-ink ms-2 normal-case tracking-normal">
+                  {design ? t(design.name, locale) : ""}
+                </span>
+              </legend>
+
+              <div className="ns-no-scrollbar flex gap-2.5 overflow-x-auto pb-1">
+                {designs.map((option) => {
+                  const depleted = !inStockDesigns.has(option.id);
+                  const selected = designId === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => {
+                        setDesignId(option.id);
+                        setActiveImage(0);
+                        // The chosen size may not be cut for this artwork.
+                        const next = availableSizeIds(product, colorId, option.id);
+                        if (sizeId && !next.includes(sizeId)) setSizeId(null);
+                      }}
+                      aria-pressed={selected}
+                      title={t(option.name, locale)}
+                      className={cn(
+                        "rounded-md relative h-16 w-16 shrink-0 cursor-pointer overflow-hidden transition-all duration-300",
+                        "ring-offset-paper ring-offset-2",
+                        selected ? "ring-ink ring-2" : "ring-ink/12 hover:ring-ink/35 ring-1",
+                        // Selectable but visibly depleted, like the colours.
+                        depleted && "opacity-35",
+                      )}
+                      data-cursor="hover"
+                    >
+                      <Image
+                        src={option.thumbnail.url}
+                        alt={t(option.name, locale)}
+                        fill
+                        sizes="64px"
+                        className="object-cover"
+                      />
+                      <span className="sr-only">
+                        {t(option.name, locale)}
+                        {depleted ? (rtl ? " — نفدت الكمية" : " — sold out") : ""}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* A surcharge is stated where it is chosen, not at the total. */}
+              {design?.priceDelta ? (
+                <p className="text-smoke mt-2 text-[0.8125rem]">
+                  {design.priceDelta > 0
+                    ? rtl
+                      ? `يضيف ${formatPrice(design.priceDelta, product.currency, locale)} للسعر`
+                      : `Adds ${formatPrice(design.priceDelta, product.currency, locale)}`
+                    : rtl
+                      ? `يخصم ${formatPrice(Math.abs(design.priceDelta), product.currency, locale)}`
+                      : `Saves ${formatPrice(Math.abs(design.priceDelta), product.currency, locale)}`}
+                </p>
+              ) : null}
+            </fieldset>
+          )}
+
           {/* Colour — variable products only */}
           {variable && (
             <fieldset className="mt-8">
@@ -290,12 +392,12 @@ export function ProductDetail({
                       setColorId(option.id);
                       setActiveImage(0);
                       // The chosen size may not exist in the new colour.
-                      const next = availableSizeIds(product, option.id);
+                      const next = availableSizeIds(product, option.id, designId);
                       if (sizeId && !next.includes(sizeId)) setSizeId(null);
                     }}
                     aria-pressed={colorId === option.id}
                     aria-label={
-                      availableSizeIds(product, option.id).length === 0
+                      availableSizeIds(product, option.id, designId).length === 0
                         ? `${t(option.name, locale)} — ${rtl ? "نفدت الكمية" : "sold out"}`
                         : t(option.name, locale)
                     }
@@ -306,7 +408,7 @@ export function ProductDetail({
                       colorId === option.id ? "ring-ink ring-2" : "ring-ink/12 hover:ring-ink/35 ring-1",
                       // A colour with nothing left stays selectable — the
                       // customer may want to see it — but reads as depleted.
-                      availableSizeIds(product, option.id).length === 0 && "opacity-35",
+                      availableSizeIds(product, option.id, designId).length === 0 && "opacity-35",
                     )}
                     style={{
                       background: option.hexSecondary

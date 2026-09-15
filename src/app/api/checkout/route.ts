@@ -7,7 +7,7 @@ import {
   getShippingMethods,
 } from "@/lib/catalog";
 import { priceCart } from "@/lib/pricing";
-import { hasOptions, resolveSelection } from "@/lib/product";
+import { designFor, hasDesigns, hasOptions, imagesFor, resolveSelection } from "@/lib/product";
 import { classesInCart } from "@/lib/shipping";
 import { categoryPathsFor, evaluateOffer, redemptionId } from "@/lib/offers";
 import { isPurchasable, unavailableReason } from "@/lib/visibility";
@@ -39,6 +39,8 @@ interface CheckoutLine {
   productId: string;
   colorId: string;
   sizeId: string;
+  /** The chosen artwork, on products that sell several. */
+  designId?: string;
   quantity: number;
 }
 
@@ -139,6 +141,7 @@ export async function POST(request: Request) {
     const variable = hasOptions(product);
     const colorId = variable ? String(line.colorId ?? "") : "";
     const sizeId = variable ? String(line.sizeId ?? "") : "";
+    const designId = String(line.designId ?? "");
 
     if (variable) {
       const color = product.colors.find((c) => c.id === colorId);
@@ -146,7 +149,21 @@ export async function POST(request: Request) {
       if (!color || !size) return bad("That colour and size combination is not available.");
     }
 
-    const image = product.images.find((i) => i.colorId === colorId) ?? product.images[0];
+    /*
+     * The artwork is validated against the catalogue, not accepted as sent.
+     * A design id that was withdrawn, or invented, must not reach the bench —
+     * and a product that offers artwork cannot be ordered without one, or the
+     * packing slip would say "Bone / M" and nothing else.
+     */
+    const design = designId ? designFor(product, designId) : undefined;
+    if (designId && (!design || design.available === false)) {
+      return bad(`That design of ${product.title.en} is not available.`);
+    }
+    if (hasDesigns(product) && !design) {
+      return bad(`Choose a design for ${product.title.en}.`);
+    }
+
+    const image = imagesFor(product, designId, colorId)[0] ?? product.images[0];
     if (!image) return bad("Product imagery is missing.");
 
     /*
@@ -157,7 +174,7 @@ export async function POST(request: Request) {
      * says, and the order is rejected rather than silently trimmed, because
      * quietly shipping fewer than someone paid for is the worse failure.
      */
-    const selection = resolveSelection(product, colorId, sizeId);
+    const selection = resolveSelection(product, colorId, sizeId, designId);
     if (!selection.buyable || selection.cap.max < 1) {
       return bad(`${product.title.en} has sold out.`);
     }
@@ -173,7 +190,7 @@ export async function POST(request: Request) {
     }
 
     priced.push({
-      key: cartKey(product.id, colorId, sizeId),
+      key: cartKey(product.id, colorId, sizeId, designId),
       productId: product.id,
       sku: selection.sku,
       ...(selection.gtin === undefined ? {} : { gtin: selection.gtin }),
@@ -184,6 +201,7 @@ export async function POST(request: Request) {
       colorName: product.colors.find((c) => c.id === colorId)?.name ?? { en: "", ar: "" },
       sizeId,
       sizeLabel: product.sizes.find((sz) => sz.id === sizeId)?.label ?? "",
+      ...(design ? { designId, designName: design.name } : {}),
       // Authoritative price. The browser's number never reaches this object.
       unitPrice: selection.price,
       ...(product.compareAtPrice === undefined ? {} : { compareAtPrice: product.compareAtPrice }),
@@ -397,7 +415,11 @@ export async function POST(request: Request) {
            */
           for (const line of entry.lines) {
             const index_ = variants.findIndex(
-              (v) => v.colorId === line.colorId && v.sizeId === line.sizeId,
+              (v) =>
+                v.colorId === line.colorId &&
+                v.sizeId === line.sizeId &&
+                // An unscoped row predates designs and serves them all.
+                (!v.designId || v.designId === (line.designId ?? "")),
             );
             if (index_ === -1) continue;
             const variant = variants[index_]!;

@@ -60,11 +60,49 @@ export interface ProductSize {
  * A single sellable permutation. Stock lives here, never on the product — a
  * product is "in stock" only if at least one variant is.
  */
+/**
+ * An artwork option — an embroidery, a print, a placement.
+ *
+ * A third axis, deliberately separate from colour. The shop sells tees where
+ * the same bone cotton carries four different embroideries; storing those as
+ * colours would put four identical swatches in the colour row, and the picker
+ * whose job is "which shade" would be answering "which drawing". Worse, the
+ * packing slip would say "Bone" four times and the person at the bench would
+ * have to guess.
+ *
+ * Optional throughout. A product with no designs behaves exactly as before,
+ * which is what keeps every existing product, cart line and order valid.
+ */
+export interface ProductDesign {
+  id: string;
+  name: Localized;
+  /** The chip shown in the picker. Small — it is rendered at ~56px. */
+  thumbnail: ProductImage;
+  /**
+   * Gallery images for this design. When empty the product's own images are
+   * shown, so a design can be added without re-shooting the whole product.
+   */
+  images?: ProductImage[];
+  /** Adds to the product price. Negative is allowed for a plain option. */
+  priceDelta?: number;
+  /** Hidden from the picker without deleting it, so orders keep their history. */
+  available?: boolean;
+  /** Ordering in the picker; ties fall back to array order. */
+  position?: number;
+}
+
 export interface ProductVariant {
   /** Stable SKU, also used as the Firestore document id in `variants`. */
   sku: string;
   colorId: string;
   sizeId: string;
+  /**
+   * The artwork this permutation carries, when the product has designs.
+   *
+   * Empty or absent means "the product's only version" — which is every
+   * variant written before designs existed, so those keep resolving.
+   */
+  designId?: string;
   stock: number;
   /** Overrides the parent price when this permutation is priced differently. */
   priceOverride?: number;
@@ -190,6 +228,13 @@ export interface Product {
   colors: ProductColor[];
   sizes: ProductSize[];
   sizeSystem: SizeSystem;
+  /**
+   * Artwork options, when this product is sold with several.
+   *
+   * Independent of colour on purpose — see `ProductDesign`. Absent or empty
+   * on everything that has one version, which is most of the catalogue.
+   */
+  designs?: ProductDesign[];
   /** Variable products only. One row per sellable permutation. */
   variants?: ProductVariant[];
 
@@ -578,7 +623,16 @@ export interface UserProfile {
  * trusted for money.
  */
 export interface CartItem {
-  /** `${productId}:${colorId}:${sizeId}` — stable, so quantity merges. */
+  /**
+   * `${productId}:${colorId}:${sizeId}`, with `:${designId}` appended only
+   * when a design was chosen.
+   *
+   * Appended rather than always present, so every line already sitting in a
+   * customer's persisted cart keeps the exact key it was written with. A key
+   * format that changed shape would orphan those lines — the stepper and the
+   * remove button both address a line by key, and they would quietly stop
+   * working on the contents of a bag somebody filled last week.
+   */
   key: string;
   productId: string;
   /** The resolved trade item: the variant's SKU, or the product's if simple. */
@@ -595,6 +649,14 @@ export interface CartItem {
   colorName: Localized;
   sizeId: string;
   sizeLabel: string;
+  /**
+   * The chosen artwork, carried all the way to the packing slip.
+   *
+   * The whole point of the axis: whoever pulls the order has to know *which*
+   * embroidery, and "Bone / M" on four different tees does not tell them.
+   */
+  designId?: string;
+  designName?: Localized;
   unitPrice: number;
   compareAtPrice?: number;
   currency: CurrencyCode;

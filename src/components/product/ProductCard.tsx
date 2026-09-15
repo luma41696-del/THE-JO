@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Link } from "@/components/ui/Link";
+import { Link, useLocalizedRouter } from "@/components/ui/Link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import { cn } from "@/lib/utils";
 import { EASE, transition } from "@/lib/motion";
 import { t } from "@/lib/format";
+import { hasDesigns } from "@/lib/product";
 import { useCart } from "@/lib/store/cart";
 import { useUI } from "@/lib/store/ui";
 import { useWishlist } from "@/lib/store/wishlist";
@@ -55,6 +56,7 @@ export function ProductCard({
   const [activeColor, setActiveColor] = useState(product.colors[0]?.id ?? "");
   const [addedSize, setAddedSize] = useState<string | null>(null);
 
+  const router = useLocalizedRouter();
   const add = useCart((s) => s.add);
   const openCart = useUI((s) => s.openCart);
   const toggleWish = useWishlist((s) => s.toggle);
@@ -68,7 +70,20 @@ export function ProductCard({
   const quickSizes = product.sizes.slice(0, 6);
   const soldOut = !product.inStock;
 
+  /*
+   * A product sold with several artworks cannot be quick-added from a hover
+   * rail — there is no honest way to guess which embroidery somebody wants,
+   * and `add` correctly refuses an unresolved line. Rather than let the
+   * button do nothing, the rail sends them to the page where the choice
+   * lives.
+   */
+  const needsDesignChoice = hasDesigns(product);
+
   function quickAdd(sizeId: string) {
+    if (needsDesignChoice) {
+      router.push(`/product/${product.slug}`);
+      return;
+    }
     const item = add({ product, colorId: activeColor, sizeId, quantity: 1 });
     if (!item) return;
     setAddedSize(sizeId);
@@ -191,7 +206,13 @@ export function ProductCard({
             >
               <div className="ns-glass rounded-md shadow-float flex items-center gap-1 p-1.5">
                 <span className="text-mist ps-2 pe-1 text-[0.625rem] tracking-[0.14em] uppercase">
-                  {locale === "ar" ? "أضف" : "Add"}
+                  {needsDesignChoice
+                    ? locale === "ar"
+                      ? "اختر"
+                      : "Pick"
+                    : locale === "ar"
+                      ? "أضف"
+                      : "Add"}
                 </span>
                 <div className="flex flex-1 items-center justify-end gap-1">
                   {quickSizes.map((size) => (
@@ -210,7 +231,11 @@ export function ProductCard({
                           : "text-ink-muted hover:bg-ink hover:text-white",
                       )}
                       data-cursor="hover"
-                      aria-label={`${locale === "ar" ? "أضف مقاس" : "Add size"} ${size.label}`}
+                      aria-label={
+                        needsDesignChoice
+                          ? `${locale === "ar" ? "اختر التصميم لمقاس" : "Choose a design for size"} ${size.label}`
+                          : `${locale === "ar" ? "أضف مقاس" : "Add size"} ${size.label}`
+                      }
                     >
                       {addedSize === size.id ? "✓" : size.label}
                     </button>

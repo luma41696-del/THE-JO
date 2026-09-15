@@ -714,7 +714,13 @@ export function CheckoutFlow({
                       {t(item.title, locale)}
                     </p>
                     <p className="text-smoke mt-0.5 text-[0.75rem]">
-                      {t(item.colorName, locale)} · {item.sizeLabel}
+                      {[
+                        t(item.colorName, locale),
+                        item.sizeLabel,
+                        item.designName && t(item.designName, locale),
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </p>
                     <p className="text-ink mt-1 text-[0.8125rem] tabular-nums">
                       {formatPrice(item.unitPrice * item.quantity, item.currency, locale)}

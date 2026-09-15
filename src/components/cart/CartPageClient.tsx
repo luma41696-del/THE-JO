@@ -357,9 +357,10 @@ export function CartPageClient({
                           </Link>
                           {/* A simple product has neither, and an empty
                               " · Size " reads as a rendering bug. */}
-                          {(item.sizeLabel || t(item.colorName, locale)) && (
+                          {(item.sizeLabel || item.designName || t(item.colorName, locale)) && (
                             <p className="text-smoke mt-1 text-[0.8125rem]">
                               {[
+                                item.designName && t(item.designName, locale),
                                 t(item.colorName, locale),
                                 item.sizeLabel && `${rtl ? "مقاس" : "Size"} ${item.sizeLabel}`,
                               ]

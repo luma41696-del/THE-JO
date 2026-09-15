@@ -34,9 +34,18 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-/** Stable cart-line identity. Same product + colour + size merges quantities. */
-export function cartKey(productId: string, colorId: string, sizeId: string) {
-  return `${productId}:${colorId}:${sizeId}`;
+/**
+ * Stable cart-line identity. Same product + colour + size + design merges.
+ *
+ * The design segment is **appended only when there is one**, so a line written
+ * before designs existed keeps byte-for-byte the same key. Carts are persisted
+ * in the browser and synced to Firestore; a key format that changed shape for
+ * everyone would orphan every line already in a customer's bag, and the
+ * quantity stepper and remove button both address a line by its key.
+ */
+export function cartKey(productId: string, colorId: string, sizeId: string, designId = "") {
+  const base = `${productId}:${colorId}:${sizeId}`;
+  return designId ? `${base}:${designId}` : base;
 }
 
 /** Clamp with no surprises when min > max. */

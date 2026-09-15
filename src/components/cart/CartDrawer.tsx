@@ -204,9 +204,15 @@ export function CartDrawer({ locale = "en" }: { locale?: Locale }) {
                                 {/* Simple products carry no colour or size.
                                     Printing " · " around two empty strings
                                     leaves a stray separator under the title. */}
-                                {(item.sizeLabel || t(item.colorName, locale)) && (
+                                {(item.sizeLabel ||
+                                  item.designName ||
+                                  t(item.colorName, locale)) && (
                                   <p className="text-smoke mt-1 truncate text-[0.75rem]">
-                                    {[t(item.colorName, locale), item.sizeLabel]
+                                    {[
+                                      item.designName && t(item.designName, locale),
+                                      t(item.colorName, locale),
+                                      item.sizeLabel,
+                                    ]
                                       .filter(Boolean)
                                       .join(" · ")}
                                   </p>

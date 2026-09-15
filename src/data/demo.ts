@@ -476,6 +476,8 @@ type Seed = {
   /** Defaults to `variable` — most of this catalogue is garments. */
   type?: ProductType;
   shippingClass?: string;
+  /** Artwork options. Thumbnails reuse the product's own demo imagery. */
+  designs?: { id: string; en: string; ar: string; priceDelta?: number }[];
   /** `1` is the sold-individually case. Undefined means stock is the only cap. */
   maxPerOrder?: number;
   /** Product ids. "Instead of this" on the product page. */
@@ -658,6 +660,17 @@ const SEEDS: Seed[] = [
     ],
     shippingClass: "light",
     upsell: ["featherweight-cashmere-tee"],
+    /*
+     * The one product in the demo catalogue that carries artwork options, so
+     * the picker, the per-design stock grid and the design column on the
+     * packing slip can all be seen working. The rest of the catalogue has no
+     * designs, which is also the point: the axis has to be invisible on a
+     * product that does not use it.
+     */
+    designs: [
+      { id: "palm", en: "Palm", ar: "نخلة" },
+      { id: "wave", en: "Wave", ar: "موجة", priceDelta: 4 },
+    ],
   },
   {
     slug: "wide-leg-trouser",
@@ -908,19 +921,28 @@ function buildProduct(seed: Seed): Product {
 
   if (type === "variable") {
     variants = [];
-    for (const color of colors) {
-      for (const size of sizes) {
-        // A deterministic spread: some permutations sell out, the middle sizes
-        // carry more, and the same rebuild always produces the same shape.
-        const spread = hash(`${seed.slug}:${color.id}:${size.id}`) % 5;
-        const stock = spread === 0 ? 0 : Math.max(1, basePer - spread * 2);
-        variants.push({
-          sku: skuFor(seed.slug, color.id, size.id),
-          colorId: color.id,
-          sizeId: size.id,
-          stock,
-          gtin: gtin13(`${seed.slug}:${color.id}:${size.id}`),
-        });
+    // One row per colour × size × design. A product with no designs keeps a
+    // single unscoped pass, so its rows are byte-for-byte what they were.
+    const designKeys = seed.designs?.map((d) => d.id) ?? [""];
+
+    for (const designId of designKeys) {
+      for (const color of colors) {
+        for (const size of sizes) {
+          // A deterministic spread: some permutations sell out, the middle
+          // sizes carry more, and the same rebuild always produces the same
+          // shape.
+          const key = `${seed.slug}:${color.id}:${size.id}${designId ? `:${designId}` : ""}`;
+          const spread = hash(key) % 5;
+          const stock = spread === 0 ? 0 : Math.max(1, basePer - spread * 2);
+          variants.push({
+            sku: skuFor(seed.slug, color.id, size.id) + (designId ? `-${designId.toUpperCase()}` : ""),
+            colorId: color.id,
+            sizeId: size.id,
+            ...(designId ? { designId } : {}),
+            stock,
+            gtin: gtin13(key),
+          });
+        }
       }
     }
     totalStock = variants.reduce((sum, v) => sum + v.stock, 0);
@@ -965,6 +987,23 @@ function buildProduct(seed: Seed): Product {
     colors,
     sizes,
     sizeSystem: firstSize ? firstSize.system : "one-size",
+    ...(seed.designs
+      ? {
+          designs: seed.designs.map((d, index) => ({
+            id: d.id,
+            name: { en: d.en, ar: d.ar },
+            thumbnail: {
+              url: `/demo/${seed.slug}-${(index % 2) + 1}.svg`,
+              alt: `${d.en} — ${seed.titleEn}`,
+              width: 400,
+              height: 520,
+            },
+            available: true,
+            position: index,
+            ...(d.priceDelta ? { priceDelta: d.priceDelta } : {}),
+          })),
+        }
+      : {}),
     variants,
     // A simple product is the trade item, so it carries the GTIN itself. A
     // variable one leaves it unset: its variants each have their own.
