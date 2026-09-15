@@ -1,13 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  AnimatePresence,
-  motion,
-  useMotionValue,
-  useReducedMotion,
-  useSpring,
-} from "motion/react";
+import { AnimatePresence, motion, useMotionValue, useReducedMotion, useSpring } from "motion/react";
 
 import { EASE } from "@/lib/motion";
 import { BLOB_WAVES, NS_CENTROID, NS_VIEWBOX } from "@/components/brand/paths";
@@ -16,21 +10,24 @@ import { useUI, type CursorMode } from "@/lib/store/ui";
 /**
  * The net sale cursor.
  *
- * The brand mark is a pebble with a detached dot. That maps onto a cursor
- * almost too neatly, so the design takes it literally:
+ * One dot. It *is* the pointer — it tracks the mouse on a stiff spring, so
+ * precision is never traded for style, and there is nothing trailing behind it
+ * to drag the eye away from what is being aimed at.
  *
- *   - the **dot** is the real pointer. It tracks the mouse with zero lag, so
- *     precision is never sacrificed for style;
- *   - the **pebble** trails behind on a spring, morphing through its wave
- *     states. It is the personality; it is also never the thing you aim with.
+ * It used to carry a second element: a pebble from the brand mark that lagged
+ * on a soft spring and morphed through four wave states on a seven-second
+ * loop. That was the personality, and it was also a shape in permanent motion
+ * in the corner of every visitor's eye. This is the quieter reading of the
+ * same idea — the mark shows up on click instead, where it is a response to
+ * something the visitor did rather than ambient movement.
  *
- * Elements opt into states declaratively:
+ * States, declared by the element rather than guessed at:
  *
- *   <button data-cursor="hover">                 bubble swells, dot shrinks
- *   <a data-cursor="view" data-cursor-label="View">   label rides inside
- *   <input data-cursor="text">                   bubble becomes a caret bar
+ *   <button data-cursor="hover">                      the dot doubles
+ *   <a data-cursor="view" data-cursor-label="View">   a label rides under it
+ *   <input data-cursor="text">                        the dot becomes a caret
  *
- * Bailouts, all of them deliberate:
+ * Bailouts, all deliberate:
  *   - no pointer-fine device (touch, most tablets) → never mounts
  *   - `prefers-reduced-motion` → never mounts, OS cursor is restored by CSS
  *   - window blur / pointer leaves the document → fades out
@@ -40,18 +37,30 @@ import { useUI, type CursorMode } from "@/lib/store/ui";
  * visitor with no pointer at all.
  */
 
-const SPRING = { stiffness: 420, damping: 34, mass: 0.55 } as const;
+/**
+ * Stiff and light: with nothing trailing, this spring is the whole feel of the
+ * cursor, and anything softer reads as lag rather than as character.
+ */
 const DOT_SPRING = { stiffness: 1400, damping: 60, mass: 0.25 } as const;
 
-/** Bubble size in px for each state. */
-const SIZE: Record<CursorMode, number> = {
-  default: 26,
-  hover: 58,
-  view: 84,
-  drag: 66,
-  text: 20,
+/**
+ * Dot diameter in px per state.
+ *
+ * `hover` is exactly double `default` — a change big enough to notice in
+ * peripheral vision, small enough that it never covers the thing it is
+ * pointing at. `view` sits between the two because it carries a label.
+ */
+const DOT_SIZE: Record<CursorMode, number> = {
+  default: 8,
+  hover: 16,
+  view: 12,
+  drag: 16,
+  text: 2,
   hidden: 0,
 };
+
+/** The caret's height, when the dot becomes a text bar. */
+const CARET_HEIGHT = 26;
 
 interface Ripple {
   id: number;
@@ -71,11 +80,9 @@ export function BrandCursor() {
   const [ripples, setRipples] = useState<Ripple[]>([]);
   const rippleId = useRef(0);
 
-  // Raw pointer position; the springs below derive everything else from it.
+  // Raw pointer position; the spring below derives everything from it.
   const x = useMotionValue(-100);
   const y = useMotionValue(-100);
-  const bubbleX = useSpring(x, SPRING);
-  const bubbleY = useSpring(y, SPRING);
   const dotX = useSpring(x, DOT_SPRING);
   const dotY = useSpring(y, DOT_SPRING);
 
@@ -162,13 +169,17 @@ export function BrandCursor() {
 
   if (!enabled) return null;
 
-  const size = SIZE[mode];
   const isText = mode === "text";
+  const size = DOT_SIZE[mode];
+  const width = isText ? 2 : size;
+  const height = isText ? CARET_HEIGHT : size;
   const showLabel = Boolean(label) && (mode === "view" || mode === "drag");
 
   return (
     <div className="pointer-events-none fixed inset-0 z-[300] hidden md:block" aria-hidden="true">
-      {/* Click ripples — the logo silhouette, expanding from the click point. */}
+      {/* Click ripples — the logo silhouette, expanding from the click point.
+          The one place the mark still appears, and it is a response to
+          something the visitor did rather than ambient movement. */}
       <AnimatePresence>
         {ripples.map((ripple) => (
           <motion.svg
@@ -203,82 +214,61 @@ export function BrandCursor() {
         ))}
       </AnimatePresence>
 
-      {/* The pebble — trails, morphs, carries the label. */}
+      {/* The dot — the whole cursor. */}
       <motion.div
-        className="absolute top-0 left-0 flex items-center justify-center"
-        style={{ x: bubbleX, y: bubbleY }}
+        className="absolute top-0 left-0"
+        style={{ x: dotX, y: dotY }}
         animate={{ opacity: visible && mode !== "hidden" ? 1 : 0 }}
         transition={{ duration: 0.2, ease: EASE.silk }}
       >
-        <motion.div
-          className="flex items-center justify-center"
+        <motion.span
+          className="bg-brand absolute block rounded-full"
           animate={{
-            width: isText ? 2 : size,
-            height: isText ? 26 : size,
-            scale: pressed ? 0.82 : 1,
+            width,
+            height,
+            marginLeft: -width / 2,
+            marginTop: -height / 2,
+            // A press is the only thing that moves it off its own size.
+            scale: pressed ? 0.75 : 1,
+            borderRadius: isText ? 1 : size,
           }}
-          transition={{ duration: 0.34, ease: EASE.brand }}
-          style={{ marginLeft: isText ? -1 : -size / 2, marginTop: isText ? -13 : -size / 2 }}
-        >
-          {isText ? (
-            <span className="h-full w-full rounded-full bg-brand" />
-          ) : (
-            <motion.svg
-              viewBox={NS_VIEWBOX}
-              fill="none"
-              className="h-full w-full overflow-visible"
+          transition={{ duration: 0.22, ease: EASE.brand }}
+          style={{
+            /*
+             * A hairline of white around the dot.
+             *
+             * Without it the cursor disappears over the brand colour itself —
+             * a brand-filled button, the announcement bar, a sale badge — and
+             * a pointer that vanishes on the shop's own call-to-action is the
+             * one place it must not. Invisible against paper, where the ring
+             * and the background are the same colour.
+             */
+            boxShadow: "0 0 0 1.5px rgba(255,255,255,0.7)",
+          }}
+        />
+
+        {/*
+          The label, under the dot rather than inside a shape.
+          Centred horizontally so it reads the same in both directions — an
+          offset to one side would sit on the wrong side of the pointer in
+          Arabic, and flipping it per locale is a lot of machinery for a chip.
+        */}
+        <AnimatePresence>
+          {showLabel && (
+            <motion.span
+              key={label}
+              className="font-display bg-ink absolute rounded-pill px-2.5 py-1 text-[0.5625rem] font-semibold tracking-[0.16em] whitespace-nowrap text-white uppercase"
+              style={{ left: 0, top: 16, translateX: "-50%" }}
+              initial={{ opacity: 0, y: -4, scale: 0.85 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -4, scale: 0.85 }}
+              transition={{ duration: 0.2, ease: EASE.brand }}
             >
-              <motion.path
-                d={BLOB_WAVES[0]}
-                initial={{ d: BLOB_WAVES[0] }}
-                animate={{
-                  d: [BLOB_WAVES[0], BLOB_WAVES[1], BLOB_WAVES[2], BLOB_WAVES[3], BLOB_WAVES[0]],
-                }}
-                transition={{ duration: 7, ease: "easeInOut", repeat: Infinity }}
-                fill={
-                  mode === "view" || mode === "drag"
-                    ? "var(--color-brand)"
-                    : "var(--color-ink)"
-                }
-                fillOpacity={mode === "default" ? 0.14 : 1}
-                stroke={mode === "default" ? "var(--color-ink)" : "none"}
-                strokeWidth={mode === "default" ? 1.6 : 0}
-                strokeOpacity={0.35}
-              />
-            </motion.svg>
+              {label}
+            </motion.span>
           )}
-
-          <AnimatePresence>
-            {showLabel && (
-              <motion.span
-                key={label}
-                className="font-display absolute text-[0.625rem] font-semibold tracking-[0.18em] text-white uppercase"
-                initial={{ opacity: 0, scale: 0.7 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.7 }}
-                transition={{ duration: 0.22, ease: EASE.brand }}
-              >
-                {label}
-              </motion.span>
-            )}
-          </AnimatePresence>
-        </motion.div>
+        </AnimatePresence>
       </motion.div>
-
-      {/* The dot — the actual pointer. Never lags, never grows large enough to
-          obscure what is underneath it. */}
-      <motion.span
-        className="absolute top-0 left-0 rounded-full bg-brand"
-        style={{ x: dotX, y: dotY }}
-        animate={{
-          width: mode === "view" ? 0 : 6,
-          height: mode === "view" ? 0 : 6,
-          opacity: visible && mode !== "hidden" ? 1 : 0,
-          marginLeft: mode === "view" ? 0 : -3,
-          marginTop: mode === "view" ? 0 : -3,
-        }}
-        transition={{ duration: 0.25, ease: EASE.brand }}
-      />
     </div>
   );
 }
