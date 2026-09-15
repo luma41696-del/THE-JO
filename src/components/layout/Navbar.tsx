@@ -15,6 +15,8 @@ import { useI18n } from "@/components/providers/LocaleProvider";
 import { AnimatedLogo } from "@/components/brand/AnimatedLogo";
 import { LanguageSwitcher, LanguageSwitcherWide } from "./LanguageSwitcher";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
+import { CategoryAccordion, CategoryMegaMenu } from "./CategoryMenu";
+import type { CategoryNode } from "@/types";
 
 /**
  * Primary navigation.
@@ -32,14 +34,25 @@ import type { Dictionary } from "@/lib/i18n/dictionaries";
  * so RTL is handled by the `dir` attribute rather than a mirrored stylesheet.
  */
 
+/*
+ * The flat "Categories" link is gone: the mega menu replaces it, and having
+ * both would give the shopper two controls that claim the same territory and
+ * behave differently.
+ */
 const NAV = (t: Dictionary) => [
   { href: "/shop", label: t.nav.shop },
-  { href: "/categories", label: t.nav.categories },
   { href: "/shop?sort=newest", label: t.nav.newIn },
   { href: "/fitting-room", label: t.nav.fittingRoom },
 ];
 
-export function Navbar({ announcement }: { announcement?: React.ReactNode }) {
+export function Navbar({
+  announcement,
+  categoryTree = [],
+}: {
+  announcement?: React.ReactNode;
+  /** Departments with their subcategories, for the menu. */
+  categoryTree?: CategoryNode[];
+}) {
   const pathname = usePathname();
   const { t, locale } = useI18n();
   const { scrollY } = useScroll();
@@ -117,6 +130,9 @@ export function Navbar({ announcement }: { announcement?: React.ReactNode }) {
 
             {/* Desktop links */}
             <ul className="hidden items-center gap-8 lg:flex">
+              <li>
+                <CategoryMegaMenu tree={categoryTree} locale={locale} />
+              </li>
               {items.map((item) => {
                 const base = item.href.split("?")[0] ?? "";
                 const active = pathname.endsWith(base);
@@ -196,7 +212,7 @@ export function Navbar({ announcement }: { announcement?: React.ReactNode }) {
         </div>
       </motion.header>
 
-      <MobileNav />
+      <MobileNav categoryTree={categoryTree} />
     </>
   );
 }
@@ -276,7 +292,7 @@ function IconButton({
 
 /* -------------------------------------------------------------------------- */
 
-function MobileNav() {
+function MobileNav({ categoryTree = [] }: { categoryTree?: CategoryNode[] }) {
   const open = useUI((s) => s.mobileNavOpen);
   const setOpen = useUI((s) => s.setMobileNavOpen);
   const { status } = useAuth();
@@ -329,6 +345,15 @@ function MobileNav() {
                 </motion.li>
               ))}
             </ul>
+
+            {/* The department tree, collapsed. On a phone the menu has to be
+                scannable in one thumb-length, so subcategories stay folded
+                until asked for. */}
+            <CategoryAccordion
+              tree={categoryTree}
+              locale={locale}
+              onNavigate={() => setOpen(false)}
+            />
 
             <div className="border-line mt-6 flex flex-wrap items-center gap-x-6 gap-y-3 border-t pt-6">
               <Link href="/wishlist" onClick={() => setOpen(false)} className="text-ink-muted text-sm">

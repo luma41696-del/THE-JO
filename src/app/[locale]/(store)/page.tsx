@@ -1,5 +1,6 @@
 import {
   getBanners,
+  getSlotSettings,
   getCategoryTree,
   getDiscountedProducts,
   getFeaturedProducts,
@@ -7,7 +8,7 @@ import {
   getTestimonials,
   getTrendingProducts,
 } from "@/lib/catalog";
-import { Hero } from "@/components/home/Hero";
+import { HeroBanner } from "@/components/home/HeroBanner";
 import { PromoRail } from "@/components/home/PromoRail";
 import { CategoryGrid } from "@/components/home/CategoryGrid";
 import { BrandStory } from "@/components/home/BrandStory";
@@ -52,6 +53,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
     heroBanners,
     promoBanners,
     spotlight,
+    heroSlot,
     newArrivals,
     featured,
     trending,
@@ -62,6 +64,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
     getBanners("hero"),
     getBanners("promo-rail"),
     getBanners("spotlight"),
+    getSlotSettings("hero"),
     getNewArrivals(10),
     getFeaturedProducts(8),
     getTrendingProducts(10),
@@ -70,12 +73,23 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
     getTestimonials(),
   ]);
 
-  const hero = heroBanners[0] ?? null;
   const campaignCards = [...promoBanners, ...spotlight];
 
   return (
     <>
-      <Hero banner={hero} products={featured} locale={locale} />
+      {/*
+        The hero is whatever the merchant has scheduled — or nothing at all.
+        `heroSlot.enabled` turns the placement off without touching the banners
+        in it, which is the difference between "this campaign is over" and
+        "we are not running a hero this month".
+      */}
+      <HeroBanner
+        banners={heroSlot.enabled ? heroBanners : []}
+        display={heroSlot.display}
+        interval={heroSlot.interval}
+        locale={locale}
+        fallbackHeading={t.brand.taglineLong ? t.brand.tagline : t.brand.name}
+      />
 
       {/* --- Campaigns / advertising rail --------------------------------- */}
       <section className="ns-container py-16 md:py-24">

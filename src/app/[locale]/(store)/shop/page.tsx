@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { getAllProducts, getCategories, listProducts } from "@/lib/catalog";
+import { getCategories, getShopProducts, listProducts } from "@/lib/catalog";
 import { FilterBar } from "@/components/shop/FilterBar";
 import { ProductGrid } from "@/components/product/ProductGrid";
 import { PageIntro } from "@/components/ui/PageIntro";
@@ -46,7 +46,10 @@ export default async function ShopPage({
   const locale: Locale = isLocale(raw) ? raw : "en";
   const t = getDictionary(locale);
 
-  const [categories, allProducts] = await Promise.all([getCategories(), getAllProducts()]);
+  // Facets are built from the visible set: a colour filter that returns
+  // nothing because every product carrying it is in the seasonal warehouse is
+  // a filter that looks broken.
+  const [categories, allProducts] = await Promise.all([getCategories(), getShopProducts()]);
 
   const categorySlug = one(query.category);
   const category = categories.find((c) => c.slug === categorySlug);

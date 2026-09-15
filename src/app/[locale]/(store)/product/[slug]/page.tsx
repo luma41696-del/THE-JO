@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import {
-  getAllProducts,
   getCategories,
   getProductBySlug,
   getRelatedProducts,
   getShippingClasses,
+  getShopProducts,
   getUpsellProducts,
 } from "@/lib/catalog";
 import { categoryTrail } from "@/lib/categories";
@@ -27,7 +27,9 @@ export const revalidate = 3600;
  * pages — cheap, and it means no shopper ever waits on a cold render.
  */
 export async function generateStaticParams() {
-  const products = await getAllProducts();
+  // Only visible products are pre-rendered; a hidden one resolves through
+  // `getProductBySlug`, finds nothing, and 404s.
+  const products = await getShopProducts();
   return LOCALES.flatMap((locale) =>
     products.map((product) => ({ locale, slug: product.slug })),
   );

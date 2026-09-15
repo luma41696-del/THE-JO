@@ -39,11 +39,13 @@ import {
   demoTestimonials,
 } from "@/data/demo";
 import { buildCategoryTree, descendantIds, withRolledUpCounts } from "@/lib/categories";
+import { visibleProducts } from "@/lib/visibility";
 import type {
   Banner,
   BannerSlot,
   Category,
   CategoryNode,
+  SlotSettings,
   Offer,
   Product,
   ProductFilters,
@@ -100,6 +102,15 @@ function productsRef() {
   return collection(getDb(), "products").withConverter(productConverter);
 }
 
+/**
+ * Every **active** product, including ones hidden for the season.
+ *
+ * This is the catalogue as the *server* needs it: the checkout has to be able
+ * to resolve a hidden product in order to refuse it by name, and the admin has
+ * to see what it has pulled. Storefront code wants `getShopProducts` instead —
+ * calling this one on a listing page is how a hidden product leaks back onto
+ * the site.
+ */
 export const getAllProducts = cache(async (): Promise<Product[]> =>
   readOrFallback(
     "products",
@@ -113,18 +124,41 @@ export const getAllProducts = cache(async (): Promise<Product[]> =>
   ),
 );
 
+/**
+ * What a shopper may browse: active, and not withheld for the season.
+ *
+ * Out-of-stock products are deliberately kept. A sold-out size is useful
+ * information, and removing the page would break every link that points at it.
+ */
+export const getShopProducts = cache(async (): Promise<Product[]> =>
+  visibleProducts(await getAllProducts()),
+);
+
+/**
+ * A product by slug, for the storefront.
+ *
+ * Resolves against the visible set, so a hidden product 404s rather than
+ * rendering with a disabled button — the page would otherwise announce that
+ * the piece exists and is being withheld, and would still be indexed.
+ */
 export const getProductBySlug = cache(async (slug: string): Promise<Product | null> => {
+  const all = await getShopProducts();
+  return all.find((p) => p.slug === slug) ?? null;
+});
+
+/** By slug, ignoring visibility — for the checkout's refusal message. */
+export const getAnyProductBySlug = cache(async (slug: string): Promise<Product | null> => {
   const all = await getAllProducts();
   return all.find((p) => p.slug === slug) ?? null;
 });
 
 export const getNewArrivals = cache(async (count = 8): Promise<Product[]> => {
-  const all = await getAllProducts();
+  const all = await getShopProducts();
   return [...all].sort((a, b) => b.publishedAt - a.publishedAt).slice(0, count);
 });
 
 export const getFeaturedProducts = cache(async (count = 8): Promise<Product[]> => {
-  const all = await getAllProducts();
+  const all = await getShopProducts();
   // "Featured" is editorially weighted: badge first, then rating, then recency.
   const weight = (p: Product) =>
     (p.badges.includes("exclusive") ? 3 : 0) +
@@ -141,7 +175,7 @@ export const getFeaturedProducts = cache(async (count = 8): Promise<Product[]> =
 });
 
 export const getTrendingProducts = cache(async (count = 8): Promise<Product[]> => {
-  const all = await getAllProducts();
+  const all = await getShopProducts();
   // Proxy for trend until real analytics land: review volume × rating.
   return [...all]
     .sort(
@@ -153,7 +187,7 @@ export const getTrendingProducts = cache(async (count = 8): Promise<Product[]> =
 });
 
 export const getDiscountedProducts = cache(async (count = 8): Promise<Product[]> => {
-  const all = await getAllProducts();
+  const all = await getShopProducts();
   return all
     .filter((p) => p.compareAtPrice && p.compareAtPrice > p.price)
     .sort(
@@ -167,7 +201,7 @@ export const getDiscountedProducts = cache(async (count = 8): Promise<Product[]>
 /** Products a customer is likely to wear with this one — same collection first. */
 export const getRelatedProducts = cache(
   async (product: Product, count = 4): Promise<Product[]> => {
-    const all = await getAllProducts();
+    const all = await getShopProducts();
     const score = (p: Product) => {
       if (p.id === product.id) return -1;
       let s = 0;
@@ -197,10 +231,10 @@ export const getRelatedProducts = cache(
  */
 export const getUpsellProducts = cache(async (product: Product): Promise<Product[]> => {
   if (product.upsellIds.length === 0) return [];
-  const all = await getAllProducts();
+  const all = await getShopProducts();
   return product.upsellIds
     .map((id) => all.find((p) => p.id === id))
-    .filter((p): p is Product => Boolean(p) && p!.status === "active" && p!.inStock);
+    .filter((p): p is Product => Boolean(p) && p!.inStock);
 });
 
 /**
@@ -210,7 +244,7 @@ export const getUpsellProducts = cache(async (product: Product): Promise<Product
 export const getCrossSellProducts = cache(
   async (productIds: string[], count = 4): Promise<Product[]> => {
     if (productIds.length === 0) return [];
-    const all = await getAllProducts();
+    const all = await getShopProducts();
     const inBag = new Set(productIds);
 
     const seen = new Set<string>();
@@ -221,7 +255,7 @@ export const getCrossSellProducts = cache(
       for (const crossId of source.crossSellIds) {
         if (inBag.has(crossId) || seen.has(crossId)) continue;
         const target = all.find((p) => p.id === crossId);
-        if (!target || target.status !== "active" || !target.inStock) continue;
+        if (!target || !target.inStock) continue;
         seen.add(crossId);
         out.push(target);
         if (out.length >= count) return out;
@@ -230,6 +264,40 @@ export const getCrossSellProducts = cache(
     return out;
   },
 );
+
+/**
+ * How each placement presents its banners.
+ *
+ * Stored as one document rather than a field per banner, because it is a
+ * property of the *slot*: whether the hero is a carousel is not something each
+ * banner should be able to disagree about.
+ *
+ * The default for every slot is `single`. A carousel shows its second slide to
+ * almost nobody, so defaulting to one would quietly bury whichever campaign
+ * happened to sort second.
+ */
+export const getSlotSettings = cache(async (slot: BannerSlot): Promise<SlotSettings> => {
+  const fallback: SlotSettings = { id: slot, display: "single", interval: 6, enabled: true };
+  return readOrFallback(
+    `slots:${slot}`,
+    async () => {
+      const snap = await getDocs(
+        query(collection(getDb(), "slotSettings"), where("id", "==", slot), fsLimit(1)),
+      );
+      const row = snap.docs[0]?.data();
+      if (!row) return [fallback];
+      return [
+        {
+          id: slot,
+          display: row.display === "carousel" ? "carousel" : "single",
+          interval: Number(row.interval) > 0 ? Number(row.interval) : 6,
+          enabled: row.enabled !== false,
+        } as SlotSettings,
+      ];
+    },
+    () => [fallback],
+  ).then((rows) => rows[0] ?? fallback);
+});
 
 /**
  * The cross-sell graph, in the smallest form a client can use.
@@ -244,7 +312,7 @@ export const getCrossSellProducts = cache(
  */
 export const getCrossSellIndex = cache(
   async (): Promise<{ edges: Record<string, string[]>; targets: Product[] }> => {
-    const all = await getAllProducts();
+    const all = await getShopProducts();
     const edges: Record<string, string[]> = {};
     const targetIds = new Set<string>();
 
@@ -252,7 +320,7 @@ export const getCrossSellIndex = cache(
       if (product.crossSellIds.length === 0) continue;
       const live = product.crossSellIds.filter((id) => {
         const target = all.find((p) => p.id === id);
-        return Boolean(target) && target!.status === "active" && target!.inStock;
+        return Boolean(target) && target!.inStock;
       });
       if (live.length === 0) continue;
       edges[product.id] = live;
@@ -270,7 +338,7 @@ export const getCrossSellIndex = cache(
  * Algolia/Typesense index rather than growing more `where` clauses.
  */
 export async function listProducts(filters: ProductFilters = {}): Promise<Product[]> {
-  const all = await getAllProducts();
+  const all = await getShopProducts();
 
   let rows = all.filter((p) => {
     // Match against the whole ancestry, not just the leaf: filtering on
@@ -326,7 +394,8 @@ export async function listProducts(filters: ProductFilters = {}): Promise<Produc
 export async function searchProducts(term: string, max = 12): Promise<Product[]> {
   const needle = term.trim().toLowerCase();
   if (!needle) return [];
-  const all = await getAllProducts();
+  // Search must not surface what the storefront is hiding.
+  const all = await getShopProducts();
   return all
     .filter((p) =>
       [p.title.en, p.title.ar, p.subtitle?.en ?? "", p.categoryId, ...p.tags]
@@ -368,8 +437,19 @@ export const getCategoryBySlug = cache(async (slug: string): Promise<Category | 
  * it no longer has is a dead end the customer walks into.
  */
 export const getCategoryTree = cache(async (): Promise<CategoryNode[]> => {
-  const [categories, products] = await Promise.all([getCategories(), getAllProducts()]);
-  return buildCategoryTree(withRolledUpCounts(categories, products));
+  const [categories, products] = await Promise.all([getCategories(), getShopProducts()]);
+  /*
+   * Counted from the *visible* set, and hidden categories are dropped. A
+   * department advertising "12 pieces" that leads to an empty grid — because
+   * all twelve are in the seasonal warehouse — is a dead end the customer
+   * walks into.
+   */
+  return buildCategoryTree(
+    withRolledUpCounts(
+      categories.filter((c) => !c.hidden),
+      products,
+    ),
+  );
 });
 
 /** A category plus every category beneath it — the ids a listing filters on. */

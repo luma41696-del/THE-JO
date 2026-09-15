@@ -37,6 +37,8 @@ const NAV: { group: string; items: { href: string; label: string; icon: ReactNod
     group: "Catalogue",
     items: [
       { href: "/admin/products", label: "Products", icon: <TagIcon /> },
+      { href: "/admin/categories", label: "Categories", icon: <TagIcon /> },
+      { href: "/admin/warehouse", label: "Seasonal warehouse", icon: <BoxIcon /> },
       { href: "/admin/offers", label: "Offers & campaigns", icon: <SparkIcon /> },
     ],
   },
@@ -297,6 +299,15 @@ function TagIcon() {
     <svg width="17" height="17" viewBox="0 0 18 18" fill="none" aria-hidden="true">
       <path d="M8.2 2.5H15V9.3l-6.4 6.4a1 1 0 0 1-1.4 0l-5.3-5.3a1 1 0 0 1 0-1.4L8.2 2.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
       <circle cx="11.6" cy="6" r="1.1" fill="currentColor" />
+    </svg>
+  );
+}
+
+function BoxIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <path d="M2.6 5.6 9 2.4l6.4 3.2v6.8L9 15.6l-6.4-3.2V5.6Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+      <path d="M2.6 5.6 9 8.8l6.4-3.2M9 8.8v6.8" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
     </svg>
   );
 }

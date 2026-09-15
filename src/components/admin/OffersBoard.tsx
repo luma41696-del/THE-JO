@@ -11,6 +11,7 @@ import { DataTable, Panel, StatTile, type Column } from "./AdminUI";
 import { ExportMenu } from "./ExportMenu";
 import { Button } from "@/components/ui/Button";
 import { OfferEditor } from "./OfferEditor";
+import { BannerEditor } from "./BannerEditor";
 import { offerStatus } from "@/lib/offers";
 import { getIdToken } from "@/lib/firebase/auth";
 import type { Banner, Category, Offer, OfferStatus, Product } from "@/types";
@@ -51,6 +52,49 @@ export function OffersBoard({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
+  const [bannerEditorOpen, setBannerEditorOpen] = useState(false);
+  const [bannerBusyId, setBannerBusyId] = useState<string | null>(null);
+
+  function openNewBanner() {
+    setEditingBanner(null);
+    setBannerEditorOpen(true);
+  }
+
+  /**
+   * Pause, resume and reorder a banner without opening the editor.
+   *
+   * Taking a campaign down is the urgent action — stock ran out, the price was
+   * wrong — and it should be one click from the list, not a form submission
+   * away.
+   */
+  async function patchBanner(banner: Banner, patch: { status?: string; priority?: number }) {
+    setBannerBusyId(banner.id);
+    setActionError(null);
+    try {
+      const token = await getIdToken().catch(() => null);
+      const response = await fetch("/api/admin/banners", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ id: banner.id, ...patch }),
+      });
+      const data = (await response.json()) as { ok?: boolean; error?: string; persisted?: boolean };
+      if (!response.ok || !data.ok) throw new Error(data.error ?? "Update failed");
+      if (data.persisted === false) {
+        setActionError("Validated, but not stored: Firebase Admin is not configured here.");
+        return;
+      }
+      router.refresh();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "The banner could not be updated.");
+    } finally {
+      setBannerBusyId(null);
+    }
+  }
 
   const live = offers.filter((o) => offerStatus(o) === "active" && o.startsAt <= now && o.endsAt > now);
   const redemptions = offers.reduce((sum, o) => sum + o.usageCount, 0);
@@ -413,6 +457,25 @@ export function OffersBoard({
           />
         </>
       ) : (
+        <>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-mist text-[0.75rem]">
+              {/* The hero is the one placement where "off" has to be obvious,
+                  because an empty first screen looks like a broken deploy. */}
+              The hero shows the highest-priority live banner. With none live,
+              the homepage falls back to a plain heading — not to old copy.
+            </p>
+            <Button variant="brand" size="sm" onClick={openNewBanner}>
+              New banner
+            </Button>
+          </div>
+
+          {actionError && (
+            <p role="alert" className="text-alert mb-3 text-[0.8125rem]">
+              {actionError}
+            </p>
+          )}
+
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {banners.map((banner) => {
             const expired = banner.endsAt ? banner.endsAt <= now : false;
@@ -470,11 +533,58 @@ export function OffersBoard({
                       </div>
                     )}
                   </dl>
+
+                  {/* Controls, inside the card: a separate actions column
+                      would put the button that takes a campaign down a long
+                      way from the artwork that identifies it. */}
+                  <div className="border-line mt-3 flex flex-wrap items-center gap-1.5 border-t pt-3">
+                    <SmallAction onClick={() => { setEditingBanner(banner); setBannerEditorOpen(true); }}>
+                      Edit
+                    </SmallAction>
+
+                    {(banner.status ?? (banner.active ? "active" : "paused")) === "active" ? (
+                      <SmallAction
+                        busy={bannerBusyId === banner.id}
+                        onClick={() => patchBanner(banner, { status: "paused" })}
+                      >
+                        Pause
+                      </SmallAction>
+                    ) : (
+                      <SmallAction
+                        busy={bannerBusyId === banner.id}
+                        onClick={() => patchBanner(banner, { status: "active" })}
+                      >
+                        Make live
+                      </SmallAction>
+                    )}
+
+                    <SmallAction
+                      busy={bannerBusyId === banner.id}
+                      onClick={() => patchBanner(banner, { priority: (banner.priority ?? 0) + 10 })}
+                      label="Raise priority"
+                    >
+                      ↑
+                    </SmallAction>
+                    <SmallAction
+                      busy={bannerBusyId === banner.id}
+                      onClick={() =>
+                        patchBanner(banner, { priority: Math.max(0, (banner.priority ?? 0) - 10) })
+                      }
+                      label="Lower priority"
+                    >
+                      ↓
+                    </SmallAction>
+
+                    <span className="text-mist ms-auto text-[0.6875rem] tabular-nums">
+                      {banner.slot} · p{banner.priority ?? 0}
+                    </span>
+                  </div>
                 </div>
               </Panel>
             );
           })}
         </div>
+        </>
       )}
 
       <p className="text-mist mt-4 max-w-2xl text-[0.75rem] leading-relaxed">
@@ -485,6 +595,14 @@ export function OffersBoard({
         once cannot both take the last redemption. The cart is a preview, never
         the authority.
       </p>
+
+      <BannerEditor
+        banner={editingBanner}
+        defaultSlot="hero"
+        open={bannerEditorOpen}
+        onClose={() => setBannerEditorOpen(false)}
+        onSaved={() => router.refresh()}
+      />
 
       <OfferEditor
         offer={editing}
@@ -506,6 +624,36 @@ export function OffersBoard({
  * Every row action carries a real `aria-label`: a table of bare glyphs is
  * unusable with a screen reader, and "⌫" is not a word in any language.
  */
+/** A text or glyph action sized for a card footer. */
+function SmallAction({
+  children,
+  onClick,
+  busy = false,
+  label,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  busy?: boolean;
+  label?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={busy}
+      aria-label={label}
+      title={label}
+      className={cn(
+        "border-line text-ink-muted hover:border-ink hover:text-ink rounded-pill cursor-pointer border px-2.5 py-1 text-[0.6875rem] transition-colors",
+        "disabled:opacity-40",
+      )}
+      data-cursor="hover"
+    >
+      {busy ? "…" : children}
+    </button>
+  );
+}
+
 function IconAction({
   label,
   onClick,

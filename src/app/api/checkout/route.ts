@@ -10,6 +10,7 @@ import { priceCart } from "@/lib/pricing";
 import { hasOptions, resolveSelection } from "@/lib/product";
 import { classesInCart } from "@/lib/shipping";
 import { categoryPathsFor, evaluateOffer, redemptionId } from "@/lib/offers";
+import { isPurchasable, unavailableReason } from "@/lib/visibility";
 import { cartKey, orderReference } from "@/lib/utils";
 import { isAdminConfigured, verifyRequest } from "@/lib/firebase/admin";
 import type { CartItem, Offer, Order, OrderEvent, ProductVariant } from "@/types";
@@ -106,12 +107,33 @@ export async function POST(request: Request) {
     getActiveOffers(),
   ]);
 
+  // One clock for the whole request: a schedule that flips between the
+  // visibility check and the order write would be a race against itself.
+  const now = Date.now();
+
   const priced: CartItem[] = [];
 
   for (const line of lines) {
     const product = products.find((p) => p.id === line.productId);
     if (!product || product.status !== "active") {
       return bad(`A piece in your bag is no longer available.`);
+    }
+
+    /*
+     * A product pulled for the season is unbuyable, and the check lives here
+     * because this is the only door that cannot be walked around. Hiding it
+     * from the listings stops a customer *finding* it; it does nothing about a
+     * cart saved in October, a bookmarked link, or a direct POST to this
+     * route — and stock would be decremented for a piece the warehouse has
+     * deliberately taken off the floor.
+     *
+     * The message says "not available", never "sold out": the stock claim
+     * would be false, and there is nothing to gain by telling a customer the
+     * piece exists and is being withheld.
+     */
+    if (!isPurchasable(product, now)) {
+      const reason = unavailableReason(product, now);
+      return bad(reason?.en ?? `${product.title.en} is not available at the moment.`);
     }
 
     const variable = hasOptions(product);
@@ -206,7 +228,6 @@ export async function POST(request: Request) {
   /* --- persist ----------------------------------------------------------- */
 
   const reference = orderReference();
-  const now = Date.now();
 
   const timeline: OrderEvent[] = [
     {

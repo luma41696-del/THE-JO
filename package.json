@@ -16,7 +16,8 @@
     "emulators": "firebase emulators:start",
     "grant-admin": "tsx scripts/grant-admin.ts",
     "test:offers": "tsx --test scripts/offers.test.ts",
-    "test": "npm run test:offers && npm run test:firebase-runtime"
+    "test": "npm run test:offers && npm run test:visibility && npm run test:firebase-runtime",
+    "test:visibility": "tsx --test scripts/visibility.test.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",

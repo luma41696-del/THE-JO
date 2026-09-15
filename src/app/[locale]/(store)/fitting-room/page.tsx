@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { getAllProducts } from "@/lib/catalog";
+import { getShopProducts } from "@/lib/catalog";
 import { FittingRoom } from "@/components/fitting/FittingRoom";
 import { PageIntro } from "@/components/ui/PageIntro";
 import { isLocale } from "@/lib/i18n/config";
@@ -35,7 +35,7 @@ export default async function FittingRoomPage({
    * Filtered here rather than inside the component so the client never
    * receives products it would only have to discard.
    */
-  const products = (await getAllProducts()).filter(
+  const products = (await getShopProducts()).filter(
     (p) => p.type === "variable" && p.sizes.length > 0 && Boolean(p.fit),
   );
 

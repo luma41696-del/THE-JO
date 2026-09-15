@@ -20,7 +20,13 @@ import { EASE, transition } from "@/lib/motion";
  * does it instantly.
  */
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "brand" | "quiet";
+export type ButtonVariant =
+  | "primary"
+  | "secondary"
+  | "ghost"
+  | "brand"
+  | "quiet"
+  | "paper";
 export type ButtonSize = "sm" | "md" | "lg" | "xl";
 
 const VARIANTS: Record<ButtonVariant, string> = {
@@ -32,6 +38,13 @@ const VARIANTS: Record<ButtonVariant, string> = {
   ghost: "bg-transparent text-ink hover:bg-ink/5",
   /** Brand brand. Reserved for checkout and the single primary CTA on a page. */
   brand: "bg-brand text-white hover:bg-brand-deep shadow-brand",
+  /**
+   * Paper fill on a dark ground — a hero photograph, the footer, the
+   * fitting-room stage. The brand red is the one thing that does *not* work
+   * over an arbitrary photograph: it fights whatever is behind it, and on a
+   * dark image it stops reading as a button at all.
+   */
+  paper: "bg-paper text-ink hover:bg-white shadow-float",
   /** Text-only, inline. */
   quiet: "bg-transparent text-smoke hover:text-ink underline-offset-4 hover:underline",
 };

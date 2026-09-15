@@ -91,6 +91,39 @@ export type ProductBadge =
   | "restocked";
 
 /**
+ * Seasonal grouping for the warehouse.
+ *
+ * `all-season` is not "no season" — it is a positive statement that the piece
+ * stays out year-round, which is what a bulk "hide winter" action has to
+ * respect. A product may belong to several.
+ */
+export type Season = "winter" | "spring" | "summer" | "autumn" | "all-season";
+
+/**
+ * Why a product is or is not on the storefront.
+ *
+ * Deliberately separate from `status`, because they answer different
+ * questions and conflating them loses information the merchant needs:
+ *
+ *  - `status` is the product's lifecycle — draft, active, archived.
+ *  - `visibility` is whether an *active* product is currently on display.
+ *
+ * A coat pulled for the summer is `status: "active"`, `visibility: "hidden"`.
+ * It keeps its stock, its reviews and its place in old orders; it simply is
+ * not shown. Marking it `archived` instead would say it is gone for good, and
+ * zeroing its stock would lose a real count that has to come back in October.
+ */
+export type ProductVisibility = "visible" | "hidden";
+
+/** A pending, scheduled change of visibility. */
+export interface VisibilitySchedule {
+  /** Show the product at this instant, if set. */
+  showAt?: number;
+  /** Hide the product at this instant, if set. */
+  hideAt?: number;
+}
+
+/**
  * How a product is *bought*, which decides how it is rendered and priced.
  *
  *  - `simple`   — one trade item. No choices to make: no swatches, no size
@@ -176,6 +209,35 @@ export interface Product {
   shippingClassId?: string;
 
   /**
+   * Seasons this product belongs to. Empty is treated as `all-season` — a
+   * product nobody has classified should not vanish from a seasonal filter.
+   */
+  seasons?: Season[];
+
+  /**
+   * Whether an active product is currently on the storefront. Defaults to
+   * visible, so every product written before the warehouse existed keeps
+   * showing.
+   */
+  visibility?: ProductVisibility;
+
+  /**
+   * A scheduled show or hide. Evaluated at read time rather than by a cron:
+   * a job that fails leaves the catalogue wrong until someone notices, while
+   * a read-time comparison is simply correct on the next request.
+   *
+   * A manual change clears the schedule — see `visibilityOverride`.
+   */
+  visibilitySchedule?: VisibilitySchedule;
+
+  /**
+   * Set when a person overrides the schedule by hand. While true the schedule
+   * is ignored, so "show this now" is not undone an hour later by a rule
+   * somebody set last season and forgot.
+   */
+  visibilityOverride?: boolean;
+
+  /**
    * Hard cap on units of this product in a single order.
    *
    * `1` is the "sold individually" case — limited drops, one-per-customer
@@ -238,6 +300,14 @@ export interface Category {
   featured: boolean;
   /** Show in the primary nav's category menu. Subcategories usually do not. */
   showInNav?: boolean;
+  /**
+   * Hidden categories keep their products and their URLs but leave the nav
+   * and the category grid — the way a department is retired without breaking
+   * every link that ever pointed at it.
+   */
+  hidden?: boolean;
+  createdAt?: number;
+  updatedAt?: number;
 }
 
 /** A category with its children attached — what the nav and tiles render. */
@@ -270,6 +340,28 @@ export type BannerSlot =
 export type BannerTone = "ink" | "brand" | "sand" | "paper";
 
 /**
+ * Where the copy sits over the artwork.
+ *
+ * A banner is a photograph with words on it, and the two are chosen by
+ * different people at different times. Without a position control the words
+ * land wherever the layout puts them — which is how a headline ends up across
+ * a model's face and the merchant's only recourse is to re-crop the image.
+ */
+export type BannerTextPosition =
+  | "start-top"
+  | "start-middle"
+  | "start-bottom"
+  | "center-middle"
+  | "end-top"
+  | "end-middle"
+  | "end-bottom";
+
+/** Ink over a light photograph, or paper over a dark one. */
+export type BannerTextTone = "light" | "dark";
+
+export type BannerStatus = "draft" | "active" | "paused" | "archived";
+
+/**
  * One card in the merchandising system. The homepage ad rail, the hero, and
  * the announcement bar are all the same document shape with a different slot,
  * so marketing can move a campaign between placements without a rebuild.
@@ -282,7 +374,25 @@ export interface Banner {
   title: Localized;
   body?: Localized;
   cta?: { label: Localized; href: string };
+
+  /**
+   * Desktop artwork. A wide crop; on a phone it is letterboxed to nothing
+   * useful, which is why `mediaMobile` exists rather than one image being
+   * asked to work at both shapes.
+   */
   media?: ProductImage;
+  /** Portrait crop for narrow screens. Falls back to `media` when unset. */
+  mediaMobile?: ProductImage;
+
+  textPosition?: BannerTextPosition;
+  textTone?: BannerTextTone;
+  /**
+   * 0–1. A scrim between the artwork and the copy. Photographs are not
+   * designed around text, so legibility needs a dimming layer the merchant can
+   * tune per image — too little and the headline disappears into a bright sky.
+   */
+  scrim?: number;
+
   /** Renders as a countdown when set; the card self-hides once passed. */
   startsAt?: number;
   endsAt?: number;
@@ -290,7 +400,32 @@ export interface Banner {
   priority: number;
   /** Relative width in the promo rail grid: 1 = standard, 2 = wide. */
   span?: 1 | 2;
+
+  status?: BannerStatus;
+  /** Legacy mirror of `status === "active"`, kept in sync on write. */
   active: boolean;
+
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+/**
+ * How a slot presents more than one live banner.
+ *
+ * `single` shows the highest-priority one and is the honest default: a
+ * carousel that nobody scrolls shows the second slide to almost no one, so
+ * putting a campaign in slide two is usually a decision to hide it.
+ */
+export type SlotDisplay = "single" | "carousel";
+
+export interface SlotSettings {
+  /** The `BannerSlot` this configures. */
+  id: BannerSlot;
+  display: SlotDisplay;
+  /** Seconds per slide. Ignored when `display` is `single`. */
+  interval: number;
+  /** Turns the whole placement off without touching its banners. */
+  enabled: boolean;
 }
 
 export type OfferType = "percentage" | "fixed" | "free-shipping" | "bundle";

@@ -149,7 +149,38 @@ export const categoryConverter: FirestoreDataConverter<Category> = {
     } as Category;
   },
 };
-export const bannerConverter = withId<Banner>();
+/**
+ * Banners written before `status` existed carry only `active`. Reading a
+ * missing status as "draft" would switch off every running campaign on
+ * deploy, so it is derived from `active` instead.
+ */
+export const bannerConverter: FirestoreDataConverter<Banner> = {
+  toFirestore: withId<Banner>().toFirestore,
+  fromFirestore(snapshot, options): Banner {
+    const raw = normaliseTimestamps<Record<string, unknown>>(snapshot.data(options));
+    const active = raw.active !== false;
+    const status =
+      raw.status === "draft" ||
+      raw.status === "active" ||
+      raw.status === "paused" ||
+      raw.status === "archived"
+        ? raw.status
+        : active
+          ? "active"
+          : "paused";
+
+    return {
+      ...raw,
+      id: snapshot.id,
+      status,
+      active: status === "active",
+      priority: typeof raw.priority === "number" ? raw.priority : 0,
+      textPosition: raw.textPosition ?? "start-middle",
+      textTone: raw.textTone === "dark" ? "dark" : "light",
+      scrim: typeof raw.scrim === "number" ? raw.scrim : 0.35,
+    } as Banner;
+  },
+};
 
 /**
  * Coupons written before the rewrite carry only `active`, no `status`, and

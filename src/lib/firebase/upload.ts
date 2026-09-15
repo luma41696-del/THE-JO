@@ -100,11 +100,38 @@ export async function uploadProductImage(
   alt: string,
   options: UploadOptions = {},
 ): Promise<ProductImage> {
+  return uploadImage(`products/${productId}`, file, alt, options);
+}
+
+/**
+ * Upload into a banner or category folder.
+ *
+ * A separate entry point because the Storage rules are per-folder: `banners/`
+ * and `categories/` are flat, while `products/` is nested under an id. Reusing
+ * `uploadProductImage("banners", …)` would write to `products/banners/…`,
+ * which the rules do allow — and which would quietly file every campaign image
+ * under a product that does not exist.
+ */
+export async function uploadMerchandisingImage(
+  folder: "banners" | "categories",
+  file: File,
+  alt: string,
+  options: UploadOptions = {},
+): Promise<ProductImage> {
+  return uploadImage(folder, file, alt, options);
+}
+
+async function uploadImage(
+  folder: string,
+  file: File,
+  alt: string,
+  options: UploadOptions = {},
+): Promise<ProductImage> {
   validate(file);
 
   const { width, height } = await measure(file);
   const storage = getStorageClient();
-  const path = `products/${productId}/${objectName(file)}`;
+  const path = `${folder}/${objectName(file)}`;
   const task = uploadBytesResumable(ref(storage, path), file, {
     contentType: file.type,
     cacheControl: "public, max-age=31536000, immutable",
@@ -151,7 +178,13 @@ export async function uploadProductImage(
  * and an image that was never there satisfies it. Failing here would leave the
  * admin unable to clean up a half-finished record.
  */
+export const deleteMerchandisingImage = deleteImage;
+
 export async function deleteProductImage(url: string): Promise<void> {
+  return deleteImage(url);
+}
+
+async function deleteImage(url: string): Promise<void> {
   if (!url.includes("firebasestorage")) return; // a seeded /demo asset
   try {
     await deleteObject(ref(getStorageClient(), url));

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { getAllProducts } from "@/lib/catalog";
+import { getShopProducts } from "@/lib/catalog";
 import { WishlistClient } from "@/components/account/WishlistClient";
 import { PageIntro } from "@/components/ui/PageIntro";
 import { isLocale } from "@/lib/i18n/config";
@@ -24,7 +24,12 @@ export default async function WishlistPage({ params }: { params: Promise<{ local
 
   // The full catalogue is passed down and filtered on the client: the wishlist
   // stores ids only, so prices and stock are always today's, never a snapshot.
-  const products = await getAllProducts();
+  /*
+   * The visible set, so a saved piece that has been pulled for the season
+   * drops out rather than linking to a page that 404s. The wishlist entry
+   * itself is kept — when the product returns in October, so does the card.
+   */
+  const products = await getShopProducts();
 
   return (
     <>
