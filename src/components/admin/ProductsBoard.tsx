@@ -9,6 +9,29 @@ import { formatPrice, t as pick } from "@/lib/format";
 import { discountPercent } from "@/lib/utils";
 import { AdminPageHeader } from "./AdminShell";
 import { useAdminLocale } from "./AdminLocale";
+import { getIdToken } from "@/lib/firebase/auth";
+import { storefrontState, type StorefrontState } from "@/lib/visibility";
+import { ACTION_LABELS, type ProductAction } from "@/lib/product-state";
+import type { AdminKey } from "@/lib/i18n/admin";
+
+/** The same tones and words the warehouse uses, so one product reads the same on both screens. */
+const STATE_KEYS: Record<StorefrontState, AdminKey> = {
+  live: "wh.state.live",
+  "sold-out": "wh.state.sold-out",
+  "out-of-stock": "wh.state.out-of-stock",
+  hidden: "wh.state.hidden",
+  draft: "wh.state.draft",
+  archived: "wh.state.archived",
+};
+
+const STATE_TONES: Record<StorefrontState, string> = {
+  live: "bg-mint/12 text-mint",
+  "sold-out": "bg-clay/20 text-ink-muted",
+  "out-of-stock": "bg-alert/10 text-alert",
+  hidden: "bg-brand-mist text-brand-deep",
+  draft: "bg-paper-sunken text-smoke",
+  archived: "bg-paper-sunken text-mist",
+};
 import { DataTable, FilterChips, type Column } from "./AdminUI";
 import { ExportMenu } from "./ExportMenu";
 import { Button } from "@/components/ui/Button";
@@ -35,8 +58,53 @@ export function ProductsBoard({
 }) {
   const { t, locale } = useAdminLocale();
   const router = useLocalizedRouter();
+  /*
+   * One clock for the whole render. Calling `Date.now()` per row would let two
+   * products either side of a scheduled boundary disagree within one table.
+   */
+  const now = Date.now();
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [stateError, setStateError] = useState<string | null>(null);
+  const [stateNotice, setStateNotice] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
+
+  /** Apply one state action to one product, and say what happened. */
+  async function runAction(id: string, action: ProductAction) {
+    setBusyId(id);
+    setStateError(null);
+    setStateNotice(null);
+    try {
+      const token = await getIdToken().catch(() => null);
+      const response = await fetch("/api/admin/products/state", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ ids: [id], action }),
+      });
+      const data = (await response.json()) as {
+        ok?: boolean;
+        error?: string;
+        changed?: number;
+        refused?: { reason?: string }[];
+      };
+      if (!response.ok || !data.ok) throw new Error(data.error ?? t("wh.updateFailed"));
+
+      // A refusal is the useful answer, not a failure — it carries the reason.
+      if ((data.changed ?? 0) === 0) {
+        setStateError(data.refused?.[0]?.reason ?? t("wh.updateFailed"));
+      } else {
+        setStateNotice(ACTION_LABELS[action][locale]);
+        router.refresh();
+      }
+    } catch (error) {
+      setStateError(error instanceof Error ? error.message : t("wh.updateError"));
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   const counts = useMemo(
     () => ({
@@ -170,17 +238,65 @@ export function ProductsBoard({
     {
       key: "status",
       header: t("col.status"),
-      cell: (product) => (
-        <span
-          className={cn(
-            "rounded-pill inline-flex px-2.5 py-1 text-[0.6875rem] font-medium capitalize",
-            product.status === "active" ? "bg-mint/12 text-mint" : "bg-paper-sunken text-smoke",
-          )}
-        >
-          {product.status}
-        </span>
-      ),
-      sortValue: (product) => product.status,
+      /*
+       * The real state, not just `status`.
+       *
+       * `status` alone says "active" for a product that is in the warehouse,
+       * stopped by hand, or sold out — three situations a merchant scanning
+       * this list needs to tell apart at a glance, and which used to look
+       * identical here.
+       */
+      cell: (product) => {
+        const state = storefrontState(product, now);
+        return (
+          <span
+            className={cn(
+              "rounded-pill inline-flex px-2.5 py-1 text-[0.6875rem] font-medium",
+              STATE_TONES[state],
+            )}
+          >
+            {t(STATE_KEYS[state])}
+          </span>
+        );
+      },
+      sortValue: (product) => storefrontState(product, now),
+    },
+    {
+      key: "act",
+      header: "",
+      /*
+       * One action per row, chosen for the state the product is actually in —
+       * the next thing a merchant would want to do to it. The full set lives
+       * in the warehouse, where a selection can be acted on together.
+       */
+      cell: (product) => {
+        const state = storefrontState(product, now);
+        const action: ProductAction | null =
+          state === "draft"
+            ? "publish"
+            : state === "archived"
+              ? "restore"
+              : state === "sold-out"
+                ? "restock"
+                : state === "hidden"
+                  ? "shopfront"
+                  : "sold-out";
+
+        return (
+          <button
+            type="button"
+            disabled={busyId === product.id}
+            onClick={(event) => {
+              event.stopPropagation();
+              void runAction(product.id, action);
+            }}
+            className="border-line text-ink-muted hover:border-ink hover:text-ink rounded-pill cursor-pointer border px-2.5 py-1 text-[0.6875rem] whitespace-nowrap transition-colors disabled:opacity-40"
+            data-cursor="hover"
+          >
+            {ACTION_LABELS[action][locale]}
+          </button>
+        );
+      },
     },
   ];
 
@@ -229,6 +345,19 @@ export function ProductsBoard({
           </>
         }
       />
+
+      {/* A refusal carries its reason — "missing title.ar" is actionable,
+          "could not publish" is not. */}
+      {stateError && (
+        <p role="alert" className="text-alert mb-3 text-[0.8125rem]">
+          {stateError}
+        </p>
+      )}
+      {stateNotice && !stateError && (
+        <p role="status" className="text-mint mb-3 text-[0.8125rem]">
+          {stateNotice}
+        </p>
+      )}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <FilterChips options={filters} value={filter} onChange={setFilter} counts={counts} />
