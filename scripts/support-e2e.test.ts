@@ -136,6 +136,7 @@ let adminSupport: typeof import("../src/app/api/admin/support/route");
 let team: typeof import("../src/app/api/admin/team/route");
 let invite: typeof import("../src/app/api/gift/invite/route");
 let warehouse: typeof import("../src/app/api/admin/warehouse/route");
+let productState: typeof import("../src/app/api/admin/products/state/route");
 let adminSdk: typeof import("../src/lib/firebase/admin");
 
 before(async () => {
@@ -146,6 +147,7 @@ before(async () => {
   team = await import("../src/app/api/admin/team/route");
   invite = await import("../src/app/api/gift/invite/route");
   warehouse = await import("../src/app/api/admin/warehouse/route");
+  productState = await import("../src/app/api/admin/products/state/route");
   adminSdk = await import("../src/lib/firebase/admin");
 
   customer = await signUp("customer@example.test");
@@ -493,6 +495,161 @@ describe("appointing staff", () => {
     assert.equal(response.ok, false);
     assert.equal(response.httpStatus, 404);
     assert.match(response.error, /sign in to the shop once/i);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/*  Product state, in bulk                                                    */
+/* -------------------------------------------------------------------------- */
+
+describe("product state actions", () => {
+  const complete = "e2e-state-complete";
+  const incomplete = "e2e-state-incomplete";
+
+  const base = {
+    slug: "e2e-tee",
+    title: { en: "State tee", ar: "تي شيرت الحالة" },
+    categoryId: "tees",
+    type: "simple",
+    price: 12,
+    currency: "JOD",
+    images: [{ url: "/a.jpg", alt: "a", width: 800, height: 1000 }],
+    colors: [],
+    sizes: [],
+    variants: [],
+    tags: [],
+    badges: [],
+    inStock: true,
+    totalStock: 5,
+    status: "draft",
+  };
+
+  before(async () => {
+    const db = adminSdk.getAdminDb();
+    await db.collection("products").doc(complete).set(base);
+    // Missing the Arabic title and any image — publishable only after editing.
+    await db
+      .collection("products")
+      .doc(incomplete)
+      .set({ ...base, slug: "e2e-half", title: { en: "Half", ar: "" }, images: [] });
+  });
+
+  const act = async (ids: string[], action: string, token = owner.token) =>
+    json<{
+      ok: boolean;
+      changed: number;
+      requested: number;
+      refused: { id: string; reason?: string }[];
+    }>(
+      await productState.POST(
+        request("/api/admin/products/state", {
+          method: "POST",
+          token,
+          body: JSON.stringify({ ids, action }),
+        }),
+      ),
+    );
+
+  test("a bulk publish reports the ones it could not do, and still does the rest", async () => {
+    /*
+     * The behaviour that makes bulk usable: one unpublishable product must not
+     * fail the other. A merchant selecting thirty needs "29 published, 1
+     * refused, here is which", not a single error.
+     */
+    const result = await act([complete, incomplete], "publish");
+
+    assert.equal(result.ok, true);
+    assert.equal(result.changed, 1);
+    assert.equal(result.requested, 2);
+    assert.equal(result.refused.length, 1);
+    assert.equal(result.refused[0]!.id, incomplete);
+    assert.match(result.refused[0]!.reason ?? "", /title\.ar|images/);
+
+    const db = adminSdk.getAdminDb();
+    assert.equal((await db.collection("products").doc(complete).get()).data()!.status, "active");
+    assert.equal((await db.collection("products").doc(incomplete).get()).data()!.status, "draft");
+  });
+
+  test("stopping a sale never touches the stock count", async () => {
+    const db = adminSdk.getAdminDb();
+    await act([complete], "sold-out");
+
+    const stored = (await db.collection("products").doc(complete).get()).data()!;
+    assert.equal(stored.saleState, "sold-out");
+    assert.equal(stored.totalStock, 5, "a manual stop must not zero the count");
+    assert.equal(stored.status, "active", "nor unpublish it");
+  });
+
+  test("resuming refuses when the shelves are actually empty", async () => {
+    const db = adminSdk.getAdminDb();
+    await db.collection("products").doc(complete).set({ totalStock: 0, inStock: false }, { merge: true });
+
+    const result = await act([complete], "restock");
+    assert.equal(result.changed, 0);
+    assert.match(result.refused[0]!.reason ?? "", /stock/i);
+
+    // Put the units back; now it resumes.
+    await db.collection("products").doc(complete).set({ totalStock: 5, inStock: true }, { merge: true });
+    const second = await act([complete], "restock");
+    assert.equal(second.changed, 1);
+    assert.equal((await db.collection("products").doc(complete).get()).data()!.saleState, "auto");
+  });
+
+  test("moving to the warehouse leaves stock and publication alone", async () => {
+    const db = adminSdk.getAdminDb();
+    await act([complete], "warehouse");
+
+    const stored = (await db.collection("products").doc(complete).get()).data()!;
+    assert.equal(stored.visibility, "hidden");
+    assert.equal(stored.visibilityOverride, true);
+    assert.equal(stored.totalStock, 5);
+    assert.equal(stored.status, "active");
+  });
+
+  test("returning a draft to the shopfront does not publish it", async () => {
+    const result = await act([incomplete], "shopfront");
+    assert.equal(result.changed, 0);
+    assert.equal(
+      (await adminSdk.getAdminDb().collection("products").doc(incomplete).get()).data()!.status,
+      "draft",
+    );
+  });
+
+  test("restore lands in draft, not straight back on sale", async () => {
+    const db = adminSdk.getAdminDb();
+    await act([complete], "archive");
+    assert.equal((await db.collection("products").doc(complete).get()).data()!.status, "archived");
+
+    await act([complete], "restore");
+    assert.equal((await db.collection("products").doc(complete).get()).data()!.status, "draft");
+  });
+
+  test("a repeated action changes nothing and says so", async () => {
+    const result = await act([complete], "restore");
+    assert.equal(result.changed, 0);
+    assert.equal(result.refused.length, 1);
+  });
+
+  test("every change is written to the audit log with who did it", async () => {
+    const snap = await adminSdk
+      .getAdminDb()
+      .collection("auditLog")
+      .where("action", "==", "product.archive")
+      .get();
+    const entry = snap.docs.map((d) => d.data())[0];
+    assert.ok(entry, "a state change nobody can trace is how a shop loses track of itself");
+    assert.equal(entry.actorUid, owner.uid);
+  });
+
+  test("a customer cannot change product state", async () => {
+    const response = await productState.POST(
+      request("/api/admin/products/state", {
+        method: "POST",
+        token: customer.token,
+        body: JSON.stringify({ ids: [complete], action: "publish" }),
+      }),
+    );
+    assert.equal(response.status, 403);
   });
 });
 

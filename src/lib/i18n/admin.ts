@@ -440,6 +440,13 @@ export const ADMIN_STRINGS = {
   "wh.season.autumn": { en: "Autumn", ar: "خريف" },
   "wh.season.all-season": { en: "All season", ar: "كل المواسم" },
   "wh.state.live": { en: "Live", ar: "معروض" },
+  "wh.state.sold-out": { en: "Stopped", ar: "موقوف" },
+  "wh.refused": { en: "refused", ar: "رُفض" },
+  "wh.publication": { en: "Publication and sale", ar: "النشر والبيع" },
+  "wh.publicationHint": {
+    en: "Draft keeps stock and images. Stopping a sale never changes the count.",
+    ar: "المسودة تحتفظ بالمخزون والصور. وإيقاف البيع لا يغيّر الكمية أبداً.",
+  },
   "wh.state.out-of-stock": { en: "Sold out", ar: "نفد" },
   "wh.state.hidden": { en: "In warehouse", ar: "في المستودع" },
   "wh.state.draft": { en: "Draft", ar: "مسودة" },

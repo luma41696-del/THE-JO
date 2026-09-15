@@ -153,6 +153,14 @@ export type Season = "winter" | "spring" | "summer" | "autumn" | "all-season";
  */
 export type ProductVisibility = "visible" | "hidden";
 
+/**
+ * Whether a visible product may be bought.
+ *
+ * `auto` — follow the stock count.
+ * `sold-out` — stopped by a person, whatever the count says.
+ */
+export type SaleState = "auto" | "sold-out";
+
 /** A pending, scheduled change of visibility. */
 export interface VisibilitySchedule {
   /** Show the product at this instant, if set. */
@@ -281,6 +289,19 @@ export interface Product {
    * somebody set last season and forgot.
    */
   visibilityOverride?: boolean;
+
+  /**
+   * Whether this product may be bought, independently of how many are left.
+   *
+   * `auto` follows the stock count. `sold-out` is a merchant stopping sales by
+   * hand — a supplier problem, a pricing error, a photo that has to be redone.
+   *
+   * Separate from the quantity on purpose: zeroing stock to stop sales throws
+   * away a real number that has to come back, and it makes every stock report
+   * lie. Correcting a count to zero stays a stock action; this is a sale
+   * action.
+   */
+  saleState?: SaleState;
 
   /**
    * Hard cap on units of this product in a single order.

@@ -26,6 +26,9 @@ export const SEASONS: Season[] = ["winter", "spring", "summer", "autumn", "all-s
 
 export type StorefrontState =
   | "live"
+  /** Stopped by a person. The count is untouched and may be anything. */
+  | "sold-out"
+  /** Stopped by the shelves being empty. */
   | "out-of-stock"
   | "hidden"
   | "draft"
@@ -82,6 +85,12 @@ export function storefrontState(product: Product, now = Date.now()): StorefrontS
   if (product.status === "draft") return "draft";
   if (product.status === "archived") return "archived";
   if (effectiveVisibility(product, now) === "hidden") return "hidden";
+  /*
+   * A manual stop is reported before the stock check, and as its own state.
+   * Merging the two would tell a merchant their shelves are empty when they
+   * are full, and would let a restock silently undo a deliberate decision.
+   */
+  if (product.saleState === "sold-out") return "sold-out";
   if (!product.inStock || product.totalStock <= 0) return "out-of-stock";
   return "live";
 }
@@ -95,7 +104,9 @@ export function storefrontState(product: Product, now = Date.now()): StorefrontS
  */
 export function isShoppable(product: Product, now = Date.now()): boolean {
   const state = storefrontState(product, now);
-  return state === "live" || state === "out-of-stock";
+  // A stopped or sold-out product keeps its page: the link still works, and
+  // "sold out" is information a shopper came for.
+  return state === "live" || state === "out-of-stock" || state === "sold-out";
 }
 
 /**
@@ -125,6 +136,17 @@ export function unavailableReason(product: Product, now = Date.now()) {
       return {
         en: `${product.title.en} has sold out.`,
         ar: `نفدت الكمية من ${product.title.ar}.`,
+      };
+    /*
+     * A manual stop says "not on sale", not "sold out". Claiming the stock is
+     * gone when the shelves are full is a lie the shop would have to keep
+     * telling, and it is the wrong prompt for a shopper deciding whether to
+     * wait.
+     */
+    case "sold-out":
+      return {
+        en: `${product.title.en} is not on sale at the moment.`,
+        ar: `${product.title.ar} غير معروض للبيع حالياً.`,
       };
     case "hidden":
     case "draft":

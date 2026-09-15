@@ -16,6 +16,7 @@ import {
 } from "@/lib/visibility";
 import { AdminPageHeader } from "./AdminShell";
 import { useAdminLocale } from "./AdminLocale";
+import { ACTION_LABELS, type ProductAction } from "@/lib/product-state";
 import type { AdminKey } from "@/lib/i18n/admin";
 import { Panel, StatTile } from "./AdminUI";
 import { Button } from "@/components/ui/Button";
@@ -71,6 +72,7 @@ const SEASON_KEYS: Record<Season, AdminKey> = {
 
 const STATE_STYLES: Record<StorefrontState, { label: AdminKey; tone: string }> = {
   live: { label: "wh.state.live", tone: "bg-mint/12 text-mint" },
+  "sold-out": { label: "wh.state.sold-out", tone: "bg-clay/20 text-ink-muted" },
   "out-of-stock": { label: "wh.state.out-of-stock", tone: "bg-alert/10 text-alert" },
   hidden: { label: "wh.state.hidden", tone: "bg-brand-mist text-brand-deep" },
   draft: { label: "wh.state.draft", tone: "bg-paper-sunken text-smoke" },
@@ -118,6 +120,7 @@ export function WarehouseBoard({
   const counts = useMemo(() => {
     const out: Record<StorefrontState, number> = {
       live: 0,
+      "sold-out": 0,
       "out-of-stock": 0,
       hidden: 0,
       draft: 0,
@@ -136,6 +139,66 @@ export function WarehouseBoard({
       else next.add(id);
       return next;
     });
+  }
+
+  /**
+   * Publication and sale state, for the whole selection.
+   *
+   * A separate route from `apply` because it answers differently: the
+   * warehouse endpoint moves display and seasons and either works or does not,
+   * while a state change is decided per product — a bulk Publish over thirty
+   * products will usually refuse a few for a missing Arabic title, and the
+   * useful answer names them rather than failing the other twenty-six.
+   */
+  async function applyState(action: ProductAction) {
+    if (selected.size === 0) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const token = await getIdToken().catch(() => null);
+      const response = await fetch("/api/admin/products/state", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ ids: [...selected], action }),
+      });
+      const data = (await response.json()) as {
+        ok?: boolean;
+        error?: string;
+        changed?: number;
+        requested?: number;
+        refused?: { title?: string; reason?: string }[];
+      };
+      if (!response.ok || !data.ok) throw new Error(data.error ?? t("wh.updateFailed"));
+
+      const changed = data.changed ?? 0;
+      const refused = data.refused ?? [];
+
+      /*
+       * Both halves are reported. "26 changed" alone hides the four that did
+       * not, and a merchant who is not told will find out from a customer.
+       */
+      let message = `${ACTION_LABELS[action][locale]} — ${changed}/${data.requested ?? selected.size}.`;
+      if (refused.length > 0) {
+        const shown = refused
+          .slice(0, 3)
+          .map((r) => `${r.title ?? "?"}: ${r.reason ?? ""}`)
+          .join(" · ");
+        message += ` ${t("wh.refused")}: ${shown}`;
+        if (refused.length > 3) message += ` (+${refused.length - 3})`;
+      }
+      setNotice(message);
+
+      if (changed > 0) setSelected(new Set());
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("wh.updateError"));
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function apply(payload: Record<string, unknown>, describe: string) {
@@ -254,8 +317,33 @@ export function WarehouseBoard({
       {selected.size > 0 && (
         <Panel
           title={`${selected.size} selected`}
-          description={t("wh.hidingHint")}
+          description={t("wh.publicationHint")}
         >
+          {/*
+            Publication and sale first, display below. They are different
+            axes — a draft is not a hidden product, and a stopped sale is not
+            an empty shelf — and grouping them by axis is what stops an
+            operator reaching for the wrong one.
+          */}
+          <div className="border-line mb-4 flex flex-wrap items-center gap-2 border-b pb-4">
+            <span className="text-mist me-1 text-[0.6875rem] tracking-[0.1em] uppercase">
+              {t("wh.publication")}
+            </span>
+            {(["publish", "draft", "sold-out", "restock", "archive", "restore"] as const).map(
+              (action) => (
+                <Button
+                  key={action}
+                  variant={action === "publish" ? "brand" : "secondary"}
+                  size="sm"
+                  loading={busy}
+                  onClick={() => void applyState(action)}
+                >
+                  {ACTION_LABELS[action][locale]}
+                </Button>
+              ),
+            )}
+          </div>
+
           <div className="flex flex-wrap items-end gap-3">
             <Button
               variant="secondary"
