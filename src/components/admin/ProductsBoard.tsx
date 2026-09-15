@@ -493,6 +493,13 @@ export function ProductsBoard({
               filename="net-sale-catalogue"
               title={t("products.title")}
             />
+            {/* Beside Export, because they are the two halves of the same
+                round trip: take the catalogue out, edit it, bring it back. */}
+            <Link href="/admin/products/import">
+              <Button variant="ghost" size="sm">
+                {t("imp.open")}
+              </Button>
+            </Link>
             <Link href="/admin/products/new">
               <Button variant="brand" size="sm">
                 {t("products.new")}

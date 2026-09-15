@@ -166,6 +166,7 @@ let productState: typeof import("../src/app/api/admin/products/state/route");
 let products: typeof import("../src/app/api/admin/products/route");
 let media: typeof import("../src/app/api/admin/media/route");
 let bulk: typeof import("../src/app/api/admin/products/bulk/route");
+let importRoute: typeof import("../src/app/api/admin/products/import/route");
 let adminSdk: typeof import("../src/lib/firebase/admin");
 
 before(async () => {
@@ -180,6 +181,7 @@ before(async () => {
   products = await import("../src/app/api/admin/products/route");
   media = await import("../src/app/api/admin/media/route");
   bulk = await import("../src/app/api/admin/products/bulk/route");
+  importRoute = await import("../src/app/api/admin/products/import/route");
   adminSdk = await import("../src/lib/firebase/admin");
 
   customer = await signUp("customer@example.test");
@@ -194,7 +196,7 @@ before(async () => {
 
 after(async () => {
   const db = adminSdk.getAdminDb();
-  for (const name of ["tickets", "auditLog", "giftCampaigns", "products", "media", "categories"]) {
+  for (const name of ["tickets", "auditLog", "giftCampaigns", "products", "media", "categories", "importJobs"]) {
     const snap = await db.collection(name).get();
     await Promise.all(snap.docs.map((doc) => doc.ref.delete()));
   }
@@ -1508,5 +1510,447 @@ describe("bulk edit", () => {
 
     const a = (await db().collection("products").doc("e2e-bulk-a").get()).data()!;
     assert.notEqual(a.price, 1);
+  });
+});
+/* -------------------------------------------------------------------------- */
+/*  Importing a spreadsheet                                                   */
+/* -------------------------------------------------------------------------- */
+
+describe("product import", () => {
+  const db = () => adminSdk.getAdminDb();
+
+  const seed = async (id: string, body: Record<string, unknown>) =>
+    json<{ ok: boolean; error?: string }>(
+      await products.POST(
+        request("/api/admin/products", {
+          method: "POST",
+          token: owner.token,
+          body: JSON.stringify({
+            id,
+            categoryId: "tees",
+            type: "simple",
+            status: "draft",
+            ...body,
+          }),
+        }),
+      ),
+    );
+
+  const send = async (body: Record<string, unknown>, token = owner.token) =>
+    json<{
+      ok: boolean;
+      error?: string;
+      created?: number;
+      updated?: number;
+      applied?: number;
+      alreadyApplied?: boolean;
+      restored?: number;
+      deleted?: number;
+      kept?: string[];
+      outcomes?: { line: number; ok: boolean; action?: string; id?: string; reason?: string }[];
+    }>(
+      await importRoute.POST(
+        request("/api/admin/products/import", {
+          method: "POST",
+          token,
+          body: JSON.stringify(body),
+        }),
+      ),
+    );
+
+  /** A parsed row in the shape the browser sends. */
+  const row = (line: number, values: Record<string, unknown>) => ({ line, values, problems: [] });
+
+  before(async () => {
+    await seed("e2e-imp-existing", {
+      slug: "e2e-imp-existing",
+      title: { en: "Existing tee", ar: "تي شيرت موجود" },
+      sku: "IMP-EXIST",
+      price: 20,
+      totalStock: 5,
+    });
+  });
+
+  test("a row matching nothing creates a draft, never a live product", async () => {
+    /*
+     * An import that publishes is an import that puts something on the
+     * storefront nobody has looked at. A file that says `status: published`
+     * still can — this is only what happens when it says nothing.
+     */
+    const result = await send({
+      jobId: "job-create-001",
+      filename: "new.csv",
+      total: 1,
+      offset: 0,
+      rows: [
+        row(2, {
+          titleEn: "Imported tee",
+          titleAr: "تي شيرت مستورد",
+          categoryId: "tees",
+          price: 9.5,
+          totalStock: 3,
+        }),
+      ],
+    });
+
+    assert.equal(result.ok, true, result.error);
+    assert.equal(result.created, 1);
+
+    const id = result.outcomes!.find((outcome) => outcome.action === "create")!.id!;
+    const stored = (await db().collection("products").doc(id).get()).data()!;
+    assert.equal(stored.status, "draft");
+    assert.equal(stored.price, 9.5);
+    assert.equal(stored.totalStock, 3);
+    // The pair that has to move together, or a listing offers an empty product.
+    assert.equal(stored.inStock, true);
+    assert.equal(stored.slug.length > 0, true);
+    assert.deepEqual(stored.images, []);
+  });
+
+  test("a row matching an existing product updates only what it carried", async () => {
+    /*
+     * The failure this pins: an importer that writes every field would send
+     * `description: ""` for a price-list file and erase every description in
+     * the catalogue, with nothing in the preview to suggest it would.
+     */
+    const before = (await db().collection("products").doc("e2e-imp-existing").get()).data()!;
+
+    const result = await send({
+      jobId: "job-update-001",
+      filename: "prices.csv",
+      total: 1,
+      offset: 0,
+      rows: [row(2, { sku: "IMP-EXIST", price: 24 })],
+    });
+    assert.equal(result.ok, true, result.error);
+    assert.equal(result.updated, 1);
+
+    const after = (await db().collection("products").doc("e2e-imp-existing").get()).data()!;
+    assert.equal(after.price, 24);
+    assert.equal(after.title.en, before.title.en);
+    assert.equal(after.totalStock, before.totalStock);
+  });
+
+  test("re-running the same file writes nothing", async () => {
+    // The most common thing a merchant does: run yesterday's file again to be
+    // sure. Rewriting every row would move each `updatedAt` and break every
+    // open editor's conflict check.
+    const before = (await db().collection("products").doc("e2e-imp-existing").get()).data()!;
+
+    const result = await send({
+      jobId: "job-update-002",
+      filename: "prices.csv",
+      total: 1,
+      offset: 0,
+      rows: [row(2, { sku: "IMP-EXIST", price: 24 })],
+    });
+    assert.equal(result.ok, true, result.error);
+    assert.equal(result.updated, 0);
+    assert.equal(result.outcomes?.[0]?.action, "skip");
+
+    const after = (await db().collection("products").doc("e2e-imp-existing").get()).data()!;
+    assert.equal(after.updatedAt, before.updatedAt);
+  });
+
+  test("a retried slice is recognised and not applied twice", async () => {
+    /*
+     * The response was lost, not the write. Without the job's record of how
+     * far it got, the retry creates a second copy of every product in the
+     * slice — and the merchant has no way to tell which half is the duplicate.
+     */
+    const first = await send({
+      jobId: "job-retry-001",
+      filename: "retry.csv",
+      total: 1,
+      offset: 0,
+      rows: [
+        row(2, {
+          titleEn: "Retried tee",
+          titleAr: "تي شيرت معاد",
+          categoryId: "tees",
+          price: 11,
+        }),
+      ],
+    });
+    assert.equal(first.created, 1);
+
+    const again = await send({
+      jobId: "job-retry-001",
+      filename: "retry.csv",
+      total: 1,
+      offset: 0,
+      rows: [
+        row(2, {
+          titleEn: "Retried tee",
+          titleAr: "تي شيرت معاد",
+          categoryId: "tees",
+          price: 11,
+        }),
+      ],
+    });
+    assert.equal(again.ok, true);
+    assert.equal(again.alreadyApplied, true);
+    assert.equal(again.created ?? 0, 0);
+
+    const copies = await db()
+      .collection("products")
+      .where("title.en", "==", "Retried tee")
+      .get();
+    assert.equal(copies.size, 1);
+  });
+
+  test("a second slice carries on from where the first stopped", async () => {
+    const first = await send({
+      jobId: "job-slices-001",
+      filename: "two-slices.csv",
+      total: 2,
+      offset: 0,
+      rows: [row(2, { titleEn: "Slice one", titleAr: "شريحة ١", categoryId: "tees", price: 5 })],
+    });
+    assert.equal(first.applied, 1);
+
+    const second = await send({
+      jobId: "job-slices-001",
+      filename: "two-slices.csv",
+      total: 2,
+      offset: 1,
+      rows: [row(3, { titleEn: "Slice two", titleAr: "شريحة ٢", categoryId: "tees", price: 6 })],
+    });
+    assert.equal(second.applied, 2);
+    assert.equal(second.created, 1);
+
+    const job = (await db().collection("importJobs").doc("job-slices-001").get()).data()!;
+    assert.equal(job.status, "done");
+    assert.equal(job.created, 2);
+  });
+
+  test("the plan is recomputed here, against the catalogue as it is now", async () => {
+    /*
+     * The browser planned this row as a create. In between, the product came
+     * into existence. Trusting the browser would make a second copy; planning
+     * again makes it the update it now is.
+     */
+    await seed("e2e-imp-raced", {
+      slug: "e2e-imp-raced",
+      title: { en: "Raced tee", ar: "تي شيرت سباق" },
+      sku: "IMP-RACE",
+      price: 12,
+    });
+
+    const result = await send({
+      jobId: "job-race-001",
+      filename: "race.csv",
+      total: 1,
+      offset: 0,
+      rows: [
+        row(2, {
+          sku: "IMP-RACE",
+          titleEn: "Raced tee",
+          titleAr: "تي شيرت سباق",
+          categoryId: "tees",
+          price: 15,
+        }),
+      ],
+    });
+
+    assert.equal(result.created, 0);
+    assert.equal(result.updated, 1);
+    const stored = (await db().collection("products").doc("e2e-imp-raced").get()).data()!;
+    assert.equal(stored.price, 15);
+  });
+
+  test("a bad row is refused and the good rows in the same slice still land", async () => {
+    const result = await send({
+      jobId: "job-mixed-001",
+      filename: "mixed.csv",
+      total: 2,
+      offset: 0,
+      rows: [
+        row(2, { titleEn: "No price" }),
+        row(3, { titleEn: "Fine tee", titleAr: "تي شيرت سليم", categoryId: "tees", price: 8 }),
+      ],
+    });
+
+    assert.equal(result.ok, true, result.error);
+    assert.equal(result.created, 1);
+    const refused = result.outcomes!.find((outcome) => outcome.line === 2)!;
+    assert.equal(refused.ok, false);
+    assert.equal((refused.reason ?? "").length > 0, true);
+  });
+
+  test("the same product twice in one slice is refused the second time", async () => {
+    const result = await send({
+      jobId: "job-dupe-001",
+      filename: "dupe.csv",
+      total: 2,
+      offset: 0,
+      rows: [
+        row(2, { sku: "IMP-EXIST", price: 31 }),
+        row(3, { sku: "IMP-EXIST", price: 32 }),
+      ],
+    });
+
+    assert.equal(result.updated, 1);
+    assert.equal(result.outcomes!.find((outcome) => outcome.line === 3)!.ok, false);
+
+    // The first one is what applied, because it is the one the merchant can see.
+    const stored = (await db().collection("products").doc("e2e-imp-existing").get()).data()!;
+    assert.equal(stored.price, 31);
+  });
+
+  /* ---- undo ------------------------------------------------------------ */
+
+  test("undo puts back what was changed and removes what was added", async () => {
+    await seed("e2e-imp-undo", {
+      slug: "e2e-imp-undo",
+      title: { en: "Undo tee", ar: "تي شيرت تراجع" },
+      sku: "IMP-UNDO",
+      price: 40,
+      totalStock: 9,
+    });
+
+    const applied = await send({
+      jobId: "job-undo-001",
+      filename: "undo.csv",
+      total: 2,
+      offset: 0,
+      rows: [
+        row(2, { sku: "IMP-UNDO", price: 5, totalStock: 1 }),
+        row(3, { titleEn: "Undo new", titleAr: "جديد تراجع", categoryId: "tees", price: 7 }),
+      ],
+    });
+    assert.equal(applied.updated, 1);
+    assert.equal(applied.created, 1);
+    const createdId = applied.outcomes!.find((outcome) => outcome.action === "create")!.id!;
+
+    const undone = await send({ action: "undo", jobId: "job-undo-001" });
+    assert.equal(undone.ok, true, undone.error);
+    assert.equal(undone.restored, 1);
+    assert.equal(undone.deleted, 1);
+
+    const restored = (await db().collection("products").doc("e2e-imp-undo").get()).data()!;
+    assert.equal(restored.price, 40);
+    assert.equal(restored.totalStock, 9);
+
+    const gone = await db().collection("products").doc(createdId).get();
+    assert.equal(gone.exists, false);
+  });
+
+  test("undo removes a field the import invented, rather than leaving it", async () => {
+    /*
+     * The product had no was-price. The import gave it one. Restoring only the
+     * fields that had values would leave the invented one in place, and the
+     * shop would keep showing a discount nobody set.
+     */
+    await seed("e2e-imp-undo-field", {
+      slug: "e2e-imp-undo-field",
+      title: { en: "Field tee", ar: "تي شيرت حقل" },
+      sku: "IMP-FIELD",
+      price: 20,
+    });
+
+    await send({
+      jobId: "job-undo-002",
+      filename: "field.csv",
+      total: 1,
+      offset: 0,
+      rows: [row(2, { sku: "IMP-FIELD", compareAtPrice: 30 })],
+    });
+    const withSale = (await db().collection("products").doc("e2e-imp-undo-field").get()).data()!;
+    assert.equal(withSale.compareAtPrice, 30);
+
+    await send({ action: "undo", jobId: "job-undo-002" });
+    const after = (await db().collection("products").doc("e2e-imp-undo-field").get()).data()!;
+    assert.equal("compareAtPrice" in after, false);
+  });
+
+  test("undo leaves alone a product somebody edited afterwards, and says which", async () => {
+    /*
+     * An undo is a statement about *this import's* changes. A product that has
+     * moved on since carries a newer, deliberate edit on top, and restoring
+     * the old value would throw away work the undo was never asked about.
+     */
+    await seed("e2e-imp-edited", {
+      slug: "e2e-imp-edited",
+      title: { en: "Edited tee", ar: "تي شيرت معدّل" },
+      sku: "IMP-EDITED",
+      price: 50,
+    });
+
+    await send({
+      jobId: "job-undo-003",
+      filename: "edited.csv",
+      total: 1,
+      offset: 0,
+      rows: [row(2, { sku: "IMP-EDITED", price: 10 })],
+    });
+
+    // Somebody prices it by hand afterwards.
+    await db()
+      .collection("products")
+      .doc("e2e-imp-edited")
+      .set({ price: 33, updatedAt: Date.now() + 60_000 }, { merge: true });
+
+    const undone = await send({ action: "undo", jobId: "job-undo-003" });
+    assert.equal(undone.ok, true, undone.error);
+    assert.equal(undone.restored, 0);
+    assert.equal(undone.kept?.length, 1);
+
+    const stored = (await db().collection("products").doc("e2e-imp-edited").get()).data()!;
+    assert.equal(stored.price, 33);
+  });
+
+  test("an import cannot be undone twice", async () => {
+    const again = await send({ action: "undo", jobId: "job-undo-001" });
+    assert.equal(again.httpStatus, 409);
+  });
+
+  test("an undone job refuses further slices", async () => {
+    // Otherwise a resume after an undo quietly re-applies what was just put back.
+    const result = await send({
+      jobId: "job-undo-001",
+      filename: "undo.csv",
+      total: 3,
+      offset: 2,
+      rows: [row(4, { titleEn: "Late", titleAr: "متأخر", categoryId: "tees", price: 3 })],
+    });
+    assert.equal(result.httpStatus, 409);
+  });
+
+  /* ---- permission ------------------------------------------------------ */
+
+  test("a customer cannot import or undo", async () => {
+    const applyAttempt = await send(
+      {
+        jobId: "job-customer-001",
+        filename: "x.csv",
+        total: 1,
+        offset: 0,
+        rows: [row(2, { titleEn: "Nope", titleAr: "لا", categoryId: "tees", price: 1 })],
+      },
+      customer.token,
+    );
+    assert.equal(applyAttempt.httpStatus, 403);
+
+    const undoAttempt = await send({ action: "undo", jobId: "job-slices-001" }, customer.token);
+    assert.equal(undoAttempt.httpStatus, 403);
+
+    const job = (await db().collection("importJobs").doc("job-slices-001").get()).data()!;
+    assert.equal(job.status, "done");
+  });
+
+  test("an oversized slice is refused rather than truncated", async () => {
+    // Truncating would report success for rows it never wrote.
+    const many = Array.from({ length: 101 }, (_, i) =>
+      row(i + 2, { titleEn: `Bulk ${i}`, titleAr: `كثير ${i}`, categoryId: "tees", price: 1 }),
+    );
+    const result = await send({
+      jobId: "job-toobig-001",
+      filename: "big.csv",
+      total: 101,
+      offset: 0,
+      rows: many,
+    });
+    assert.equal(result.httpStatus, 400);
   });
 });
