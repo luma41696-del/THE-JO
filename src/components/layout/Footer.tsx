@@ -50,7 +50,22 @@ const COLUMNS: {
   },
 ];
 
-export function Footer({ locale = "en" }: { locale?: Locale }) {
+export function Footer({
+  locale = "en",
+  social = [],
+}: {
+  locale?: Locale;
+  /**
+   * The shop's own accounts, from store settings.
+   *
+   * These used to be three hard-coded links to `instagram.com`,
+   * `tiktok.com` and `pinterest.com` — the platforms' front doors, not net
+   * sale's profiles. A link labelled "Instagram" that lands on Instagram's
+   * homepage is a dead end wearing the shop's name, and Pinterest was an
+   * account that does not exist at all.
+   */
+  social?: { label: string; href: string }[];
+}) {
   const rtl = locale === "ar";
   const year = new Date().getFullYear();
 
@@ -73,20 +88,24 @@ export function Footer({ locale = "en" }: { locale?: Locale }) {
                   : "Pieces made to outlast the season. Cut in selected mills across Italy and Portugal, delivered in days."}
               </p>
 
-              <div className="mt-8 flex items-center gap-3">
-                {["Instagram", "TikTok", "Pinterest"].map((network) => (
-                  <a
-                    key={network}
-                    href={`https://www.${network.toLowerCase()}.com/`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-pill border border-white/15 px-4 py-2 text-[0.6875rem] tracking-[0.14em] text-white/70 uppercase transition-colors hover:border-white/40 hover:text-white"
-                    data-cursor="hover"
-                  >
-                    {network}
-                  </a>
-                ))}
-              </div>
+              {/* Nothing at all when the shop has listed no accounts — an
+                  empty row of buttons is worse than no row. */}
+              {social.length > 0 && (
+                <div className="mt-8 flex flex-wrap items-center gap-3">
+                  {social.map((network) => (
+                    <a
+                      key={network.href}
+                      href={network.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-pill border border-white/15 px-4 py-2 text-[0.6875rem] tracking-[0.14em] text-white/70 uppercase transition-colors hover:border-white/40 hover:text-white"
+                      data-cursor="hover"
+                    >
+                      {network.label}
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
           </Reveal>
 

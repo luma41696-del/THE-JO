@@ -11,6 +11,7 @@ import {
   getShopProducts,
   getUpsellProducts,
 } from "@/lib/catalog";
+import { getStoreSettings } from "@/lib/settings";
 import { categoryTrail } from "@/lib/categories";
 import { ProductDetail } from "@/components/product/ProductDetail";
 import { ProductRail } from "@/components/product/ProductRail";
@@ -85,7 +86,7 @@ export default async function ProductPage({
   const product = await getProductBySlug(slug);
   if (!product || product.status !== "active") notFound();
 
-  const [related, upsells, categories, shippingClasses, reviews, reviewSummary] =
+  const [related, upsells, categories, shippingClasses, reviews, reviewSummary, settings] =
     await Promise.all([
       getRelatedProducts(product, 8),
       getUpsellProducts(product),
@@ -93,6 +94,7 @@ export default async function ProductPage({
       getShippingClasses(),
       getProductReviews(product.id),
       getReviewSummary(product.id),
+      getStoreSettings(),
     ]);
 
   const trail = categoryTrail(categories, product.categoryId);
@@ -185,6 +187,7 @@ export default async function ProductPage({
         trail={trail}
         shippingClass={shippingClass}
         reviewSummary={reviewSummary}
+        settings={settings}
       />
 
       <ProductReviews

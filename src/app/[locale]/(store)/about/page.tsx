@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 
 import { Link } from "@/components/ui/Link";
 import { PageIntro } from "@/components/ui/PageIntro";
-import { policiesIn, storeSettings } from "@/data/site-content";
+import { policiesIn } from "@/data/site-content";
+import { getStoreSettings } from "@/lib/settings";
 import { LOCALES, isLocale } from "@/lib/i18n/config";
 import { t } from "@/lib/format";
 import type { Locale } from "@/types";
@@ -31,6 +32,7 @@ export default async function AboutPage({ params }: { params: Promise<{ locale: 
   const locale: Locale = isLocale(raw) ? raw : "en";
   const rtl = locale === "ar";
   const pages = policiesIn("about");
+  const settings = await getStoreSettings();
 
   return (
     <>
@@ -79,10 +81,10 @@ export default async function AboutPage({ params }: { params: Promise<{ locale: 
               {rtl ? "تواصل" : "Contact"}
             </p>
             <p className="text-ink-muted text-[0.875rem]">
-              {storeSettings.contact.email} · {storeSettings.contact.phone}
+              {settings.contact.email} · {settings.contact.phone}
             </p>
             <p className="text-mist mt-1 text-[0.8125rem]">
-              {t(storeSettings.contact.hours, locale)}
+              {t(settings.contact.hours, locale)}
             </p>
           </div>
         </div>

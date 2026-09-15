@@ -65,3 +65,27 @@ export function revalidateNavigation() {
   }
   revalidateCatalogue();
 }
+
+/**
+ * Everything.
+ *
+ * Store settings are interpolated into sentences on almost every page — the
+ * announcement bar, the product page's delivery line, the policy documents,
+ * the footer. Enumerating those is how one gets missed, and a free-delivery
+ * threshold that is right in the cart and wrong on the product page is worse
+ * than either number on its own.
+ */
+export function revalidateAll() {
+  revalidateNavigation();
+  localised("/cart");
+  localised("/help");
+  localised("/legal");
+  localised("/about");
+  for (const group of ["help", "legal"]) {
+    try {
+      revalidatePath(`/[locale]/(store)/${group}/[slug]`, "page");
+    } catch (error) {
+      console.warn(`[revalidate] ${group} documents failed`, error);
+    }
+  }
+}

@@ -24,7 +24,7 @@ import {
   isSoldIndividually,
   resolveSelection,
 } from "@/lib/product";
-import { storeSettings } from "@/data/site-content";
+import { storeSettings, type StoreSettings } from "@/data/site-content";
 import type { Category, Locale, Product, ReviewSummary, ShippingClass } from "@/types";
 
 /**
@@ -55,6 +55,14 @@ export interface ProductDetailProps {
   trail?: Category[];
   /** The product's shipping class, surfaced in the details table. */
   shippingClass?: ShippingClass | null;
+  /**
+   * Live store settings.
+   *
+   * Passed in rather than imported, because the page is the thing that can
+   * read Firestore — a client component importing the static object would
+   * quote last deploy's threshold next to a cart that charges today's.
+   */
+  settings?: StoreSettings;
 }
 
 export function ProductDetail({
@@ -63,6 +71,7 @@ export function ProductDetail({
   trail = [],
   shippingClass = null,
   reviewSummary = null,
+  settings = storeSettings,
 }: ProductDetailProps) {
   const reduced = useReducedMotion();
   const rtl = locale === "ar";
@@ -676,12 +685,12 @@ export function ProductDetail({
           <ul className="border-line mt-6 grid gap-2.5 border-t pt-6">
             {[
               {
-                en: `Free delivery over ${storeSettings.freeShippingThreshold} JOD`,
-                ar: `توصيل مجاني فوق ${storeSettings.freeShippingThreshold} ديناراً`,
+                en: `Free delivery over ${settings.freeShippingThreshold} JOD`,
+                ar: `توصيل مجاني فوق ${settings.freeShippingThreshold} ديناراً`,
               },
               {
-                en: `Returns within ${storeSettings.returnWindowDays} days`,
-                ar: `إرجاع خلال ${storeSettings.returnWindowDays} يوماً`,
+                en: `Returns within ${settings.returnWindowDays} days`,
+                ar: `إرجاع خلال ${settings.returnWindowDays} يوماً`,
               },
               { en: "Pay on delivery", ar: "الدفع عند الاستلام" },
             ].map((item) => (

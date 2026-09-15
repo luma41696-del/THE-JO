@@ -52,6 +52,10 @@ const NAV: { group: string; items: { href: string; label: string; icon: ReactNod
       { href: "/admin/support", label: "Support", icon: <ChatIcon /> },
     ],
   },
+  {
+    group: "Shop",
+    items: [{ href: "/admin/settings", label: "Settings", icon: <DocIcon /> }],
+  },
 ];
 
 export function AdminShell({

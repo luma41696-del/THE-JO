@@ -5,6 +5,7 @@ import { SearchOverlay } from "@/components/layout/SearchOverlay";
 import { CartDrawer } from "@/components/cart/CartDrawer";
 import { ConsentBanner } from "@/components/analytics/ConsentBanner";
 import { PageTracker } from "@/components/analytics/PageTracker";
+import { getStoreSettings } from "@/lib/settings";
 import { getCategoryTree } from "@/lib/catalog";
 import { isLocale } from "@/lib/i18n/config";
 import type { Locale } from "@/types";
@@ -31,7 +32,7 @@ export default async function StoreLayout({
   const locale: Locale = isLocale(raw) ? raw : "en";
 
   // The nav is a client island, so the tree is read here and passed down.
-  const categoryTree = await getCategoryTree();
+  const [categoryTree, settings] = await Promise.all([getCategoryTree(), getStoreSettings()]);
 
   return (
     <>
@@ -42,7 +43,7 @@ export default async function StoreLayout({
         categoryTree={categoryTree}
       />
       {children}
-      <Footer locale={locale} />
+      <Footer locale={locale} social={settings.social} />
       <CartDrawer locale={locale} />
       {/* Nothing is recorded until the banner has been answered — the guard
           lives in `track()`, so mounting the tracker is safe either way. */}

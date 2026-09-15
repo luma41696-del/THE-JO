@@ -226,6 +226,31 @@ service cloud.firestore {
       allow write: if isStaff() && appCheckOk();
     }
 
+    /* ------------------------------------------------------------------ */
+    /*  Store settings — world-readable, admin-written                     */
+    /* ------------------------------------------------------------------ */
+
+    match /settings/{docId} {
+      /*
+       * Public by necessity: the contact details, the free-delivery threshold
+       * and the social links are rendered on every page, including for signed
+       * out visitors. Nothing secret belongs in this document — keys live in
+       * the server environment, never here.
+       */
+      allow read: if appCheckOk();
+
+      /*
+       * Admin only, and narrower than the rest of the shop on purpose. Staff
+       * may edit a product; the return window is a policy the business is
+       * bound by, and changing it changes what every page promises.
+       *
+       * Writes normally arrive through /api/admin/settings, which runs with
+       * the Admin SDK and bypasses this. The rule is the floor for anything
+       * that reaches Firestore another way.
+       */
+      allow write: if hasRole('admin') && appCheckOk();
+    }
+
     match /testimonials/{id} {
       allow read: if appCheckOk() && resource.data.verified == true;
       allow write: if isStaff() && appCheckOk();

@@ -67,10 +67,19 @@ export const storeSettings: StoreSettings = {
     },
     address: { en: "Amman, Jordan", ar: "عمّان، الأردن" },
   },
-  social: [
-    { label: "Instagram", href: "https://instagram.com/" },
-    { label: "TikTok", href: "https://tiktok.com/" },
-  ],
+  /*
+   * Empty on purpose.
+   *
+   * These were `https://instagram.com/` and `https://tiktok.com/` — the
+   * platforms' front doors, not net sale's profiles. A button labelled
+   * "Instagram" in the shop's own footer that lands on Instagram's homepage
+   * is a dead end wearing the shop's name, and nobody can tell it is broken
+   * by looking at it.
+   *
+   * The footer renders nothing at all while this is empty. Add the real
+   * handles in the admin under Settings → Social links.
+   */
+  social: [],
   legal: {
     tradingName: "net sale",
     country: { en: "Jordan", ar: "الأردن" },
@@ -98,9 +107,20 @@ export interface PolicyDoc {
 }
 
 const UPDATED = "2026-09-15";
-const S = storeSettings;
 
-export const policyDocs: PolicyDoc[] = [
+/**
+ * The policy documents, composed from whatever settings are live.
+ *
+ * A function rather than a constant, because these quote the shop's real
+ * numbers fourteen times over — the free-delivery threshold, the return
+ * window, the delivery window, the contact address. Built once at module load
+ * they would keep quoting the values that were in the repo at deploy time,
+ * while the cart charged what the merchant set this morning. A returns page
+ * that promises a window the shop no longer honours is the expensive kind of
+ * wrong.
+ */
+export function buildPolicyDocs(S: StoreSettings): PolicyDoc[] {
+  return [
   /* ---- Help ---- */
   {
     slug: "shipping",
@@ -424,12 +444,28 @@ export const policyDocs: PolicyDoc[] = [
       },
     ],
   },
-];
-
-export function findPolicy(group: PolicyDoc["group"], slug: string): PolicyDoc | null {
-  return policyDocs.find((d) => d.group === group && d.slug === slug) ?? null;
+  ];
 }
 
-export function policiesIn(group: PolicyDoc["group"]): PolicyDoc[] {
-  return policyDocs.filter((d) => d.group === group);
+/**
+ * The documents as they read with the repo's own settings.
+ *
+ * Kept for callers that have no way to await a Firestore read — and as the
+ * fallback the loader returns when one fails.
+ */
+export const policyDocs: PolicyDoc[] = buildPolicyDocs(storeSettings);
+
+export function findPolicy(
+  group: PolicyDoc["group"],
+  slug: string,
+  docs: PolicyDoc[] = policyDocs,
+): PolicyDoc | null {
+  return docs.find((d) => d.group === group && d.slug === slug) ?? null;
+}
+
+export function policiesIn(
+  group: PolicyDoc["group"],
+  docs: PolicyDoc[] = policyDocs,
+): PolicyDoc[] {
+  return docs.filter((d) => d.group === group);
 }
