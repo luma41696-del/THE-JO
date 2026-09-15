@@ -46,6 +46,7 @@ blocked on a backend.
 | `npm run build` / `start` | Production build / serve |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
+| `npm test` | All suites — 130 tests, Node's runner via `tsx --test` |
 | `npm run brand` | Regenerate every brand asset from `scripts/brand-paths.json` |
 | `npm run seed` | Push the demo catalogue to Firestore (needs Admin SDK) |
 | `npm run seed -- --wipe` | Clear those collections first |
@@ -110,9 +111,15 @@ Component ever imports it, the **build fails** rather than leaking the key.
 
 ## Admin
 
-`/admin` — deliberately outside the `[locale]` tree, in English only. Internal
-tooling read by the team, not by shoppers; a half-translated operations surface
-is worse than one language done properly.
+`/admin` — deliberately outside the `[locale]` tree. The operator's language is
+a preference on their machine rather than part of the URL, chosen from a toggle
+in the rail and stored per browser.
+
+The chrome, **Settings**, **Delivery** and the dashboard's stock queue are
+bilingual and mirror to RTL. The trading boards are English, and switching to
+Arabic says so on screen rather than leaving an operator to wonder whether
+something failed to load. Adding a board to the translated set is adding its
+keys to `src/lib/i18n/admin.ts`.
 
 | Screen | Does |
 | --- | --- |
@@ -120,8 +127,14 @@ is worse than one language done properly.
 | `/admin/orders` | Inbox, defaulting to **what still needs a person** rather than newest-first |
 | `/admin/orders/[ref]` | One order — status transitions, timeline, totals, tracking |
 | `/admin/products` | Catalogue, **lowest stock first** |
-| `/admin/products/[id]` | Bilingual editor, variant grid, pricing |
+| `/admin/products/[id]` | Bilingual editor, designs, variant grid per design, pricing |
 | `/admin/offers` | Discount codes and campaign banners, together |
+| `/admin/warehouse` | Seasonal visibility, bulk actions, scheduling |
+| `/admin/reviews` | Moderation queue with reasons and replies |
+| `/admin/gift` | Prize table, odds, attempt limits, issued-prize report |
+| `/admin/behaviour` | Funnel, drop-off, search-with-no-results |
+| `/admin/shipping` | Delivery methods and zones — fees, free-delivery thresholds, excluded areas |
+| `/admin/settings` | Contact details, social links, delivery promises, low-stock threshold |
 | `/admin/customers` | Lifetime value, repeat rate, revenue from repeat buyers |
 | `/admin/support` | Two-pane ticket reader with reply |
 | `/admin/invoices` | Ledger, net of credits |
@@ -279,17 +292,27 @@ between them, and the morph silently stops working.
 ## What is real vs. scaffolded
 
 **Fully working:** catalogue with Firestore + demo fallback, filtering and
-sorting via URL state, product detail with variants, cart and wishlist with
-persistence and server merge, three-step checkout with server-side re-pricing
-and a stock transaction, Firebase Auth (email + Google), order history and
-tracking, search, the fitting room's size-recommendation engine, the whole
-motion and cursor system, security rules.
+sorting via URL state, product detail with colour, size and **design** options,
+cart and wishlist with persistence and server merge, three-step checkout with
+server-side re-pricing, zone-aware delivery quotes and a stock transaction,
+coupons with redemption limits enforced in a transaction, seasonal visibility,
+customer reviews with moderation, a server-decided gift game, consented
+analytics, Firebase Auth (email + Google), order history and tracking, search,
+the fitting room's parametric 3D figure and size-recommendation engine, a
+writing `/admin` across every board, the whole motion and cursor system,
+security rules.
 
-**Scaffolded, by design:** the payment gateway element (the card step is a
-labelled mount point — card fields are deliberately not in this codebase), the
-try-on render pipeline (the data model and UI are complete; the stage shows
-garment tiles rather than a generated composite), and `/admin`, which is
-read-only with the five steps to production written on the page.
+**Scaffolded, by design, and said so on screen:**
+
+- The payment gateway element — the card step is a labelled mount point, and
+  card fields are deliberately not in this codebase. Cash on delivery is the
+  only method offered, because it is the only one connected.
+- Photorealistic try-on and cloth simulation. The fitting room's 3D figure is
+  real and built from the customer's measurements; generating a photo of *this
+  customer* wearing *this garment* needs a provider, keys and a per-image
+  budget, and draping needs an authored glTF per garment. Both are costed in
+  [FITTING-ROOM.md](FITTING-ROOM.md), and the UI states plainly that the figure
+  comes from typed measurements rather than from a photo.
 
 ---
 

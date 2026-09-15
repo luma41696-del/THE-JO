@@ -226,6 +226,21 @@ service cloud.firestore {
       allow write: if isStaff() && appCheckOk();
     }
 
+    match /shippingZones/{id} {
+      /*
+       * Public: the checkout resolves the customer's zone in the browser to
+       * quote a price before they pay. Without this rule the collection falls
+       * to default-deny, the read fails, and every address silently quotes the
+       * un-zoned price — the failure mode being a shop that undercharges for
+       * the far governorates and never finds out.
+       */
+      allow read: if appCheckOk();
+
+      // Written through /api/admin/shipping with the Admin SDK. Admin-only
+      // here for the same reason as settings: this decides what people pay.
+      allow write: if hasRole('admin') && appCheckOk();
+    }
+
     /* ------------------------------------------------------------------ */
     /*  Store settings — world-readable, admin-written                     */
     /* ------------------------------------------------------------------ */
