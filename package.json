@@ -26,7 +26,11 @@
     "test:zones": "tsx --test scripts/zones.test.ts",
     "test:invoice": "tsx --test scripts/invoice.test.ts",
     "test:notify": "tsx --test scripts/notify.test.ts",
-    "test:payments": "tsx --test scripts/payments.test.ts"
+    "test:payments": "tsx --test scripts/payments.test.ts",
+    "test:rules:run": "tsx --test scripts/rules.test.ts",
+    "test:rules": "firebase emulators:exec --only firestore \"npm run test:rules:run\"",
+    "test:storage-rules:run": "tsx --test scripts/storage-rules.test.ts",
+    "test:storage-rules": "firebase emulators:exec --only storage \"npm run test:storage-rules:run\""
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -50,6 +54,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.7",
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@tailwindcss/postcss": "^4.1.0",
     "@types/node": "^22.10.0",
     "@types/react": "^19.1.0",

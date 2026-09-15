@@ -1,5 +1,8 @@
 rules_version = '2';
 
+//
+// Deploy with:  npm run rules:deploy
+// Test with:    npm run test:storage-rules   (10 tests, against the emulator)
 // ============================================================================
 // net sale | نت سيل — Cloud Storage Security Rules
 //
@@ -12,6 +15,9 @@ rules_version = '2';
 // storefront already renders trusted SVG through `next/image`, which is why
 // `next.config.ts` sets `dangerouslyAllowSVG` — that flag is only safe because
 // customer-supplied files can never reach the same path.
+//
+// Deploy with:  npm run rules:deploy
+// Test with:    npm run test:storage-rules   (10 tests, against the emulator)
 // ============================================================================
 
 service firebase.storage {
@@ -29,8 +35,21 @@ service firebase.storage {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    /*
+     * `'role' in` first, deliberately.
+     *
+     * Reading an absent property in a rules expression is an *error*, not
+     * false — and an error denies. That happens to be the right answer here,
+     * but only because every rule in this file happens to put the owner check
+     * first in its OR. Written the other way round, `isStaff() || isOwner(uid)`
+     * would error on an ordinary customer and deny them their own document.
+     *
+     * Checking for the property makes this return false cleanly, so the next
+     * rule anybody writes cannot fall into that ordering trap.
+     */
     function isStaff() {
       return isSignedIn()
+        && 'role' in request.auth.token
         && (request.auth.token.role == 'staff' || request.auth.token.role == 'admin');
     }
 

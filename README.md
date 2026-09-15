@@ -47,6 +47,8 @@ blocked on a backend.
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
 | `npm test` | All suites — 164 tests, Node's runner via `tsx --test` |
+| `npm run test:rules` | Firestore security rules — 28 tests against the emulator |
+| `npm run test:storage-rules` | Storage security rules — 10 tests against the emulator |
 | `npm run brand` | Regenerate every brand asset from `scripts/brand-paths.json` |
 | `npm run seed` | Push the demo catalogue to Firestore (needs Admin SDK) |
 | `npm run seed -- --wipe` | Clear those collections first |

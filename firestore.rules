@@ -8,8 +8,16 @@ rules_version = '2';
 // and anything involving money is writable only by the Admin SDK, which these
 // rules do not apply to at all.
 //
-// Deploy with:  firebase deploy --only firestore:rules
-// Test with:    firebase emulators:exec --only firestore "npm run test:rules"
+// Deploy with:  npm run rules:deploy
+// Test with:    npm run test:rules          (28 tests, against the emulator)
+//
+// That second line was here from the start and named a script that did not
+// exist, so these rules had been verified by reading them — which catches the
+// mistakes you thought of and none of the ones you did not. The suite lives in
+// scripts/rules.test.ts and is written from the attacker's side: "can a
+// signed-in stranger read this", not "can the owner". An owner's path failing
+// is reported in minutes; a stranger's path succeeding is a breach nobody
+// notices.
 // ============================================================================
 
 service cloud.firestore {
@@ -31,8 +39,20 @@ service cloud.firestore {
     // It is signed by Firebase, so a client cannot forge or self-assign it.
     // Note this reads the *token*, never a Firestore document — reading a
     // document here would let a user who can write that document escalate.
+    /*
+     * `'role' in` first, deliberately.
+     *
+     * Reading an absent property in a rules expression is an *error*, not
+     * false — and an error denies. That happens to be the right answer here,
+     * but only because every rule in this file happens to put the owner check
+     * first in its OR. Written the other way round, `isStaff() || isOwner(uid)`
+     * would error on an ordinary customer and deny them their own document.
+     *
+     * Checking for the property makes this return false cleanly, so the next
+     * rule anybody writes cannot fall into that ordering trap.
+     */
     function hasRole(role) {
-      return isSignedIn() && request.auth.token.role == role;
+      return isSignedIn() && 'role' in request.auth.token && request.auth.token.role == role;
     }
 
     function isStaff() {
