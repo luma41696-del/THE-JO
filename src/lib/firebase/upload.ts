@@ -121,6 +121,28 @@ export async function uploadMerchandisingImage(
   return uploadImage(folder, file, alt, options);
 }
 
+/**
+ * A photo attached to a review.
+ *
+ * Scoped to the author's own folder — `reviews/{uid}/…` — because these are
+ * **customer** uploads, not staff ones. The banner and category folders are
+ * staff-writable; letting review photos share them would mean giving every
+ * signed-in shopper write access to the shop's campaign artwork.
+ *
+ * They are publicly readable, unlike the fitting-room folder: a review photo
+ * is published next to the review by design, and a customer who attaches one
+ * is choosing to show it. That is exactly why the size and type limits matter
+ * and why reviews carrying images queue for moderation.
+ */
+export async function uploadReviewImage(
+  uid: string,
+  file: File,
+  alt: string,
+  options: UploadOptions = {},
+): Promise<ProductImage> {
+  return uploadImage(`reviews/${uid}`, file, alt, options);
+}
+
 async function uploadImage(
   folder: string,
   file: File,

@@ -31,6 +31,7 @@ const NAV: { group: string; items: { href: string; label: string; icon: ReactNod
       { href: "/admin", label: "Dashboard", icon: <ChartIcon /> },
       { href: "/admin/orders", label: "Orders", icon: <BagIcon /> },
       { href: "/admin/invoices", label: "Invoices", icon: <DocIcon /> },
+      { href: "/admin/behaviour", label: "Behaviour", icon: <ChartIcon /> },
     ],
   },
   {
@@ -40,6 +41,8 @@ const NAV: { group: string; items: { href: string; label: string; icon: ReactNod
       { href: "/admin/categories", label: "Categories", icon: <TagIcon /> },
       { href: "/admin/warehouse", label: "Seasonal warehouse", icon: <BoxIcon /> },
       { href: "/admin/offers", label: "Offers & campaigns", icon: <SparkIcon /> },
+      { href: "/admin/gift", label: "Gift game", icon: <SparkIcon /> },
+      { href: "/admin/reviews", label: "Reviews", icon: <ChatIcon /> },
     ],
   },
   {

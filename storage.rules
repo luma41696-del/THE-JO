@@ -63,6 +63,21 @@ service firebase.storage {
     }
 
     /* ---------------------------------------------------------------- */
+    /*  Review photos — public read, owner write                         */
+    /* ---------------------------------------------------------------- */
+
+    // Published next to the review by design, so world-readable. Written only
+    // into the author's own folder: a shared folder would let any signed-in
+    // shopper overwrite somebody else's photo. Smaller than product imagery
+    // because nobody needs a 10MB snapshot of a jumper, and every one of these
+    // is a file a stranger uploaded.
+    match /reviews/{uid}/{fileName} {
+      allow read: if true;
+      allow write: if isOwner(uid) && isSafeImage() && underSize(5);
+      allow delete: if isOwner(uid) || isStaff();
+    }
+
+    /* ---------------------------------------------------------------- */
     /*  Customer uploads — private to their owner                        */
     /* ---------------------------------------------------------------- */
 

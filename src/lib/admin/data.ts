@@ -21,13 +21,17 @@ import {
   type CustomerSummary,
 } from "@/data/demo-operations";
 import type {
+  AnalyticsEvent,
   Banner,
   Category,
   CategoryNode,
+  GiftCampaign,
+  GiftPlay,
   Invoice,
   Offer,
   Order,
   Product,
+  Review,
   ShippingClass,
   SupportTicket,
 } from "@/types";
@@ -67,6 +71,63 @@ function serialise<T>(input: unknown): T {
     return Object.fromEntries(Object.entries(input).map(([key, value]) => [key, serialise(value)])) as T;
   }
   return input as T;
+}
+
+/**
+ * Read a whole time window, paging past the per-query cap.
+ *
+ * The count-capped read below is fine for a table that shows the most recent
+ * N rows. It is **wrong for a report**: "revenue over 90 days" computed from
+ * the most recent 1000 orders is silently short the moment the shop passes
+ * 1000 orders in that window, and the number it produces looks entirely
+ * plausible — which is what makes it dangerous. Nobody notices a total that is
+ * merely too low.
+ *
+ * So a report reads by date and pages until the window is exhausted, with a
+ * hard page ceiling so a runaway query cannot hang the admin. When that
+ * ceiling is hit the result says `truncated: true`, and the UI says so out
+ * loud rather than presenting a partial total as a fact.
+ */
+async function readWindow<T>(
+  name: string,
+  timeField: string,
+  from: number,
+  fallback: () => T[],
+  pageSize = 500,
+  maxPages = 40,
+): Promise<{ rows: T[]; live: boolean; truncated: boolean }> {
+  const session = await requireAdminSession();
+  if (!session) return { rows: ALLOW_DEMO ? fallback() : [], live: false, truncated: false };
+
+  try {
+    const db = getAdminDb();
+    const rows: T[] = [];
+    let cursor: FirebaseFirestore.QueryDocumentSnapshot | null = null;
+    let pages = 0;
+
+    for (; pages < maxPages; pages += 1) {
+      let q = db
+        .collection(name)
+        .where(timeField, ">=", from)
+        .orderBy(timeField, "asc")
+        .limit(pageSize);
+      if (cursor) q = q.startAfter(cursor);
+
+      const snapshot: FirebaseFirestore.QuerySnapshot = await withTimeout(q.get(), READ_TIMEOUT_MS);
+      if (snapshot.empty) break;
+
+      for (const doc of snapshot.docs) {
+        rows.push(serialise<T>({ ...doc.data(), id: doc.id }));
+      }
+
+      if (snapshot.size < pageSize) break;
+      cursor = snapshot.docs[snapshot.docs.length - 1] ?? null;
+    }
+
+    return { rows, live: true, truncated: pages >= maxPages };
+  } catch {
+    return { rows: ALLOW_DEMO ? fallback() : [], live: false, truncated: false };
+  }
 }
 
 async function readCollection<T>(
@@ -190,6 +251,38 @@ export const getAdminCategories = cache(async (): Promise<Category[]> => {
 
   return flatten(buildCategoryTree([...rows].sort(byOrder)));
 });
+
+/**
+ * Orders across a reporting window, complete rather than capped.
+ *
+ * Used by anything that computes a total. The dashboard's tables still use
+ * `getAdminOrders`, which is count-capped and right for "the latest 1000".
+ */
+export const getAdminOrdersSince = cache(
+  async (from: number): Promise<{ rows: Order[]; live: boolean; truncated: boolean }> =>
+    readWindow<Order>("orders", "createdAt", from, () => demoOrders),
+);
+
+/** Analytics events across a window, for the behaviour report. */
+export const getAnalyticsEvents = cache(
+  async (from: number): Promise<{ rows: AnalyticsEvent[]; live: boolean; truncated: boolean }> =>
+    readWindow<AnalyticsEvent>("analyticsEvents", "at", from, () => []),
+);
+
+/** Every review, including held ones — the moderation queue needs both. */
+export const getAdminReviews = cache(async (): Promise<Review[]> =>
+  (await readCollection<Review>("reviews", "createdAt", 1000, () => [])).rows,
+);
+
+/** Gift campaigns, newest first. */
+export const getAdminGiftCampaigns = cache(async (): Promise<GiftCampaign[]> =>
+  (await readCollection<GiftCampaign>("giftCampaigns", "startsAt", 100, () => [])).rows,
+);
+
+/** Plays, for the campaign report. */
+export const getAdminGiftPlays = cache(async (): Promise<GiftPlay[]> =>
+  (await readCollection<GiftPlay>("giftPlays", "playedAt", 1000, () => [])).rows,
+);
 
 export const getAdminShippingClasses = cache(async (): Promise<ShippingClass[]> =>
   (await readCollection("shippingClasses", "order", 100, () => demoShippingClasses)).rows.sort(

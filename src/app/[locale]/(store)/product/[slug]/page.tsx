@@ -5,6 +5,8 @@ import {
   getCategories,
   getProductBySlug,
   getRelatedProducts,
+  getProductReviews,
+  getReviewSummary,
   getShippingClasses,
   getShopProducts,
   getUpsellProducts,
@@ -13,6 +15,7 @@ import { categoryTrail } from "@/lib/categories";
 import { ProductDetail } from "@/components/product/ProductDetail";
 import { ProductRail } from "@/components/product/ProductRail";
 import { UpsellRail } from "@/components/product/UpsellRail";
+import { ProductReviews } from "@/components/product/ProductReviews";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { LOCALES, isLocale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionaries";
@@ -82,12 +85,15 @@ export default async function ProductPage({
   const product = await getProductBySlug(slug);
   if (!product || product.status !== "active") notFound();
 
-  const [related, upsells, categories, shippingClasses] = await Promise.all([
-    getRelatedProducts(product, 8),
-    getUpsellProducts(product),
-    getCategories(),
-    getShippingClasses(),
-  ]);
+  const [related, upsells, categories, shippingClasses, reviews, reviewSummary] =
+    await Promise.all([
+      getRelatedProducts(product, 8),
+      getUpsellProducts(product),
+      getCategories(),
+      getShippingClasses(),
+      getProductReviews(product.id),
+      getReviewSummary(product.id),
+    ]);
 
   const trail = categoryTrail(categories, product.categoryId);
   const shippingClass =
@@ -145,12 +151,21 @@ export default async function ProductPage({
       ? { category: trail.map((c) => pick(c.name, locale)).join(" > ") }
       : {}),
     offers,
-    ...(product.rating
+    /*
+     * The aggregate rating comes from published reviews, not from the
+     * `rating` field seeded with the demo catalogue. Publishing a rating
+     * nobody wrote is a fabricated review snippet in Google's results — the
+     * kind of structured-data claim that gets a site's rich results pulled,
+     * and rightly so. With no reviews, the property is absent.
+     */
+    ...(reviewSummary.count > 0
       ? {
           aggregateRating: {
             "@type": "AggregateRating",
-            ratingValue: product.rating.average,
-            reviewCount: product.rating.count,
+            ratingValue: reviewSummary.average,
+            reviewCount: reviewSummary.count,
+            bestRating: 5,
+            worstRating: 1,
           },
         }
       : {}),
@@ -169,6 +184,15 @@ export default async function ProductPage({
         locale={locale}
         trail={trail}
         shippingClass={shippingClass}
+        reviewSummary={reviewSummary}
+      />
+
+      <ProductReviews
+        productId={product.id}
+        productTitle={pick(product.title, locale)}
+        summary={reviewSummary}
+        reviews={reviews}
+        locale={locale}
       />
 
       {/*

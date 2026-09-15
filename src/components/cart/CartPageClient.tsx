@@ -11,6 +11,7 @@ import { formatDeliveryWindow, formatPrice, t } from "@/lib/format";
 import { priceCart, subtotalOf } from "@/lib/pricing";
 import { classesInCart, quoteShipping } from "@/lib/shipping";
 import { evaluateOffer, findOfferByCode } from "@/lib/offers";
+import { track } from "@/lib/analytics/track";
 import { useCoupon } from "@/lib/store/coupon";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { useCart, useCartHydrated } from "@/lib/store/cart";
@@ -218,12 +219,21 @@ export function CartPageClient({
         ok?: boolean;
         message?: { en: string; ar: string };
         offer?: { code: string };
+        reason?: string;
       };
 
       if (data.ok && data.offer) {
+        track("coupon_apply", { code: data.offer.code }, { uid });
         setCouponCode(data.offer.code);
         setCode("");
       } else {
+        /*
+         * Rejections are recorded with the *reason*, not the code alone. The
+         * useful report is "how many people tried an expired code this week",
+         * which tells the merchant a campaign is still being shared after it
+         * closed — a fact no other signal surfaces.
+         */
+        track("coupon_reject", { code: code.trim().slice(0, 40), reason: data.reason ?? "unknown" }, { uid });
         setCodeError(
           data.message?.[locale] ??
             (rtl ? "تعذّر التحقق من الرمز." : "That code could not be checked."),

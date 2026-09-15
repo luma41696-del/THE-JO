@@ -93,7 +93,17 @@ service cloud.firestore {
       // `active` is mirrored from `status` on every write, so this check keeps
       // working for documents written before `status` existed and for ones
       // written after. A paused or archived coupon is invisible to shoppers.
-      allow read: if appCheckOk() && (resource.data.active == true || isStaff());
+      /*
+       * Public coupons only. A coupon with `assignedUid` is somebody's gift,
+       * and the rule excludes it from the world-readable set — otherwise
+       * anyone could list `offers` and harvest every gift code in the shop.
+       * Customers reach their own through /api/gift/mine, which reads as them
+       * with the Admin SDK.
+       */
+      allow read: if appCheckOk()
+        && ((resource.data.active == true && !('assignedUid' in resource.data))
+            || (isSignedIn() && resource.data.assignedUid == request.auth.uid)
+            || isStaff());
 
       // Writes go through /api/admin/offers, which runs with the Admin SDK and
       // bypasses these rules. Staff are allowed here only so the admin can be
@@ -142,6 +152,63 @@ service cloud.firestore {
         && request.resource.data.uid == request.auth.uid
         && appCheckOk();
       allow update, delete: if false;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Reviews                                                            */
+    /* ------------------------------------------------------------------ */
+
+    match /reviews/{reviewId} {
+      // Published reviews are public. A held or hidden one is visible only to
+      // its author — who needs to see why it was held — and to staff. Making
+      // pending reviews public would publish exactly the content moderation
+      // exists to catch.
+      allow read: if appCheckOk()
+        && (resource.data.status == 'published'
+            || isStaff()
+            || (isSignedIn() && resource.data.uid == request.auth.uid));
+
+      // Writes go through /api/reviews with the Admin SDK, which is what
+      // resolves the verified-purchase badge and decides whether a review
+      // publishes. A client write here could award itself the badge, so there
+      // is none.
+      allow write: if false;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Gift game                                                          */
+    /* ------------------------------------------------------------------ */
+
+    match /giftCampaigns/{campaignId} {
+      // The wheel has to render its slices, so an active campaign is readable.
+      // Prize *weights* are readable with it — which is fine: knowing the odds
+      // changes nothing, because the draw happens on the server.
+      allow read: if appCheckOk() && (resource.data.status == 'active' || isStaff());
+      allow write: if false;
+    }
+
+    match /giftPlays/{playId} {
+      // A customer may see their own plays. Nobody may write one: a client
+      // that could create a play could award itself any prize on the wheel.
+      allow read: if isSignedIn() && (resource.data.uid == request.auth.uid || isStaff());
+      allow write: if false;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Analytics                                                          */
+    /* ------------------------------------------------------------------ */
+
+    match /analyticsEvents/{eventId} {
+      /*
+       * Write-only from the app's own API route, never from a browser, and
+       * never readable by one.
+       *
+       * Readable analytics would be a per-visitor event stream available to
+       * anyone who could guess a session id — which is precisely the
+       * re-identification this data is shaped to avoid. Staff read aggregates
+       * through the Admin SDK, which bypasses these rules.
+       */
+      allow read, write: if false;
     }
 
     /* ------------------------------------------------------------------ */

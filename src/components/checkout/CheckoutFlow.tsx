@@ -10,6 +10,7 @@ import { EASE, transition } from "@/lib/motion";
 import { formatDeliveryWindow, formatPrice, t } from "@/lib/format";
 import { priceCart, subtotalOf } from "@/lib/pricing";
 import { evaluateOffer, findOfferByCode } from "@/lib/offers";
+import { track } from "@/lib/analytics/track";
 import { useCart } from "@/lib/store/cart";
 import { useCoupon } from "@/lib/store/coupon";
 import { useAuth } from "@/components/providers/AuthProvider";
@@ -171,6 +172,19 @@ export function CheckoutFlow({
 
   function goNext() {
     if (!validateStep(step)) return;
+    // The funnel's second step: reaching delivery means the bag survived the
+    // first look at the total.
+    if (step === 0) {
+      track(
+        "checkout_start",
+        {
+          value: totals.total,
+          currency: totals.currency,
+          quantity: items.reduce((sum, i) => sum + i.quantity, 0),
+        },
+        { uid: user?.uid ?? null },
+      );
+    }
     setStep((s) => Math.min(2, s + 1) as Step);
   }
 
@@ -231,6 +245,24 @@ export function CheckoutFlow({
       }
 
       setPlaced({ reference: data.reference, total: data.total ?? totals.total });
+
+      /*
+       * The purchase, keyed on the order reference. `track` refuses a repeat
+       * of the same reference, so a refreshed or shared confirmation cannot
+       * add a sale that did not happen.
+       */
+      track(
+        "purchase",
+        {
+          orderReference: data.reference,
+          value: data.total ?? totals.total,
+          currency: totals.currency,
+          quantity: items.reduce((sum, i) => sum + i.quantity, 0),
+          ...(offer ? { code: offer.code } : {}),
+        },
+        { uid: user?.uid ?? null },
+      );
+
       clearCart();
       /*
        * The coupon and the idempotency key are released only on success.

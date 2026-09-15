@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { EASE, transition } from "@/lib/motion";
 import { formatPrice, t } from "@/lib/format";
 import { useUI } from "@/lib/store/ui";
+import { track } from "@/lib/analytics/track";
 import { BrandWave } from "@/components/brand/BrandWave";
 import type { CurrencyCode, Locale, Localized, ProductImage } from "@/types";
 
@@ -110,8 +111,26 @@ export function SearchOverlay({ locale = "en" }: { locale?: Locale }) {
         signal: controller.signal,
       });
       const data = (await response.json()) as { results: SearchHit[] };
-      setResults(data.results ?? []);
+      const hits = data.results ?? [];
+      setResults(hits);
       setCursor(0);
+
+      /*
+       * Recorded once the results are in, so the event carries the count —
+       * and a search that found nothing is its own event.
+       *
+       * A zero-result search is the single most actionable thing in this
+       * whole system: it is a customer telling the shop, in their own words,
+       * what they came for and did not find. Counting it separately is what
+       * makes that list readable rather than buried among successful queries.
+       */
+      const trimmed = query.trim();
+      if (trimmed.length >= 2) {
+        track(hits.length === 0 ? "search_no_results" : "search", {
+          query: trimmed,
+          results: hits.length,
+        });
+      }
     } catch (error) {
       // An abort is the expected path when typing quickly, not a failure.
       if ((error as Error)?.name !== "AbortError") setResults([]);

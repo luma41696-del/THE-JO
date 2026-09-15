@@ -40,11 +40,15 @@ import {
 } from "@/data/demo";
 import { buildCategoryTree, descendantIds, withRolledUpCounts } from "@/lib/categories";
 import { visibleProducts } from "@/lib/visibility";
+import { summarise, summariseAll } from "@/lib/reviews";
 import type {
   Banner,
   BannerSlot,
   Category,
   CategoryNode,
+  GiftCampaign,
+  Review,
+  ReviewSummary,
   SlotSettings,
   Offer,
   Product,
@@ -262,6 +266,111 @@ export const getCrossSellProducts = cache(
       }
     }
     return out;
+  },
+);
+
+/* -------------------------------------------------------------------------- */
+/*  Gift campaign                                                             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The campaign currently running, if any.
+ *
+ * Read without caching: the gift page is dynamic because eligibility depends
+ * on when *this* customer last played, and a campaign that has just been
+ * paused must stop offering spins immediately rather than at the next
+ * revalidation.
+ *
+ * Returns `null` rather than a placeholder when nothing is running. A wheel
+ * with no campaign behind it is a button that cannot do anything, and the page
+ * says so in words instead.
+ */
+export async function getActiveGiftCampaign(): Promise<GiftCampaign | null> {
+  const now = Date.now();
+  const rows = await readOrFallback(
+    "giftCampaign",
+    async () => {
+      const snap = await getDocs(
+        query(
+          collection(getDb(), "giftCampaigns"),
+          where("status", "==", "active"),
+          fsLimit(1),
+        ),
+      );
+      return snap.docs.map((d) => ({ ...(d.data() as GiftCampaign), id: d.id }));
+    },
+    () => [],
+  );
+
+  const campaign = rows[0] ?? null;
+  if (!campaign) return null;
+  // A window that has closed must not survive a stale read into the page.
+  if (campaign.startsAt > now || campaign.endsAt <= now) return null;
+  return campaign;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Reviews                                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Published reviews for one product.
+ *
+ * Only published ones are read, and the filter is in the *query* rather than
+ * applied afterwards — a client reading this collection is bound by the same
+ * rule in the security rules, so the two cannot drift into a state where the
+ * server hides a review the browser can still fetch.
+ */
+export const getProductReviews = cache(async (productId: string): Promise<Review[]> =>
+  readOrFallback(
+    `reviews:${productId}`,
+    async () => {
+      const snap = await getDocs(
+        query(
+          collection(getDb(), "reviews"),
+          where("productId", "==", productId),
+          where("status", "==", "published"),
+          orderBy("createdAt", "desc"),
+          fsLimit(200),
+        ),
+      );
+      return snap.docs.map((d) => ({ ...(d.data() as Review), id: d.id }));
+    },
+    // No demo reviews. A hand-written testimonial counting toward a product's
+    // average is the difference between a rating and an advertisement.
+    () => [],
+  ),
+);
+
+/** The rating block for one product. */
+export const getReviewSummary = cache(async (productId: string): Promise<ReviewSummary> =>
+  summarise(productId, await getProductReviews(productId)),
+);
+
+/**
+ * Summaries for every product, for listing cards.
+ *
+ * One read for the whole catalogue rather than one per card: a grid of twelve
+ * products would otherwise issue twelve queries, and the star row is not worth
+ * twelve round trips.
+ */
+export const getAllReviewSummaries = cache(
+  async (): Promise<Record<string, ReviewSummary>> => {
+    const rows = await readOrFallback(
+      "reviews:all",
+      async () => {
+        const snap = await getDocs(
+          query(
+            collection(getDb(), "reviews"),
+            where("status", "==", "published"),
+            fsLimit(1000),
+          ),
+        );
+        return snap.docs.map((d) => ({ ...(d.data() as Review), id: d.id }));
+      },
+      () => [],
+    );
+    return summariseAll(rows);
   },
 );
 

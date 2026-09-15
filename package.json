@@ -16,8 +16,10 @@
     "emulators": "firebase emulators:start",
     "grant-admin": "tsx scripts/grant-admin.ts",
     "test:offers": "tsx --test scripts/offers.test.ts",
-    "test": "npm run test:offers && npm run test:visibility && npm run test:firebase-runtime",
-    "test:visibility": "tsx --test scripts/visibility.test.ts"
+    "test": "npm run test:offers && npm run test:visibility && npm run test:phase3 && npm run test:privacy && npm run test:firebase-runtime",
+    "test:visibility": "tsx --test scripts/visibility.test.ts",
+    "test:phase3": "tsx --test scripts/phase3.test.ts",
+    "test:privacy": "tsx --test scripts/analytics-privacy.test.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",

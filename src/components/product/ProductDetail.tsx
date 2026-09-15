@@ -22,7 +22,7 @@ import {
   resolveSelection,
 } from "@/lib/product";
 import { storeSettings } from "@/data/site-content";
-import type { Category, Locale, Product, ShippingClass } from "@/types";
+import type { Category, Locale, Product, ReviewSummary, ShippingClass } from "@/types";
 
 /**
  * Product detail.
@@ -46,6 +46,8 @@ import type { Category, Locale, Product, ShippingClass } from "@/types";
 export interface ProductDetailProps {
   product: Product;
   locale?: Locale;
+  /** Computed from published reviews. Absent means "no reviews yet". */
+  reviewSummary?: ReviewSummary | null;
   /** Root-first category ancestry, for the breadcrumb. */
   trail?: Category[];
   /** The product's shipping class, surfaced in the details table. */
@@ -57,6 +59,7 @@ export function ProductDetail({
   locale = "en",
   trail = [],
   shippingClass = null,
+  reviewSummary = null,
 }: ProductDetailProps) {
   const reduced = useReducedMotion();
   const rtl = locale === "ar";
@@ -249,12 +252,23 @@ export function ProductDetail({
               locale={locale}
               size="lg"
             />
-            {product.rating && (
-              <span className="text-smoke flex items-center gap-1.5 text-[0.8125rem]">
+            {/*
+              The *real* rating, from published reviews — and nothing at all
+              when there are none. The demo catalogue ships a `rating` field
+              ("4.8 from 214") that no customer ever wrote; showing it is a
+              fabricated review count, and a shopper who clicks through to find
+              zero reviews has learned the shop makes things up.
+            */}
+            {reviewSummary && reviewSummary.count > 0 && (
+              <a
+                href="#reviews"
+                className="text-smoke hover:text-ink flex items-center gap-1.5 text-[0.8125rem] transition-colors"
+                data-cursor="hover"
+              >
                 <span className="text-brand">★</span>
-                <span className="tabular-nums">{product.rating.average.toFixed(1)}</span>
-                <span className="text-mist">({product.rating.count})</span>
-              </span>
+                <span className="tabular-nums">{reviewSummary.average.toFixed(1)}</span>
+                <span className="text-mist">({reviewSummary.count})</span>
+              </a>
             )}
           </div>
 

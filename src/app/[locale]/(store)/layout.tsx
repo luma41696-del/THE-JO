@@ -3,6 +3,8 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { SearchOverlay } from "@/components/layout/SearchOverlay";
 import { CartDrawer } from "@/components/cart/CartDrawer";
+import { ConsentBanner } from "@/components/analytics/ConsentBanner";
+import { PageTracker } from "@/components/analytics/PageTracker";
 import { getCategoryTree } from "@/lib/catalog";
 import { isLocale } from "@/lib/i18n/config";
 import type { Locale } from "@/types";
@@ -42,6 +44,10 @@ export default async function StoreLayout({
       {children}
       <Footer locale={locale} />
       <CartDrawer locale={locale} />
+      {/* Nothing is recorded until the banner has been answered — the guard
+          lives in `track()`, so mounting the tracker is safe either way. */}
+      <PageTracker />
+      <ConsentBanner locale={locale} />
       <SearchOverlay locale={locale} />
     </>
   );

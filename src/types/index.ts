@@ -791,6 +791,233 @@ export interface FitRecommendation {
 /*  Misc                                                                      */
 /* -------------------------------------------------------------------------- */
 
+/* -------------------------------------------------------------------------- */
+/*  Reviews                                                                   */
+/* -------------------------------------------------------------------------- */
+
+export type ReviewStatus = "published" | "pending" | "hidden";
+
+/**
+ * A customer review.
+ *
+ * Deliberately a different type from `Testimonial`, which is marketing copy
+ * the shop wrote about itself. Mixing the two would let a hand-written quote
+ * count toward a product's average rating, which is the difference between a
+ * rating and an advertisement.
+ *
+ * Reviews are **never edited by staff**. Moderation can hide one and record
+ * why, and can reply to it in the shop's own voice — but the customer's words
+ * and their star count are theirs. An admin who can rewrite a two-star review
+ * into a five-star one has turned the whole system into decoration.
+ */
+export interface Review {
+  id: string;
+  productId: string;
+  uid: string;
+  /** Display name at the time of writing; a later rename must not rewrite history. */
+  authorName: string;
+  rating: 1 | 2 | 3 | 4 | 5;
+  title?: string;
+  body: string;
+  images: ProductImage[];
+
+  /**
+   * Set when the reviewer has a delivered order containing this product.
+   * Resolved server-side at submission and stored, not recomputed on read —
+   * an order archived later must not silently strip the badge.
+   */
+  verifiedPurchase: boolean;
+  /** The order that proved it. Never shown to other customers. */
+  verifiedOrderId?: string;
+
+  status: ReviewStatus;
+  /**
+   * Why a review was hidden. Shown to the author, never to other shoppers —
+   * they do not need to know a removed review existed, and the author does.
+   */
+  moderationNote?: string;
+  moderatedBy?: string;
+  moderatedAt?: number;
+
+  /** The shop's public answer, in the shop's voice, clearly attributed. */
+  reply?: {
+    body: string;
+    authorName: string;
+    at: number;
+  };
+
+  /** Other customers marking it useful. Sorting only; never affects the average. */
+  helpfulCount: number;
+
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** What a product page needs to render its rating block. */
+export interface ReviewSummary {
+  productId: string;
+  average: number;
+  count: number;
+  /** Index 0 is one star, index 4 is five. */
+  distribution: [number, number, number, number, number];
+  verifiedCount: number;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Gift campaign                                                             */
+/* -------------------------------------------------------------------------- */
+
+export type GiftGameKind = "wheel" | "scratch";
+
+/**
+ * One prize slot in a campaign.
+ *
+ * `weight` is a relative share, not a percentage: percentages have to sum to
+ * 100 and a merchant editing one of five prizes will not keep them summing.
+ * Weights are normalised at draw time, so any set of numbers is valid.
+ */
+export interface GiftPrize {
+  id: string;
+  label: Localized;
+  /**
+   * What the winner gets. `none` is a real, necessary outcome — a campaign
+   * where every spin wins is a discount, not a game, and hiding the losing
+   * slice would make the wheel a lie.
+   */
+  reward: "percentage" | "fixed" | "free-shipping" | "none";
+  value: number;
+  /** Cap on a percentage reward, in store currency. */
+  maxDiscount?: number;
+  /** Days the issued coupon stays valid. */
+  validForDays: number;
+  minSubtotal?: number;
+
+  weight: number;
+  /** Total that may ever be issued. Undefined is unlimited. */
+  quantity?: number;
+  /** Issued so far. Incremented inside the draw transaction. */
+  issued: number;
+}
+
+export interface GiftCampaign {
+  id: string;
+  name: Localized;
+  kind: GiftGameKind;
+  prizes: GiftPrize[];
+
+  startsAt: number;
+  endsAt: number;
+  /** Hours a customer must wait between attempts. */
+  cooldownHours: number;
+  /** Lifetime attempts per account. Undefined is unlimited (subject to cooldown). */
+  maxAttempts?: number;
+
+  /** Terms shown before playing and on the issued gift. */
+  terms?: Localized;
+  status: "draft" | "active" | "paused" | "archived";
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+/**
+ * One play, and its outcome.
+ *
+ * Written **before** the winning animation runs. The browser is told what it
+ * won; it is never asked. A client that could choose its own prize, or replay
+ * a draw by refreshing, is not a game — and the record has to exist first so
+ * that a network failure mid-animation cannot produce a win nobody issued.
+ */
+export interface GiftPlay {
+  id: string;
+  campaignId: string;
+  uid: string;
+  prizeId: string;
+  /** The coupon issued, when the prize was not `none`. */
+  offerId?: string;
+  code?: string;
+  expiresAt?: number;
+  playedAt: number;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Analytics                                                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * What a visitor has agreed to.
+ *
+ * Two separate consents, because they are two different asks. Behavioural
+ * analytics is about how the shop is used; fitting-room processing sends a
+ * photograph of a person's body to a machine. Bundling them would mean a
+ * shopper who wants size help has also agreed to be tracked, which is not
+ * consent in any sense that matters.
+ */
+export interface ConsentState {
+  /** Strictly necessary is not listed: it needs no consent and cannot be declined. */
+  analytics: boolean;
+  /** Separate, and only asked for at the point the fitting room needs it. */
+  fittingRoom: boolean;
+  /** When the choice was made, so a policy change can re-ask. */
+  decidedAt: number;
+  /** The version of the policy that was agreed to. */
+  version: number;
+}
+
+export type AnalyticsEventName =
+  | "page_view"
+  | "product_view"
+  | "category_view"
+  | "search"
+  | "search_no_results"
+  | "filter_apply"
+  | "wishlist_add"
+  | "wishlist_remove"
+  | "cart_add"
+  | "cart_remove"
+  | "checkout_start"
+  | "purchase"
+  | "coupon_apply"
+  | "coupon_reject"
+  | "gift_play"
+  | "fitting_room_open"
+  | "recommendation_click";
+
+/**
+ * One recorded event.
+ *
+ * `anonymousId` is a random per-browser value, not a hash of anything about
+ * the person: a hashed email is still an identifier, and pretending otherwise
+ * is how "anonymous" analytics end up re-identifiable.
+ *
+ * `props` is deliberately narrow. Nothing here may carry an address, a
+ * measurement, a payment detail or an image — the event writer strips unknown
+ * keys rather than trusting callers, because the one time a caller passes the
+ * whole cart object is the time an address ends up in the analytics store.
+ */
+export interface AnalyticsEvent {
+  id: string;
+  name: AnalyticsEventName;
+  anonymousId: string;
+  /** Present only for signed-in sessions, and only with analytics consent. */
+  uid?: string;
+  sessionId: string;
+  at: number;
+  path: string;
+  device: "mobile" | "tablet" | "desktop";
+  /** `utm_source` or the referring host. Never a full referrer URL. */
+  source?: string;
+  props?: Record<string, string | number | boolean>;
+}
+
+/** One step of the conversion funnel, for the admin report. */
+export interface FunnelStep {
+  name: string;
+  label: Localized;
+  count: number;
+  /** Fraction of the step before it. 1 for the first. */
+  conversion: number;
+}
+
 export interface Testimonial {
   id: string;
   name: string;

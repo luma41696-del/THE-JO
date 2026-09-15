@@ -202,7 +202,10 @@ export function ProductsBoard({
                 { header: "Colours", value: (p) => p.colors.map((c) => pick(c.name, "en")).join(", "), width: 28 },
                 { header: "Sizes", value: (p) => p.sizes.map((s) => s.label).join(", ") },
                 { header: "Status", value: (p) => p.status },
-                { header: "Rating", value: (p) => p.rating?.average ?? "" },
+                // Exported from the seeded field, which is demo data. Left in
+                // the export for continuity, but the storefront no longer shows
+                // it — the product page reads published reviews instead.
+                { header: "Seeded rating", value: (p) => p.rating?.average ?? "" },
               ]}
               filename="net-sale-catalogue"
               title="net sale — catalogue"

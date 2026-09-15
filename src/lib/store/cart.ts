@@ -6,6 +6,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import type { CartItem, CurrencyCode, Product } from "@/types";
 import { cartKey, clamp } from "@/lib/utils";
 import { buildCartItem, hasOptions, resolveSelection } from "@/lib/product";
+import { track } from "@/lib/analytics/track";
 
 /**
  * Cart state.
@@ -126,6 +127,17 @@ export const useCart = create<CartState>()(
             }
           : buildCartItem(product, selection, colorId, sizeId, granted);
 
+        // Recorded here rather than at each button: every path into the bag
+        // — product page, cross-sell shelf, fitting room — comes through this
+        // one function, so nothing can be added without being counted.
+        track("cart_add", {
+          productId: product.id,
+          sku: selection.sku,
+          price: selection.price,
+          currency: product.currency,
+          quantity: granted,
+        });
+
         set((state) => ({
           items: existing
             ? state.items.map((i) => (i.key === key ? next : i))
@@ -149,7 +161,18 @@ export const useCart = create<CartState>()(
 
       clearRejection: () => set({ lastRejection: null }),
 
-      remove: (key) => set((state) => ({ items: state.items.filter((i) => i.key !== key) })),
+      remove: (key) => {
+        const item = get().items.find((i) => i.key === key);
+        if (item) {
+          track("cart_remove", {
+            productId: item.productId,
+            sku: item.sku,
+            price: item.unitPrice,
+            quantity: item.quantity,
+          });
+        }
+        set((state) => ({ items: state.items.filter((i) => i.key !== key) }));
+      },
 
       setQuantity: (key, quantity) => {
         const item = get().items.find((i) => i.key === key);
