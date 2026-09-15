@@ -16,7 +16,15 @@ import {
   type WithFieldValue,
 } from "firebase/firestore";
 
-import type { Banner, Category, Offer, Order, Outfit, Product, UserProfile } from "@/types";
+import type {
+  Banner,
+  Category,
+  Offer,
+  Order,
+  Outfit,
+  Product,
+  UserProfile,
+} from "@/types";
 
 /** Accepts Timestamp, Date, number or a serialised {seconds} shape. */
 export function toMillis(value: unknown, fallback = 0): number {
@@ -142,7 +150,49 @@ export const categoryConverter: FirestoreDataConverter<Category> = {
   },
 };
 export const bannerConverter = withId<Banner>();
-export const offerConverter = withId<Offer>();
+
+/**
+ * Coupons written before the rewrite carry only `active`, no `status`, and
+ * none of the scope or eligibility fields.
+ *
+ * Defaulting `status` from `active` is the important one: reading a missing
+ * status as "draft" would switch off every running campaign the moment this
+ * deploys, and the first anyone would hear of it is a customer saying their
+ * code stopped working. The new list fields default to empty — "no
+ * exclusions", which is what a coupon that predates exclusions meant.
+ */
+export const offerConverter: FirestoreDataConverter<Offer> = {
+  toFirestore: withId<Offer>().toFirestore,
+  fromFirestore(snapshot, options): Offer {
+    const raw = normaliseTimestamps<Record<string, unknown>>(snapshot.data(options));
+    const active = raw.active !== false;
+    const status =
+      raw.status === "draft" ||
+      raw.status === "active" ||
+      raw.status === "paused" ||
+      raw.status === "archived"
+        ? raw.status
+        : active
+          ? "active"
+          : "paused";
+
+    return {
+      ...raw,
+      id: snapshot.id,
+      status,
+      // Kept in sync so a reader that predates `status` still agrees with one
+      // that does not.
+      active: status === "active",
+      appliesToCategoryIds: Array.isArray(raw.appliesToCategoryIds) ? raw.appliesToCategoryIds : [],
+      appliesToProductIds: Array.isArray(raw.appliesToProductIds) ? raw.appliesToProductIds : [],
+      excludesCategoryIds: Array.isArray(raw.excludesCategoryIds) ? raw.excludesCategoryIds : [],
+      excludesProductIds: Array.isArray(raw.excludesProductIds) ? raw.excludesProductIds : [],
+      usageCount: typeof raw.usageCount === "number" ? raw.usageCount : 0,
+      firstOrderOnly: raw.firstOrderOnly === true,
+      stackable: raw.stackable === true,
+    } as Offer;
+  },
+};
 export const orderConverter = withId<Order>();
 export const outfitConverter = withId<Outfit>();
 

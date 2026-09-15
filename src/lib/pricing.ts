@@ -17,6 +17,7 @@ import type {
 } from "@/types";
 import { minorUnits } from "@/lib/format";
 import { quoteShipping } from "@/lib/shipping";
+import { evaluateOffer, type OfferEvaluation } from "@/lib/offers";
 
 /**
  * Jordan's general sales tax, applied to the discounted subtotal before
@@ -36,7 +37,20 @@ export interface PriceInput {
    */
   shippingClasses?: ShippingClass[];
   offer?: Offer | null;
+  /**
+   * A pre-computed coupon evaluation.
+   *
+   * Callers that have one (the cart, which needs the rejection message
+   * anyway; the checkout, which evaluates inside its transaction) pass it so
+   * the coupon is judged exactly once. Callers that do not pass only `offer`,
+   * and this module evaluates it — but without the customer's usage history,
+   * so a per-user limit cannot be enforced from here. That is why the server
+   * never relies on this path.
+   */
+  offerEvaluation?: OfferEvaluation | null;
   currency?: CurrencyCode;
+  /** Product id → category ancestry, for category-scoped coupons. */
+  categoryPaths?: Record<string, string[]>;
 }
 
 /**
@@ -64,34 +78,26 @@ export function subtotalOf(items: CartItem[]) {
  * Discount for one offer against one cart. Returns 0 rather than throwing for
  * an offer that does not apply, so callers can attempt optimistically.
  */
-export function discountFor(items: CartItem[], offer: Offer | null | undefined, now = Date.now()) {
-  const currency = items[0]?.currency ?? "JOD";
-  if (!offer || !offer.active) return 0;
-  if (offer.startsAt > now || offer.endsAt <= now) return 0;
-  if (offer.usageLimit !== undefined && offer.usageCount >= offer.usageLimit) return 0;
-
-  const scoped =
-    offer.appliesToProductIds.length || offer.appliesToCategoryIds.length
-      ? items.filter((i) => offer.appliesToProductIds.includes(i.productId))
-      : items;
-
-  const base = subtotalOf(scoped);
-  if (base === 0) return 0;
-  if (offer.minSubtotal && subtotalOf(items) < offer.minSubtotal) return 0;
-
-  switch (offer.type) {
-    case "percentage":
-      return money(base * (offer.value / 100), currency);
-    case "fixed":
-      // Never discount below zero.
-      return money(Math.min(offer.value, base), currency);
-    case "free-shipping":
-    case "bundle":
-      // Handled in `shippingCostFor` / bundle rules respectively.
-      return 0;
-    default:
-      return 0;
-  }
+/**
+ * Monetary discount for one coupon against one basket.
+ *
+ * Thin wrapper over `evaluateOffer` now. It used to carry its own copy of the
+ * rules, and the copy had drifted: it filtered by product id while *claiming*
+ * to honour `appliesToCategoryIds`, so a category-scoped coupon matched no
+ * lines and silently discounted nothing.
+ */
+export function discountFor(
+  items: CartItem[],
+  offer: Offer | null | undefined,
+  now = Date.now(),
+  categoryPaths: Record<string, string[]> = {},
+) {
+  return evaluateOffer(offer, {
+    items,
+    subtotal: subtotalOf(items),
+    now,
+    categoryPaths,
+  }).discount;
 }
 
 /**
@@ -110,9 +116,32 @@ export function shippingCostFor(
   offer?: Offer | null,
   items: CartItem[] = [],
   classes: ShippingClass[] = [],
+  evaluation?: OfferEvaluation | null,
 ) {
   if (!method) return 0;
-  if (offer?.type === "free-shipping" && offer.active) return 0;
+
+  /*
+   * A free-shipping coupon waives the fee only if it is *valid*.
+   *
+   * This line used to read `offer?.type === "free-shipping" && offer.active`,
+   * which checked neither the dates, nor the redemption limit, nor the
+   * minimum spend. A campaign that ended in March kept shipping free
+   * indefinitely for anyone who still had the code, and nothing in the totals
+   * showed it — the order simply arrived with a smaller number on it.
+   *
+   * The evaluation is trusted when the caller supplies one (it may know the
+   * customer's usage history, which this function cannot). Otherwise the
+   * coupon is evaluated here, which still catches every basket-level rule.
+   */
+  if (offer?.type === "free-shipping") {
+    const verdict =
+      evaluation ??
+      evaluateOffer(offer, {
+        items,
+        subtotal: subtotalAfterDiscount,
+      });
+    if (verdict.ok && verdict.freeShipping) return 0;
+  }
 
   if (classes.length > 0 && items.length > 0) {
     return quoteShipping(method, items, classes, subtotalAfterDiscount).total;
@@ -127,6 +156,8 @@ export function priceCart({
   shippingMethod,
   shippingClasses = [],
   offer,
+  offerEvaluation,
+  categoryPaths = {},
   currency,
 }: PriceInput): CartTotals {
   const resolvedCurrency =
@@ -136,9 +167,25 @@ export function priceCart({
     "JOD";
 
   const subtotal = subtotalOf(items);
-  const discount = Math.min(discountFor(items, offer), subtotal);
+
+  // Evaluate once, then spend the answer on both the discount and the
+  // shipping waiver — the two used to be decided by separate rule sets.
+  const verdict =
+    offerEvaluation ??
+    (offer
+      ? evaluateOffer(offer, { items, subtotal, currency: resolvedCurrency, categoryPaths })
+      : null);
+
+  const discount = Math.min(verdict?.ok ? verdict.discount : 0, subtotal);
   const discounted = money(subtotal - discount, resolvedCurrency);
-  const shipping = shippingCostFor(discounted, shippingMethod, offer, items, shippingClasses);
+  const shipping = shippingCostFor(
+    discounted,
+    shippingMethod,
+    offer,
+    items,
+    shippingClasses,
+    verdict,
+  );
   const tax = money(discounted * TAX_RATE, resolvedCurrency);
   const total = money(discounted + shipping + tax, resolvedCurrency);
 

@@ -14,7 +14,9 @@
     "brand": "node scripts/generate-brand.mjs",
     "rules:deploy": "firebase deploy --only firestore,storage",
     "emulators": "firebase emulators:start",
-    "grant-admin": "tsx scripts/grant-admin.ts"
+    "grant-admin": "tsx scripts/grant-admin.ts",
+    "test:offers": "tsx --test scripts/offers.test.ts",
+    "test": "npm run test:offers && npm run test:firebase-runtime"
   },
   "dependencies": {
     "clsx": "^2.1.1",

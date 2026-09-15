@@ -10,10 +10,22 @@ import { EASE } from "@/lib/motion";
 import { formatPrice, minorUnits } from "@/lib/format";
 import { getIdToken } from "@/lib/firebase/auth";
 import { gtinKind, isValidGtin } from "@/lib/product";
+import {
+  ACCEPT_ATTRIBUTE,
+  deleteProductImage,
+  uploadProductImage,
+} from "@/lib/firebase/upload";
 import { AdminPageHeader } from "./AdminShell";
 import { Panel } from "./AdminUI";
 import { Button } from "@/components/ui/Button";
-import type { Category, Product, ProductType, ShippingClass } from "@/types";
+import type {
+  Category,
+  Product,
+  ProductImage,
+  ProductType,
+  ProductVariant,
+  ShippingClass,
+} from "@/types";
 
 /**
  * Product editor.
@@ -115,6 +127,101 @@ export function ProductEditor({
   const router = useLocalizedRouter();
   const [draft, setDraft] = useState<Draft>(() => toDraft(product));
   const [saving, setSaving] = useState(false);
+
+  /*
+   * Imagery is edited locally and saved with the product, not on every nudge.
+   * Reordering four images would otherwise be four writes and four chances to
+   * half-apply an order.
+   */
+  const [images, setImages] = useState<ProductImage[]>(product?.images ?? []);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  /*
+   * Variant stock, edited as a grid.
+   *
+   * What was here before was worse than read-only: the input's
+   * `defaultValue` was `totalStock / (colours × sizes)` — an *invented
+   * average* presented as a per-size count. A merchant reading "12" for a size
+   * that actually had none had no way to know, and nothing they typed was ever
+   * saved. These are the real rows now.
+   */
+  const [variants, setVariants] = useState<ProductVariant[]>(product?.variants ?? []);
+
+  const variantAt = (colorId: string, sizeId: string) =>
+    variants.find((v) => v.colorId === colorId && v.sizeId === sizeId);
+
+  function setVariantStock(colorId: string, sizeId: string, stock: number) {
+    const safe = Math.max(0, Math.floor(Number.isFinite(stock) ? stock : 0));
+    setVariants((current) =>
+      current.map((v) =>
+        v.colorId === colorId && v.sizeId === sizeId ? { ...v, stock: safe } : v,
+      ),
+    );
+  }
+
+  async function handleFiles(list: FileList | null) {
+    if (!list || list.length === 0 || !product) return;
+    setUploadError(null);
+    setUploading(true);
+
+    try {
+      const files = Array.from(list);
+      for (let i = 0; i < files.length; i += 1) {
+        const file = files[i]!;
+        /*
+         * Alt text is asked for, never derived. "IMG_4821.jpg" as alt text is
+         * worse than none — a screen reader announces it in full and the
+         * listener learns nothing.
+         */
+        const alt =
+          window.prompt(
+            `Describe image ${i + 1} of ${files.length} for screen readers`,
+            draft.titleEn ? `${draft.titleEn} — ` : "",
+          ) ?? "";
+        if (!alt.trim()) {
+          setUploadError("Every image needs alt text. Nothing was uploaded.");
+          break;
+        }
+
+        const uploaded = await uploadProductImage(product.id, file, alt, {
+          onProgress: (fraction) =>
+            setUploadProgress((i + fraction) / files.length),
+        });
+        setImages((current) => [...current, uploaded]);
+      }
+    } catch (error) {
+      setUploadError(
+        error instanceof Error ? error.message : "That image could not be uploaded.",
+      );
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
+    }
+  }
+
+  function moveImage(index: number, delta: number) {
+    setImages((current) => {
+      const next = [...current];
+      const target = index + delta;
+      if (target < 0 || target >= next.length) return current;
+      [next[index], next[target]] = [next[target]!, next[index]!];
+      return next;
+    });
+  }
+
+  /*
+   * Removed from the product immediately, deleted from Storage in the
+   * background. If the delete fails the product is still correct — an orphaned
+   * object costs pennies, whereas blocking the edit on a storage hiccup costs
+   * the merchant their afternoon.
+   */
+  function removeImage(index: number) {
+    const image = images[index];
+    setImages((current) => current.filter((_, i) => i !== index));
+    if (image) void deleteProductImage(image.url).catch(() => {});
+  }
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -159,6 +266,9 @@ export function ProductEditor({
           price: draft.price,
           compareAtPrice: draft.compareAtPrice === "" ? null : draft.compareAtPrice,
           totalStock: draft.totalStock,
+          images,
+          // Only sent for a variable product; a simple one keeps its own total.
+          ...(draft.type === "variable" && variants.length > 0 ? { variants } : {}),
           status: draft.status,
           tags: draft.tags.split(",").map((t) => t.trim()).filter(Boolean),
           type: draft.type,
@@ -288,28 +398,100 @@ export function ProductEditor({
             </div>
           </Panel>
 
-          {product && product.images.length > 0 && (
+          {product && (
             <Panel
               title="Imagery"
-              description="Uploads go to Firebase Storage; SVG is rejected at the rules layer."
+              description="The first image is the one used on listing cards. SVG is rejected — it is an executable document."
             >
               <div className="flex flex-wrap gap-3">
-                {product.images.map((image) => (
+                {images.map((image, index) => (
                   <div
                     key={image.url}
-                    className="bg-paper-sunken relative h-32 w-24 overflow-hidden rounded-md"
+                    className="bg-paper-sunken group relative h-32 w-24 overflow-hidden rounded-md"
                   >
-                    <Image src={image.url} alt={image.alt} fill sizes="96px" className="object-cover" />
+                    <Image
+                      src={image.url}
+                      alt={image.alt}
+                      fill
+                      sizes="96px"
+                      className="object-cover"
+                    />
+
+                    {index === 0 && (
+                      <span className="bg-ink absolute start-1 top-1 rounded-xs px-1.5 py-0.5 text-[0.5625rem] font-semibold tracking-wide text-white uppercase">
+                        Main
+                      </span>
+                    )}
+
+                    {/*
+                      Reorder by nudging rather than drag-and-drop: a drag
+                      handle needs a pointer, and this panel is used on tablets
+                      on a stock-room bench. Arrows work with a finger and with
+                      a keyboard.
+                    */}
+                    <div className="bg-ink/70 absolute inset-x-0 bottom-0 flex items-center justify-between px-1 py-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                      <button
+                        type="button"
+                        onClick={() => moveImage(index, -1)}
+                        disabled={index === 0}
+                        aria-label={`Move image ${index + 1} earlier`}
+                        className="cursor-pointer px-1.5 text-white disabled:opacity-30"
+                      >
+                        ←
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeImage(index)}
+                        aria-label={`Remove image ${index + 1}`}
+                        className="text-alert cursor-pointer px-1.5"
+                      >
+                        ✕
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveImage(index, 1)}
+                        disabled={index === images.length - 1}
+                        aria-label={`Move image ${index + 1} later`}
+                        className="cursor-pointer px-1.5 text-white disabled:opacity-30"
+                      >
+                        →
+                      </button>
+                    </div>
                   </div>
                 ))}
-                <label className="border-line hover:border-brand text-mist hover:text-brand grid h-32 w-24 cursor-pointer place-items-center rounded-md border border-dashed text-[0.75rem] transition-colors">
+
+                <label
+                  className={cn(
+                    "border-line hover:border-brand text-mist hover:text-brand grid h-32 w-24 place-items-center rounded-md border border-dashed text-[0.75rem] transition-colors",
+                    uploading ? "cursor-wait opacity-60" : "cursor-pointer",
+                  )}
+                >
                   <span className="text-center leading-tight">
-                    +<br />
-                    Add
+                    {uploading ? `${Math.round(uploadProgress * 100)}%` : <>+<br />Add</>}
                   </span>
-                  <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only" />
+                  <input
+                    type="file"
+                    accept={ACCEPT_ATTRIBUTE}
+                    multiple
+                    disabled={uploading}
+                    onChange={(event) => handleFiles(event.target.files)}
+                    className="sr-only"
+                  />
                 </label>
               </div>
+
+              {uploadError && (
+                <p role="alert" className="text-alert mt-3 text-[0.8125rem]">
+                  {uploadError}
+                </p>
+              )}
+
+              {images.length === 0 && !uploading && (
+                <p className="text-mist mt-3 text-[0.8125rem]">
+                  No imagery yet. A product without an image still lists, but it
+                  will not sell.
+                </p>
+              )}
             </Panel>
           )}
 
@@ -342,26 +524,43 @@ export function ProductEditor({
                             <span className="text-ink">{color.name.en}</span>
                           </span>
                         </td>
-                        {product.sizes.map((size) => (
-                          <td key={size.id} className="py-2.5 text-center">
-                            <input
-                              type="number"
-                              min={0}
-                              defaultValue={Math.floor(
-                                product.totalStock / (product.colors.length * product.sizes.length),
-                              )}
-                              className="border-line focus:border-brand bg-paper w-14 rounded-sm border px-2 py-1 text-center text-[0.75rem] tabular-nums outline-none"
-                            />
-                          </td>
-                        ))}
+                        {product.sizes.map((size) => {
+                          const variant = variantAt(color.id, size.id);
+                          return (
+                            <td key={size.id} className="py-2.5 text-center">
+                              <input
+                                type="number"
+                                min={0}
+                                value={variant?.stock ?? 0}
+                                disabled={!variant}
+                                aria-label={`Stock for ${color.name.en} ${size.label}`}
+                                title={variant ? variant.sku : "This permutation is not sold"}
+                                onChange={(event) =>
+                                  setVariantStock(color.id, size.id, Number(event.target.value))
+                                }
+                                className="border-line focus:border-brand bg-paper w-14 rounded-sm border px-2 py-1 text-center text-[0.75rem] tabular-nums outline-none disabled:opacity-30"
+                              />
+                            </td>
+                          );
+                        })}
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              <p className="text-mist mt-3 text-[0.75rem]">
-                Per-variant counts are edited here and aggregated into the product&apos;s total by a
-                Cloud Function — never written from the browser.
+              <p className="text-mist mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[0.75rem]">
+                <span>
+                  Total across variants:{" "}
+                  <strong className="text-ink tabular-nums">
+                    {variants.reduce((sum, v) => sum + v.stock, 0)}
+                  </strong>
+                </span>
+                <span>
+                  {/* The product's own total is derived server-side from these
+                      rows, so the two can never disagree. */}
+                  Saved with the product; the checkout decrements the variant,
+                  not the total.
+                </span>
               </p>
             </Panel>
           )}

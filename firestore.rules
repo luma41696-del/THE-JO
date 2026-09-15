@@ -89,7 +89,73 @@ service cloud.firestore {
       // Offers are readable so the cart can validate a code and show its terms.
       // The discount is still recomputed server-side at checkout — a client
       // that reads an offer cannot apply one.
+      //
+      // `active` is mirrored from `status` on every write, so this check keeps
+      // working for documents written before `status` existed and for ones
+      // written after. A paused or archived coupon is invisible to shoppers.
       allow read: if appCheckOk() && (resource.data.active == true || isStaff());
+
+      // Writes go through /api/admin/offers, which runs with the Admin SDK and
+      // bypasses these rules. Staff are allowed here only so the admin can be
+      // operated in an emergency; `usageCount` is excluded either way, because
+      // a client that could set it could hand back redemptions already spent.
+      allow write: if isStaff()
+        && appCheckOk()
+        && !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['usageCount']);
+      allow create: if isStaff() && appCheckOk();
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Coupon redemptions — written only by the checkout transaction      */
+    /* ------------------------------------------------------------------ */
+
+    match /offerRedemptions/{id} {
+      // A customer may see their own redemption history; nobody may write it
+      // from a client. The count is what enforces "one per customer", so a
+      // writable copy would make the limit advisory.
+      allow read: if isSignedIn() && (resource.data.uid == request.auth.uid || isStaff());
+      allow write: if false;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Checkout idempotency claims                                        */
+    /* ------------------------------------------------------------------ */
+
+    match /checkoutClaims/{key} {
+      // Server-only. These are what stop a retried checkout becoming a second
+      // order; a client that could read or forge one could replay an order.
+      allow read, write: if false;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Support tickets                                                    */
+    /* ------------------------------------------------------------------ */
+
+    match /tickets/{ticketId} {
+      // A customer sees their own thread and may open one. Replies from staff
+      // are written by /api/admin/support with the Admin SDK, so no client
+      // needs write access to an existing ticket — which also means a customer
+      // cannot edit what support said, or mark their own ticket resolved.
+      allow read: if isSignedIn() && (resource.data.uid == request.auth.uid || isStaff());
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && appCheckOk();
+      allow update, delete: if false;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Shipping configuration                                             */
+    /* ------------------------------------------------------------------ */
+
+    match /shippingClasses/{id} {
+      // Public: the cart quotes surcharges and hides excluded speeds locally.
+      allow read: if appCheckOk();
+      allow write: if isStaff() && appCheckOk();
+    }
+
+    match /shippingMethods/{id} {
+      allow read: if appCheckOk();
       allow write: if isStaff() && appCheckOk();
     }
 

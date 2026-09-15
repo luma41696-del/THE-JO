@@ -21,6 +21,7 @@ import {
   isSoldIndividually,
   resolveSelection,
 } from "@/lib/product";
+import { storeSettings } from "@/data/site-content";
 import type { Category, Locale, Product, ShippingClass } from "@/types";
 
 /**
@@ -546,12 +547,27 @@ export function ProductDetail({
             </button>
           </div>
 
-          {/* Service promises — placed under the CTA where hesitation happens. */}
+          {/*
+            Service promises, placed under the CTA where hesitation happens —
+            and composed from the store's real settings rather than written as
+            prose. All three used to be hard-coded strings: the threshold was
+            stated in three files that could disagree with the shipping rate,
+            the returns window claimed 30 days against a 14-day policy, and
+            "Secure checkout with 3-D Secure" described a card gateway the shop
+            does not have. A promise the checkout cannot keep is worse than no
+            promise, because the customer only finds out at the door.
+          */}
           <ul className="border-line mt-6 grid gap-2.5 border-t pt-6">
             {[
-              { en: "Free express delivery over 75 JOD", ar: "توصيل سريع مجاني فوق ٧٥ ديناراً" },
-              { en: "Free returns within 30 days", ar: "إرجاع مجاني خلال ٣٠ يوماً" },
-              { en: "Secure checkout with 3-D Secure", ar: "دفع آمن بحماية 3-D Secure" },
+              {
+                en: `Free delivery over ${storeSettings.freeShippingThreshold} JOD`,
+                ar: `توصيل مجاني فوق ${storeSettings.freeShippingThreshold} ديناراً`,
+              },
+              {
+                en: `Returns within ${storeSettings.returnWindowDays} days`,
+                ar: `إرجاع خلال ${storeSettings.returnWindowDays} يوماً`,
+              },
+              { en: "Pay on delivery", ar: "الدفع عند الاستلام" },
             ].map((item) => (
               <li key={item.en} className="text-smoke flex items-center gap-2.5 text-[0.8125rem]">
                 <span className="text-mint" aria-hidden="true">

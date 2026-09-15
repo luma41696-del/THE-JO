@@ -10,6 +10,9 @@ import { EASE, transition } from "@/lib/motion";
 import { formatDeliveryWindow, formatPrice, t } from "@/lib/format";
 import { priceCart, subtotalOf } from "@/lib/pricing";
 import { classesInCart, quoteShipping } from "@/lib/shipping";
+import { evaluateOffer, findOfferByCode } from "@/lib/offers";
+import { useCoupon } from "@/lib/store/coupon";
+import { useAuth } from "@/components/providers/AuthProvider";
 import { useCart, useCartHydrated } from "@/lib/store/cart";
 import { Button } from "@/components/ui/Button";
 import { ProductRail } from "@/components/product/ProductRail";
@@ -40,6 +43,7 @@ export function CartPageClient({
   offers,
   suggestions,
   crossSell = { edges: {}, targets: [] },
+  categoryPaths = {},
   locale = "en",
 }: {
   shippingMethods: ShippingMethod[];
@@ -48,10 +52,16 @@ export function CartPageClient({
   suggestions: Product[];
   /** Cross-sell edges plus the products those edges point at. */
   crossSell?: { edges: Record<string, string[]>; targets: Product[] };
+  /**
+   * Product id → category ancestry. Needed to resolve a category-scoped
+   * coupon, because cart lines carry no category of their own.
+   */
+  categoryPaths?: Record<string, string[]>;
   locale?: Locale;
 }) {
   const router = useLocalizedRouter();
   const rtl = locale === "ar";
+  const uid = useAuth().user?.uid ?? null;
 
   const items = useCart((s) => s.items);
   const setQuantity = useCart((s) => s.setQuantity);
@@ -83,7 +93,23 @@ export function CartPageClient({
 
   const [methodId, setMethodId] = useState(shippingMethods[0]?.id ?? "standard");
   const [code, setCode] = useState("");
-  const [appliedOffer, setAppliedOffer] = useState<Offer | null>(null);
+  /*
+   * The coupon lives outside this component.
+   *
+   * It used to be local state, so walking from the bag to checkout silently
+   * dropped it and the customer paid full price without being told. It is
+   * persisted by code only — never the whole offer document — so a coupon
+   * that is revoked or expires between the two pages is re-evaluated rather
+   * than trusted from storage.
+   */
+  const couponCode = useCoupon((s) => s.code);
+  const setCouponCode = useCoupon((s) => s.setCode);
+  const clearCoupon = useCoupon((s) => s.clear);
+
+  const appliedOffer = useMemo(
+    () => (couponCode ? findOfferByCode(offers, couponCode) : null),
+    [couponCode, offers],
+  );
   const [codeError, setCodeError] = useState<string | null>(null);
   const [checkingCode, setCheckingCode] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -115,31 +141,111 @@ export function CartPageClient({
     usableQuotes[0]?.method ??
     null;
 
-  const totals = useMemo(
-    () => priceCart({ items, shippingMethod: method, shippingClasses, offer: appliedOffer }),
-    [items, method, shippingClasses, appliedOffer],
+  /*
+   * One evaluation, reused for the discount, the shipping waiver and the
+   * message. `categoryPaths` is what lets a category-scoped coupon resolve:
+   * cart lines carry no category, deliberately, because a category can be
+   * reparented after an item was added.
+   */
+  const offerVerdict = useMemo(
+    () =>
+      appliedOffer
+        ? evaluateOffer(appliedOffer, {
+            items,
+            subtotal: subtotalOf(items),
+            currency: items[0]?.currency ?? "JOD",
+            categoryPaths,
+            uid: uid ?? null,
+          })
+        : null,
+    [appliedOffer, items, categoryPaths, uid],
   );
+
+  const totals = useMemo(
+    () =>
+      priceCart({
+        items,
+        shippingMethod: method,
+        shippingClasses,
+        offer: appliedOffer,
+        offerEvaluation: offerVerdict,
+      }),
+    [items, method, shippingClasses, appliedOffer, offerVerdict],
+  );
+
+  /*
+   * A coupon can stop applying without the customer touching anything —
+   * removing the last eligible item, or dropping below the minimum. Saying so
+   * beats a discount that quietly vanishes from the total.
+   */
+  const couponWarning =
+    appliedOffer && offerVerdict && !offerVerdict.ok ? offerVerdict.message[locale] : null;
 
   async function applyCode() {
     setCodeError(null);
     setCheckingCode(true);
-    // Client-side validation is for the message only — the server re-validates
-    // and re-applies the discount when the order is created.
-    await new Promise((r) => setTimeout(r, 350));
 
-    const match = offers.find((o) => o.code.toLowerCase() === code.trim().toLowerCase());
-    if (!match) {
-      setCodeError(rtl ? "رمز غير صالح أو منتهٍ." : "That code is not valid or has expired.");
-    } else if (match.minSubtotal && totals.subtotal < match.minSubtotal) {
-      setCodeError(
-        rtl
-          ? `الحد الأدنى ${formatPrice(match.minSubtotal, totals.currency, locale)}.`
-          : `Minimum spend of ${formatPrice(match.minSubtotal, totals.currency, locale)} applies.`,
-      );
-    } else {
-      setAppliedOffer(match);
-      setCode("");
+    /*
+     * Ask the server, not the props.
+     *
+     * The page is only given *active* coupons, so a code that had simply
+     * expired came back from a local lookup as "not recognised" — and the
+     * customer, told their code was unknown, retyped it instead of accepting
+     * that the sale was over. The endpoint sees every coupon and the
+     * customer's own redemption history, so the reason it returns is the same
+     * one the checkout will give.
+     *
+     * A network failure falls back to the local evaluation rather than
+     * refusing outright: a valid code should not be rejected because the
+     * validator was briefly unreachable.
+     */
+    try {
+      const response = await fetch("/api/offers/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code,
+          items: items.map((i) => ({
+            productId: i.productId,
+            colorId: i.colorId,
+            sizeId: i.sizeId,
+            quantity: i.quantity,
+          })),
+        }),
+      });
+
+      const data = (await response.json()) as {
+        ok?: boolean;
+        message?: { en: string; ar: string };
+        offer?: { code: string };
+      };
+
+      if (data.ok && data.offer) {
+        setCouponCode(data.offer.code);
+        setCode("");
+      } else {
+        setCodeError(
+          data.message?.[locale] ??
+            (rtl ? "تعذّر التحقق من الرمز." : "That code could not be checked."),
+        );
+      }
+    } catch {
+      const match = findOfferByCode(offers, code);
+      const verdict = evaluateOffer(match, {
+        items,
+        subtotal: subtotalOf(items),
+        currency: items[0]?.currency ?? "JOD",
+        categoryPaths,
+        uid: uid ?? null,
+      });
+      if (verdict.ok && match) {
+        setCouponCode(match.code);
+        setCode("");
+      } else {
+        setCodeError(verdict.message[locale]);
+      }
     }
+
     setCheckingCode(false);
   }
 
@@ -440,21 +546,45 @@ export function CartPageClient({
             <div className="mt-6">
               {appliedOffer ? (
                 <motion.div
-                  className="bg-mint/10 rounded-md flex items-center justify-between gap-3 p-3.5"
+                  className={cn(
+                    "rounded-md flex flex-col gap-2 p-3.5",
+                    // Green only while it is actually reducing the total. A
+                    // coupon that no longer applies must not keep wearing the
+                    // colour of a discount that is not being given.
+                    couponWarning ? "bg-alert/10" : "bg-mint/10",
+                  )}
                   initial={{ opacity: 0, y: -6 }}
                   animate={{ opacity: 1, y: 0 }}
                 >
-                  <span className="text-mint text-[0.8125rem] font-medium">
-                    {appliedOffer.code} · {t(appliedOffer.title, locale)}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setAppliedOffer(null)}
-                    className="text-smoke hover:text-ink cursor-pointer text-[0.75rem]"
-                    data-cursor="hover"
-                  >
-                    {rtl ? "إزالة" : "Remove"}
-                  </button>
+                  <div className="flex items-center justify-between gap-3">
+                    <span
+                      className={cn(
+                        "text-[0.8125rem] font-medium",
+                        couponWarning ? "text-alert" : "text-mint",
+                      )}
+                    >
+                      {appliedOffer.code} · {t(appliedOffer.title, locale)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => clearCoupon()}
+                      className="text-smoke hover:text-ink shrink-0 cursor-pointer text-[0.75rem]"
+                      data-cursor="hover"
+                    >
+                      {rtl ? "إزالة" : "Remove"}
+                    </button>
+                  </div>
+
+                  {/* A coupon can stop applying without the customer touching
+                      anything — the last eligible item removed, or the basket
+                      dropping below the minimum. A discount that silently
+                      disappears from the total reads as a pricing bug, so the
+                      reason is stated where the code is shown. */}
+                  {couponWarning && (
+                    <p className="text-alert text-[0.75rem]" role="status">
+                      {couponWarning}
+                    </p>
+                  )}
                 </motion.div>
               ) : (
                 <>

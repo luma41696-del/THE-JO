@@ -24,6 +24,7 @@ import type {
   Testimonial,
 } from "@/types";
 import { categoryPathFor, withComputedPaths } from "@/lib/categories";
+import { storeSettings } from "@/data/site-content";
 import { gtinCheckDigit } from "@/lib/product";
 
 const DAY = 86_400_000;
@@ -1061,8 +1062,8 @@ export const demoBanners: Banner[] = [
     slot: "announcement",
     tone: "ink",
     title: {
-      en: "Complimentary express shipping over 75 JOD · 30-day returns",
-      ar: "توصيل سريع مجاني للطلبات فوق ٧٥ ديناراً · إرجاع خلال ٣٠ يوماً",
+      en: `Free delivery over ${storeSettings.freeShippingThreshold} JOD · ${storeSettings.returnWindowDays}-day returns`,
+      ar: `توصيل مجاني فوق ${storeSettings.freeShippingThreshold} ديناراً · إرجاع خلال ${storeSettings.returnWindowDays} يوماً`,
     },
     priority: 10,
     active: true,
@@ -1075,16 +1076,24 @@ export const demoOffers: Offer[] = [
     code: "PRIVATE25",
     type: "percentage",
     value: 25,
+    // A cap is what stops "25% off" writing an unbounded cheque on a 900 JOD
+    // basket. Every percentage campaign should carry one.
+    maxDiscount: 60,
     title: { en: "Private sale — 25% off", ar: "تخفيض خاص — ٢٥٪" },
     description: { en: "Members only. Excludes final sale.", ar: "للأعضاء فقط. لا يشمل التصفية النهائية." },
     minSubtotal: 0,
     appliesToCategoryIds: [],
     appliesToProductIds: [],
+    excludesCategoryIds: [],
+    excludesProductIds: [],
     startsAt: NOW - 2 * DAY,
     endsAt: NOW + 4 * DAY,
     usageLimit: 5000,
     usageCount: 1842,
     perUserLimit: 1,
+    firstOrderOnly: false,
+    stackable: false,
+    status: "active",
     active: true,
   },
   {
@@ -1092,15 +1101,73 @@ export const demoOffers: Offer[] = [
     code: "WELCOME10",
     type: "percentage",
     value: 10,
+    maxDiscount: 25,
     title: { en: "10% off your first order", ar: "١٠٪ على طلبك الأول" },
     minSubtotal: 40,
     appliesToCategoryIds: [],
     appliesToProductIds: [],
+    excludesCategoryIds: [],
+    excludesProductIds: [],
     startsAt: NOW - 90 * DAY,
     endsAt: NOW + 365 * DAY,
     usageCount: 9120,
     perUserLimit: 1,
+    // The name promised this from the start; nothing enforced it until now.
+    firstOrderOnly: true,
+    stackable: false,
+    status: "active",
     active: true,
+  },
+  {
+    id: "shipfree",
+    code: "SHIPFREE",
+    type: "free-shipping",
+    value: 0,
+    title: { en: "Free delivery", ar: "توصيل مجاني" },
+    description: {
+      en: "On orders over 30 JOD. Not valid on oversized items.",
+      ar: "للطلبات فوق ٣٠ ديناراً. لا يشمل القطع الضخمة.",
+    },
+    minSubtotal: 30,
+    appliesToCategoryIds: [],
+    appliesToProductIds: [],
+    excludesCategoryIds: [],
+    excludesProductIds: [],
+    startsAt: NOW - 10 * DAY,
+    endsAt: NOW + 20 * DAY,
+    usageLimit: 500,
+    usageCount: 63,
+    perUserLimit: 2,
+    firstOrderOnly: false,
+    stackable: true,
+    status: "active",
+    active: true,
+  },
+  {
+    /*
+     * Deliberately expired, and kept in the catalogue rather than deleted.
+     * Before the rewrite a free-shipping coupon waived the delivery fee on
+     * `active` alone — no date check — so this row is the regression test for
+     * that bug living in the data the app actually runs against.
+     */
+    id: "lastwinter",
+    code: "LASTWINTER",
+    type: "free-shipping",
+    value: 0,
+    title: { en: "Winter delivery offer", ar: "عرض توصيل الشتاء" },
+    description: { en: "Campaign closed.", ar: "انتهت الحملة." },
+    minSubtotal: 0,
+    appliesToCategoryIds: [],
+    appliesToProductIds: [],
+    excludesCategoryIds: [],
+    excludesProductIds: [],
+    startsAt: NOW - 120 * DAY,
+    endsAt: NOW - 30 * DAY,
+    usageCount: 412,
+    firstOrderOnly: false,
+    stackable: false,
+    status: "paused",
+    active: false,
   },
 ];
 
@@ -1113,7 +1180,7 @@ export const demoShippingMethods: ShippingMethod[] = [
     price: 3.5,
     minDays: 3,
     maxDays: 5,
-    freeAbove: 75,
+    freeAbove: storeSettings.freeShippingThreshold,
   },
   {
     id: "express",

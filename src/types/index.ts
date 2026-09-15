@@ -295,24 +295,92 @@ export interface Banner {
 
 export type OfferType = "percentage" | "fixed" | "free-shipping" | "bundle";
 
+/**
+ * Where a coupon sits in its life.
+ *
+ * `paused` and `archived` are deliberately different. Pausing is reversible
+ * and expected — a campaign stops for a week. Archiving is the end of the
+ * coupon's life, and it must never delete anything: orders that already used
+ * the code keep their record of it, so an accountant can still explain why an
+ * order from March was 20% cheaper. A coupon is therefore never hard-deleted.
+ */
+export type OfferStatus = "draft" | "active" | "paused" | "archived";
+
 export interface Offer {
   id: string;
   code: string;
   type: OfferType;
   /** Percent (0-100) for `percentage`, currency amount for `fixed`. */
   value: number;
+  /**
+   * Ceiling on a percentage discount, in store currency. "20% off, up to 15
+   * JOD" — without it a percentage coupon on a large basket writes a cheque
+   * nobody approved.
+   */
+  maxDiscount?: number;
   title: Localized;
   description?: Localized;
   minSubtotal?: number;
+
   /** Empty arrays mean "applies to everything". */
   appliesToCategoryIds: string[];
   appliesToProductIds: string[];
+  /**
+   * Carve-outs, applied *after* the includes. Exclusion wins on a tie: a
+   * product both included and excluded is excluded, because the exclusion is
+   * the more specific statement and the safer reading of the merchant's
+   * intent.
+   */
+  excludesCategoryIds: string[];
+  excludesProductIds: string[];
+
   startsAt: number;
   endsAt: number;
+
   usageLimit?: number;
+  /** Incremented only inside the transaction that creates an order. */
   usageCount: number;
   perUserLimit?: number;
+
+  /** Restricts the code to one account. Personal gift and apology codes. */
+  assignedUid?: string;
+  /** Valid only on an account's first completed order. */
+  firstOrderOnly: boolean;
+  /**
+   * Whether this may combine with automatic campaign discounts. Off by
+   * default: stacking is how a 20% code and a 30% sale become 50% off, and
+   * that is discovered in the revenue report rather than at checkout.
+   */
+  stackable: boolean;
+
+  status: OfferStatus;
+  /**
+   * Legacy mirror of `status === "active"`. Kept in sync on write so any
+   * reader that predates `status` keeps working; new code reads `status`.
+   */
   active: boolean;
+
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+/**
+ * One account's use of one coupon.
+ *
+ * Stored as its own document (`offerRedemptions/{offerId}__{uid}`) rather than
+ * counted by scanning orders. A scan is a race: two checkouts submitted at the
+ * same moment both count zero prior uses and both succeed. A document can be
+ * read and written in the same transaction as the order, which is what makes
+ * "one per customer" actually mean one.
+ */
+export interface OfferRedemption {
+  id: string;
+  offerId: string;
+  uid: string;
+  count: number;
+  orderIds: string[];
+  firstUsedAt: number;
+  lastUsedAt: number;
 }
 
 /* -------------------------------------------------------------------------- */

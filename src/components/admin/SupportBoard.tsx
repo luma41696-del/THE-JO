@@ -7,6 +7,7 @@ import { Link } from "@/components/ui/Link";
 import { cn } from "@/lib/utils";
 import { transition } from "@/lib/motion";
 import { formatDate } from "@/lib/format";
+import { getIdToken } from "@/lib/firebase/auth";
 import { AdminPageHeader } from "./AdminShell";
 import { FilterChips, Panel, PriorityFlag, StatTile, TicketStatusPill } from "./AdminUI";
 import { Button } from "@/components/ui/Button";
@@ -31,6 +32,8 @@ export function SupportBoard({ tickets: initial }: { tickets: SupportTicket[] })
   const [filter, setFilter] = useState<Filter>("needs-reply");
   const [selectedId, setSelectedId] = useState<string | null>(initial[0]?.id ?? null);
   const [reply, setReply] = useState("");
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
   const counts = useMemo(() => {
@@ -75,12 +78,22 @@ export function SupportBoard({ tickets: initial }: { tickets: SupportTicket[] })
 
   const selected = tickets.find((t) => t.id === selectedId) ?? rows[0] ?? null;
 
-  function send() {
+  /**
+   * Send a reply.
+   *
+   * Optimistic, then reconciled. The UI updates immediately because a support
+   * agent typing all day should not wait on a round trip — but the reply is
+   * rolled back if the write fails, which is the half that was missing: this
+   * used to update local state and stop, so staff saw replies that had never
+   * been stored and vanished on refresh.
+   */
+  async function send() {
     if (!selected || !reply.trim()) return;
     setSending(true);
+    setSendError(null);
 
-    // Optimistic and local: the write path for support lives in a Cloud
-    // Function that also emails the customer, so this is the UI half only.
+    const snapshot = tickets;
+    const body = reply.trim();
     const now = Date.now();
     setTickets((current) =>
       current.map((ticket) =>
@@ -109,7 +122,48 @@ export function SupportBoard({ tickets: initial }: { tickets: SupportTicket[] })
     );
 
     setReply("");
-    setSending(false);
+
+    try {
+      const token = await getIdToken().catch(() => null);
+      const response = await fetch("/api/admin/support", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ ticketId: selected.id, body }),
+      });
+
+      const data = (await response.json()) as {
+        ok?: boolean;
+        error?: string;
+        persisted?: boolean;
+        delivered?: boolean;
+        deliveryNote?: string;
+      };
+      if (!response.ok || !data.ok) throw new Error(data.error ?? "The reply was not saved.");
+
+      if (data.persisted === false) {
+        // Roll back rather than leave a reply on screen that is not stored.
+        setTickets(snapshot);
+        setReply(body);
+        setSendError(
+          "Not saved: Firebase Admin is not configured in this environment.",
+        );
+      } else if (data.delivered === false && data.deliveryNote) {
+        // Stored, but not emailed. Staff must know the customer has not been
+        // pinged, or they will assume silence means the answer landed.
+        setNotice(data.deliveryNote);
+      }
+    } catch (error) {
+      setTickets(snapshot);
+      setReply(body);
+      setSendError(
+        error instanceof Error ? error.message : "The reply could not be saved.",
+      );
+    } finally {
+      setSending(false);
+    }
   }
 
   function setStatus(status: TicketStatus) {
@@ -275,9 +329,12 @@ export function SupportBoard({ tickets: initial }: { tickets: SupportTicket[] })
                   className="border-line focus:border-brand bg-paper text-ink placeholder:text-mist w-full resize-y rounded-md border px-3 py-2.5 text-[0.875rem] outline-none transition-colors"
                 />
               </label>
-              <div className="mt-3 flex items-center justify-between gap-3">
-                <p className="text-mist text-[0.6875rem]">
-                  Sending also emails the customer and moves the ticket to Waiting.
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-mist min-w-0 text-[0.6875rem]">
+                  {/* This used to claim it emailed the customer. It did not —
+                      it did not even save. It now saves, and says plainly that
+                      no email goes out until a provider is configured. */}
+                  Saves the reply to the ticket and moves it to Waiting.
                 </p>
                 <Button
                   variant="brand"
@@ -289,6 +346,18 @@ export function SupportBoard({ tickets: initial }: { tickets: SupportTicket[] })
                   Send reply
                 </Button>
               </div>
+
+              {sendError && (
+                <p role="alert" className="text-alert mt-2 text-[0.75rem]">
+                  {sendError}
+                </p>
+              )}
+
+              {notice && !sendError && (
+                <p role="status" className="text-smoke bg-paper-sunken rounded-sm mt-2 px-2.5 py-1.5 text-[0.75rem]">
+                  {notice}
+                </p>
+              )}
             </footer>
           </Panel>
         ) : (

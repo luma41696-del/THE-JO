@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { Link } from "@/components/ui/Link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
@@ -8,14 +8,23 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { EASE, transition } from "@/lib/motion";
 import { formatDeliveryWindow, formatPrice, t } from "@/lib/format";
-import { priceCart } from "@/lib/pricing";
+import { priceCart, subtotalOf } from "@/lib/pricing";
+import { evaluateOffer, findOfferByCode } from "@/lib/offers";
 import { useCart } from "@/lib/store/cart";
+import { useCoupon } from "@/lib/store/coupon";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { getIdToken } from "@/lib/firebase/auth";
 import { Button } from "@/components/ui/Button";
 import { AnimatedLogo } from "@/components/brand/AnimatedLogo";
 import { BrandWave } from "@/components/brand/BrandWave";
-import type { Address, Locale, Offer, PaymentMethod, ShippingMethod } from "@/types";
+import type {
+  Address,
+  Locale,
+  Offer,
+  PaymentMethod,
+  ShippingClass,
+  ShippingMethod,
+} from "@/types";
 
 /**
  * Checkout.
@@ -49,11 +58,17 @@ const EMPTY_ADDRESS: Omit<Address, "id" | "isDefault"> = {
 
 export function CheckoutFlow({
   shippingMethods,
+  shippingClasses = [],
   offers,
+  categoryPaths = {},
   locale = "en",
 }: {
   shippingMethods: ShippingMethod[];
+  /** Surcharges and speed exclusions, so this quote matches the bag's. */
+  shippingClasses?: ShippingClass[];
   offers: Offer[];
+  /** Product id → category ancestry, for category-scoped coupons. */
+  categoryPaths?: Record<string, string[]>;
   locale?: Locale;
 }) {
   const reduced = useReducedMotion();
@@ -68,17 +83,63 @@ export function CheckoutFlow({
   const [address, setAddress] = useState({ ...EMPTY_ADDRESS, fullName: profile?.displayName ?? "" });
   const [methodId, setMethodId] = useState(shippingMethods[0]?.id ?? "standard");
   const [payment, setPayment] = useState<PaymentMethod>("cod");
-  const [offerCode] = useState<string>("");
+  /*
+   * The coupon comes from the shared store, not from local state.
+   *
+   * This was `useState<string>("")` with no setter — a constant empty string.
+   * The checkout therefore applied no coupon *ever*: a customer who entered a
+   * code in the bag, saw the discount, and pressed "Proceed to checkout" was
+   * quietly charged full price, and the only place the difference showed was
+   * the final total they had already stopped reading.
+   */
+  const couponCode = useCoupon((s) => s.code);
+  const clearCoupon = useCoupon((s) => s.clear);
+  /** Survives re-renders and retries; cleared only after a successful order. */
+  const idempotencyKey = useRef<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [placed, setPlaced] = useState<{ reference: string; total: number } | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
 
   const method = shippingMethods.find((m) => m.id === methodId) ?? null;
-  const offer = offers.find((o) => o.code === offerCode) ?? null;
+  const offer = useMemo(
+    () => (couponCode ? findOfferByCode(offers, couponCode) : null),
+    [couponCode, offers],
+  );
+
+  /*
+   * Evaluated with the same engine the bag and the server use, so the three
+   * numbers agree. The per-user limit still cannot be checked here — it needs
+   * redemption history the browser does not have — so the server may still
+   * refuse, and that refusal is shown rather than swallowed.
+   */
+  const offerVerdict = useMemo(
+    () =>
+      offer
+        ? evaluateOffer(offer, {
+            items,
+            subtotal: subtotalOf(items),
+            currency: items[0]?.currency ?? "JOD",
+            categoryPaths,
+            uid: user?.uid ?? null,
+          })
+        : null,
+    [offer, items, categoryPaths, user],
+  );
+
   const totals = useMemo(
-    () => priceCart({ items, shippingMethod: method, offer }),
-    [items, method, offer],
+    () =>
+      priceCart({
+        items,
+        shippingMethod: method,
+        // Shipping classes were missing here, so the checkout quoted a
+        // different delivery price from the bag for any basket with a
+        // surcharge — the customer saw one number and paid another.
+        shippingClasses,
+        offer,
+        offerEvaluation: offerVerdict,
+      }),
+    [items, method, shippingClasses, offer, offerVerdict],
   );
 
   function validateStep(current: Step) {
@@ -117,6 +178,21 @@ export function CheckoutFlow({
     setServerError(null);
     setSubmitting(true);
 
+    /*
+     * One key per attempt, held until the attempt succeeds.
+     *
+     * A retry after a network timeout resends the same key, so the server
+     * returns the order it already created instead of creating a second one
+     * and spending the customer's coupon twice. It is regenerated only after
+     * a success, because a *new* order genuinely is a new attempt.
+     */
+    if (!idempotencyKey.current) {
+      idempotencyKey.current =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    }
+
     try {
       const token = await getIdToken().catch(() => null);
       const response = await fetch("/api/checkout", {
@@ -137,6 +213,7 @@ export function CheckoutFlow({
           offerCode: offer?.code ?? null,
           paymentMethod: payment,
           shippingAddress: address,
+          idempotencyKey: idempotencyKey.current,
         }),
       });
 
@@ -145,6 +222,8 @@ export function CheckoutFlow({
         reference?: string;
         total?: number;
         error?: string;
+        reason?: string;
+        duplicate?: boolean;
       };
 
       if (!response.ok || !data.ok || !data.reference) {
@@ -153,6 +232,16 @@ export function CheckoutFlow({
 
       setPlaced({ reference: data.reference, total: data.total ?? totals.total });
       clearCart();
+      /*
+       * The coupon and the idempotency key are released only on success.
+       *
+       * On failure both are kept: the customer may fix an address and retry,
+       * and they should keep their discount — and the retry must reuse the
+       * same key so a request that actually succeeded before the connection
+       * dropped is recognised rather than placed a second time.
+       */
+      clearCoupon();
+      idempotencyKey.current = null;
     } catch (error) {
       setServerError(
         error instanceof Error

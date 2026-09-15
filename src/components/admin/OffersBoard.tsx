@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 import { countdownParts, formatDate, formatPrice, t as pick } from "@/lib/format";
@@ -9,7 +10,10 @@ import { AdminPageHeader } from "./AdminShell";
 import { DataTable, Panel, StatTile, type Column } from "./AdminUI";
 import { ExportMenu } from "./ExportMenu";
 import { Button } from "@/components/ui/Button";
-import type { Banner, Offer } from "@/types";
+import { OfferEditor } from "./OfferEditor";
+import { offerStatus } from "@/lib/offers";
+import { getIdToken } from "@/lib/firebase/auth";
+import type { Banner, Category, Offer, OfferStatus, Product } from "@/types";
 
 /**
  * Offers and campaigns.
@@ -26,16 +30,116 @@ import type { Banner, Offer } from "@/types";
 export function OffersBoard({
   offers,
   banners,
+  categories = [],
+  products = [],
   now,
 }: {
   offers: Offer[];
   banners: Banner[];
+  /** For the coupon editor's scope pickers. */
+  categories?: Category[];
+  products?: Product[];
   now: number;
 }) {
+  const router = useRouter();
   const [tab, setTab] = useState<"codes" | "campaigns">("codes");
 
-  const live = offers.filter((o) => o.active && o.startsAt <= now && o.endsAt > now);
+  const [editing, setEditing] = useState<Offer | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<OfferStatus | "all">("all");
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const live = offers.filter((o) => offerStatus(o) === "active" && o.startsAt <= now && o.endsAt > now);
   const redemptions = offers.reduce((sum, o) => sum + o.usageCount, 0);
+
+  /*
+   * Archived coupons are hidden unless asked for. They are kept forever so an
+   * old order can still explain its discount, which means the list only grows
+   * — and a board where last year's campaigns outnumber this month's is a
+   * board nobody scans.
+   */
+  const visible = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return offers.filter((offer) => {
+      const status = offerStatus(offer);
+      if (statusFilter === "all" ? status === "archived" : status !== statusFilter) return false;
+      if (!needle) return true;
+      return (
+        offer.code.toLowerCase().includes(needle) ||
+        offer.title.en.toLowerCase().includes(needle) ||
+        offer.title.ar.includes(query.trim())
+      );
+    });
+  }, [offers, query, statusFilter]);
+
+  function openNew() {
+    setEditing(null);
+    setEditorOpen(true);
+  }
+
+  function openEdit(offer: Offer) {
+    setEditing(offer);
+    setEditorOpen(true);
+  }
+
+  /**
+   * Duplicate rather than "edit a running campaign".
+   *
+   * Changing the terms of a coupon customers already hold is how a store ends
+   * up honouring two different deals under one code. Copying into a new draft
+   * keeps the original's history intact and makes the new terms a new code.
+   */
+  function duplicate(offer: Offer) {
+    setEditing({
+      ...offer,
+      id: "",
+      code: `${offer.code}-COPY`,
+      usageCount: 0,
+      status: "draft",
+      active: false,
+    } as Offer);
+    setEditorOpen(true);
+  }
+
+  async function copyCode(code: string) {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(code);
+      window.setTimeout(() => setCopied(null), 1600);
+    } catch {
+      setActionError("Could not copy — your browser blocked clipboard access.");
+    }
+  }
+
+  async function setStatus(offer: Offer, status: OfferStatus) {
+    setBusyId(offer.id);
+    setActionError(null);
+    try {
+      const token = await getIdToken().catch(() => null);
+      const response = await fetch("/api/admin/offers", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ id: offer.id, status }),
+      });
+      const data = (await response.json()) as { ok?: boolean; error?: string; persisted?: boolean };
+      if (!response.ok || !data.ok) throw new Error(data.error ?? "Update failed");
+      if (data.persisted === false) {
+        setActionError("Validated, but not stored: Firebase Admin is not configured here.");
+        return;
+      }
+      router.refresh();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "The coupon could not be updated.");
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   const offerColumns: Column<Offer>[] = [
     {
@@ -131,6 +235,76 @@ export function OffersBoard({
       },
       sortValue: (offer) => offer.endsAt,
     },
+    {
+      key: "status",
+      header: "Status",
+      cell: (offer) => {
+        const status = offerStatus(offer);
+        const tone =
+          status === "active"
+            ? "bg-mint/12 text-mint"
+            : status === "paused"
+              ? "bg-brand-mist text-brand-deep"
+              : status === "draft"
+                ? "bg-paper-sunken text-smoke"
+                : "bg-paper-sunken text-mist";
+        return (
+          <span className={cn("rounded-pill px-2.5 py-1 text-[0.6875rem] font-semibold", tone)}>
+            {status}
+          </span>
+        );
+      },
+      sortValue: (offer) => offerStatus(offer),
+    },
+    {
+      key: "actions",
+      header: "",
+      align: "end",
+      cell: (offer) => {
+        const status = offerStatus(offer);
+        const busy = busyId === offer.id;
+        return (
+          <span className="inline-flex items-center justify-end gap-1">
+            <IconAction label="Copy code" onClick={() => copyCode(offer.code)}>
+              {copied === offer.code ? "✓" : "⧉"}
+            </IconAction>
+            <IconAction label="Edit" onClick={() => openEdit(offer)}>
+              ✎
+            </IconAction>
+            <IconAction label="Duplicate" onClick={() => duplicate(offer)}>
+              +
+            </IconAction>
+
+            {/* Pause and resume are one button: the opposite of the current
+                state is the only thing a merchant wants to click. */}
+            {status === "active" ? (
+              <IconAction label="Pause" busy={busy} onClick={() => setStatus(offer, "paused")}>
+                ❙❙
+              </IconAction>
+            ) : status !== "archived" ? (
+              <IconAction label="Activate" busy={busy} onClick={() => setStatus(offer, "active")}>
+                ▶
+              </IconAction>
+            ) : (
+              <IconAction label="Restore" busy={busy} onClick={() => setStatus(offer, "paused")}>
+                ↩
+              </IconAction>
+            )}
+
+            {status !== "archived" && (
+              <IconAction
+                label="Archive"
+                busy={busy}
+                danger
+                onClick={() => setStatus(offer, "archived")}
+              >
+                ⌫
+              </IconAction>
+            )}
+          </span>
+        );
+      },
+    },
   ];
 
   return (
@@ -194,13 +368,50 @@ export function OffersBoard({
       </div>
 
       {tab === "codes" ? (
-        <DataTable
-          rows={offers}
-          columns={offerColumns}
-          rowKey={(offer) => offer.id}
-          initialSort={{ key: "window", dir: "desc" }}
-          empty="No discount codes yet."
-        />
+        <>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search code or title…"
+              aria-label="Search coupons"
+              className="border-line focus:border-brand bg-paper text-ink min-w-0 flex-1 rounded-md border px-3 py-2 text-[0.8125rem] outline-none sm:max-w-xs"
+            />
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as OfferStatus | "all")}
+              aria-label="Filter by status"
+              className="border-line focus:border-brand bg-paper text-ink rounded-md border px-3 py-2 text-[0.8125rem] outline-none"
+            >
+              <option value="all">All except archived</option>
+              <option value="active">Active</option>
+              <option value="paused">Paused</option>
+              <option value="draft">Draft</option>
+              <option value="archived">Archived</option>
+            </select>
+            <Button variant="brand" size="sm" onClick={openNew}>
+              New coupon
+            </Button>
+          </div>
+
+          {actionError && (
+            <p role="alert" className="text-alert mb-3 text-[0.8125rem]">
+              {actionError}
+            </p>
+          )}
+
+          <DataTable
+            rows={visible}
+            columns={offerColumns}
+            rowKey={(offer) => offer.id}
+            initialSort={{ key: "window", dir: "desc" }}
+            empty={
+              query || statusFilter !== "all"
+                ? "No coupons match this filter."
+                : "No discount codes yet. Create one to get started."
+            }
+          />
+        </>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {banners.map((banner) => {
@@ -268,10 +479,61 @@ export function OffersBoard({
 
       <p className="text-mist mt-4 max-w-2xl text-[0.75rem] leading-relaxed">
         A discount is only ever applied server-side. `/api/checkout` re-validates
-        the code against its window, its usage limit and the cart minimum before
-        an order is created — the cart drawer showing a discount is a preview,
-        never the authority.
+        the code inside the same transaction that creates the order — against its
+        window, its total limit, this customer&rsquo;s own limit and the cart
+        minimum — and increments the count atomically, so two orders arriving at
+        once cannot both take the last redemption. The cart is a preview, never
+        the authority.
       </p>
+
+      <OfferEditor
+        offer={editing}
+        categories={categories}
+        products={products}
+        open={editorOpen}
+        onClose={() => setEditorOpen(false)}
+        onSaved={() => router.refresh()}
+      />
     </>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A square icon button.
+ *
+ * Every row action carries a real `aria-label`: a table of bare glyphs is
+ * unusable with a screen reader, and "⌫" is not a word in any language.
+ */
+function IconAction({
+  label,
+  onClick,
+  children,
+  busy = false,
+  danger = false,
+}: {
+  label: string;
+  onClick: () => void;
+  children: React.ReactNode;
+  busy?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={busy}
+      aria-label={label}
+      title={label}
+      className={cn(
+        "grid h-8 w-8 cursor-pointer place-items-center rounded-md text-[0.8125rem] transition-colors",
+        "hover:bg-paper-sunken disabled:opacity-40",
+        danger ? "text-alert" : "text-ink-muted hover:text-ink",
+      )}
+      data-cursor="hover"
+    >
+      {busy ? "…" : children}
+    </button>
   );
 }

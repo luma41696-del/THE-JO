@@ -6,7 +6,13 @@ import { money } from "@/lib/pricing";
 import { isValidGtin } from "@/lib/product";
 import { getCategories } from "@/lib/catalog";
 import { categoryPathFor } from "@/lib/categories";
-import type { Localized, Product, ProductType } from "@/types";
+import type {
+  Localized,
+  Product,
+  ProductImage,
+  ProductType,
+  ProductVariant,
+} from "@/types";
 
 /**
  * Catalogue writes.
@@ -38,6 +44,8 @@ interface Body {
   status?: Product["status"];
   tags?: string[];
 
+  images?: ProductImage[];
+  variants?: ProductVariant[];
   type?: ProductType;
   sku?: string;
   gtin?: string | null;
@@ -130,6 +138,74 @@ export async function POST(request: Request) {
   const ids = (value: unknown) =>
     Array.isArray(value) ? [...new Set(value.map(String).filter(Boolean))].slice(0, 12) : [];
 
+  /*
+   * Image records are rebuilt field by field rather than trusted wholesale.
+   *
+   * The URL is the one that matters: these are rendered through `next/image`
+   * with `dangerouslyAllowSVG` on, so a URL pointing anywhere but our own
+   * Storage bucket would be a way to serve an executable SVG from a trusted
+   * path. Only `firebasestorage` and the bundled `/demo` assets are accepted.
+   */
+  const images = Array.isArray(body.images)
+    ? body.images
+        .filter((image): image is ProductImage => Boolean(image) && typeof image.url === "string")
+        .filter(
+          (image) =>
+            image.url.startsWith("/demo/") ||
+            image.url.includes("firebasestorage.googleapis.com") ||
+            image.url.includes(".firebasestorage.app"),
+        )
+        .map((image) => ({
+          url: image.url,
+          // Alt text is required for an accessible storefront; an image that
+          // arrives without it is stored with an empty string rather than the
+          // filename, so the gap is visible in the editor instead of hidden.
+          alt: typeof image.alt === "string" ? image.alt.trim().slice(0, 300) : "",
+          width: Number.isFinite(Number(image.width)) ? Math.round(Number(image.width)) : 1200,
+          height: Number.isFinite(Number(image.height)) ? Math.round(Number(image.height)) : 1600,
+          ...(image.colorId ? { colorId: String(image.colorId) } : {}),
+        }))
+        .slice(0, 12)
+    : undefined;
+
+  /*
+   * Variant stock, when the editor sends it.
+   *
+   * `totalStock` is derived from the rows rather than accepted alongside them:
+   * two numbers that must agree will eventually not, and the variant rows are
+   * the ones the checkout decrements.
+   */
+  const variants = Array.isArray(body.variants)
+    ? body.variants
+        .filter((v): v is ProductVariant => Boolean(v) && typeof v.sku === "string")
+        .map((v) => ({
+          sku: String(v.sku),
+          colorId: String(v.colorId ?? ""),
+          sizeId: String(v.sizeId ?? ""),
+          stock: Math.max(0, Math.floor(Number(v.stock) || 0)),
+          ...(v.priceOverride === undefined || v.priceOverride === null
+            ? {}
+            : { priceOverride: money(Number(v.priceOverride), "JOD") }),
+          ...(v.gtin ? { gtin: String(v.gtin) } : {}),
+          ...(v.barcode ? { barcode: String(v.barcode) } : {}),
+        }))
+        .slice(0, 400)
+    : undefined;
+
+  if (variants) {
+    const bad = variants.find((v) => v.gtin && !isValidGtin(v.gtin));
+    if (bad) {
+      return NextResponse.json(
+        { ok: false, error: `The GTIN on ${bad.sku} has an invalid check digit.` },
+        { status: 400 },
+      );
+    }
+  }
+
+  const derivedStock = variants
+    ? variants.reduce((sum, v) => sum + v.stock, 0)
+    : undefined;
+
   const productId = body.id ?? slug;
   const upsellIds = ids(body.upsellIds).filter((id) => id !== productId);
   const crossSellIds = ids(body.crossSellIds).filter((id) => id !== productId);
@@ -164,9 +240,11 @@ export async function POST(request: Request) {
     price: money(price, "JOD"),
     compareAtPrice: compareAt && compareAt > 0 ? money(compareAt, "JOD") : undefined,
     currency: "JOD" as const,
-    totalStock,
+    ...(images ? { images } : {}),
+    ...(variants ? { variants } : {}),
+    totalStock: derivedStock ?? totalStock,
     // Derived, never trusted from the body.
-    inStock: totalStock > 0,
+    inStock: (derivedStock ?? totalStock) > 0,
     status,
     tags: Array.isArray(body.tags) ? body.tags.slice(0, 25).map(String) : [],
     type,
@@ -222,7 +300,16 @@ export async function POST(request: Request) {
     await ref.set(
       {
         ...payload,
-        ...(existing?.exists ? {} : { publishedAt: new Date(), images: [], colors: [], sizes: [] }),
+        ...(existing?.exists
+          ? {}
+          : {
+              publishedAt: new Date(),
+              // Only seed what the payload did not supply, so a create that
+              // arrives with imagery does not have it wiped.
+              ...(images ? {} : { images: [] }),
+              colors: [],
+              sizes: [],
+            }),
       },
       { merge: true },
     );

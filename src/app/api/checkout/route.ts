@@ -9,9 +9,10 @@ import {
 import { priceCart } from "@/lib/pricing";
 import { hasOptions, resolveSelection } from "@/lib/product";
 import { classesInCart } from "@/lib/shipping";
+import { categoryPathsFor, evaluateOffer, redemptionId } from "@/lib/offers";
 import { cartKey, orderReference } from "@/lib/utils";
 import { isAdminConfigured, verifyRequest } from "@/lib/firebase/admin";
-import type { CartItem, Order, OrderEvent } from "@/types";
+import type { CartItem, Offer, Order, OrderEvent, ProductVariant } from "@/types";
 
 /**
  * Order creation.
@@ -47,6 +48,12 @@ interface CheckoutBody {
   offerCode?: string | null;
   paymentMethod?: Order["paymentMethod"];
   shippingAddress?: Order["shippingAddress"];
+  /**
+   * Generated once per checkout attempt by the client and resent on retry.
+   * The first request to claim it creates the order; later ones are told
+   * about that order instead of creating a second.
+   */
+  idempotencyKey?: string;
 }
 
 const MAX_LINES = 40;
@@ -243,51 +250,228 @@ export async function POST(request: Request) {
 
   try {
     const { getAdminDb } = await import("@/lib/firebase/admin");
+    const { FieldValue } = await import("firebase-admin/firestore");
     const db = getAdminDb();
 
     const orderRef = db.collection("orders").doc();
+    const uid = caller?.uid ?? null;
 
-    await db.runTransaction(async (tx) => {
-      // Read every product first: Firestore transactions require all reads to
-      // happen before any write.
-      const productRefs = priced.map((item) => db.collection("products").doc(item.productId));
+    /*
+     * Idempotency.
+     *
+     * A customer who taps "Place order" twice, or whose phone retries a
+     * request that actually succeeded, must end up with one order and one
+     * coupon redemption. The client sends a key it generates once per
+     * checkout attempt; the first request to claim it wins, and every later
+     * request with the same key is told about the order that already exists
+     * rather than creating a second one.
+     */
+    const idempotencyKey =
+      typeof body.idempotencyKey === "string" && body.idempotencyKey.trim()
+        ? body.idempotencyKey.trim().slice(0, 128)
+        : null;
+    const claimRef = idempotencyKey
+      ? db.collection("checkoutClaims").doc(idempotencyKey)
+      : null;
+
+    const result = await db.runTransaction(async (tx) => {
+      /* ---- reads (Firestore requires all reads before any write) -------- */
+
+      if (claimRef) {
+        const claim = await tx.get(claimRef);
+        if (claim.exists) {
+          const data = claim.data() ?? {};
+          // Already processed. Return the original outcome untouched — no
+          // second order, no second redemption, no second stock decrement.
+          return {
+            duplicate: true,
+            reference: String(data.reference ?? reference),
+            orderId: String(data.orderId ?? orderRef.id),
+            total: Number(data.total ?? totals.total),
+          };
+        }
+      }
+
+      /*
+       * Aggregate by product before reading.
+       *
+       * Two lines of the same product (two sizes of one shirt) hit the same
+       * document. Reading it once per line and subtracting from the value
+       * each read returned would apply only the last subtraction — the
+       * classic lost update, and the reason a two-size order used to leave
+       * stock too high.
+       */
+      const wanted = new Map<string, { total: number; lines: typeof priced }>();
+      for (const item of priced) {
+        const entry = wanted.get(item.productId) ?? { total: 0, lines: [] };
+        entry.total += item.quantity;
+        entry.lines.push(item);
+        wanted.set(item.productId, entry);
+      }
+
+      const productIds = [...wanted.keys()];
+      const productRefs = productIds.map((id) => db.collection("products").doc(id));
       const snapshots = productRefs.length ? await tx.getAll(...productRefs) : [];
 
-      snapshots.forEach((snapshot, index) => {
-        const item = priced[index];
-        if (!item) return;
-        if (!snapshot.exists) return; // demo catalogue — nothing to decrement
+      const offerRef = offer ? db.collection("offers").doc(offer.id) : null;
+      const offerSnap = offerRef ? await tx.get(offerRef) : null;
 
-        const stock = (snapshot.data()?.totalStock as number | undefined) ?? 0;
-        if (stock < item.quantity) {
-          throw new Error(`${item.title.en} sold out while you were checking out.`);
-        }
-        tx.update(snapshot.ref, {
-          totalStock: stock - item.quantity,
-          inStock: stock - item.quantity > 0,
+      const redemptionRef =
+        offer && uid
+          ? db.collection("offerRedemptions").doc(redemptionId(offer.id, uid))
+          : null;
+      const redemptionSnap = redemptionRef ? await tx.get(redemptionRef) : null;
+
+      /* ---- coupon: re-check against numbers read inside the tx ---------- */
+
+      let freshOffer: Offer | null = null;
+      if (offer && offerSnap) {
+        /*
+         * The coupon is re-evaluated here, not trusted from the earlier
+         * validation. Between that check and this transaction the last
+         * redemption may have been taken by someone else — and `usageCount`
+         * read outside a transaction is exactly how a "5000 uses" campaign
+         * hands out 5003. This read is serialised with the write below.
+         */
+        freshOffer = offerSnap.exists
+          ? ({ ...(offerSnap.data() as Offer), id: offerSnap.id } as Offer)
+          : offer;
+
+        const userUsage = (redemptionSnap?.data()?.count as number | undefined) ?? 0;
+        const verdict = evaluateOffer(freshOffer, {
+          items: priced,
+          subtotal: totals.subtotal,
+          now,
+          currency: totals.currency,
+          userUsage,
+          uid,
+          categoryPaths: categoryPathsFor(products),
         });
+
+        if (!verdict.ok) {
+          // The customer's language is chosen by the caller; English is the
+          // API's own tongue and the storefront maps the reason code back.
+          throw new CheckoutRejection(verdict.message.en, verdict.reason ?? "not-active");
+        }
+      }
+
+      /* ---- writes ------------------------------------------------------- */
+
+      snapshots.forEach((snapshot, index) => {
+        const productId = productIds[index];
+        if (!productId) return;
+        const entry = wanted.get(productId);
+        if (!entry || !snapshot.exists) return; // demo catalogue — nothing to decrement
+
+        const data = snapshot.data() ?? {};
+        const variants = Array.isArray(data.variants)
+          ? ([...data.variants] as ProductVariant[])
+          : null;
+
+        if (variants) {
+          /*
+           * Decrement the *chosen* variant, not the product total. Stock
+           * lives per permutation, so taking it off the parent left the
+           * medium sold out in reality and available on screen.
+           */
+          for (const line of entry.lines) {
+            const index_ = variants.findIndex(
+              (v) => v.colorId === line.colorId && v.sizeId === line.sizeId,
+            );
+            if (index_ === -1) continue;
+            const variant = variants[index_]!;
+            if (variant.stock < line.quantity) {
+              throw new CheckoutRejection(
+                `${line.title.en} (${line.sizeLabel}) sold out while you were checking out.`,
+                "sold-out",
+              );
+            }
+            variants[index_] = { ...variant, stock: variant.stock - line.quantity };
+          }
+          const total = variants.reduce((sum, v) => sum + v.stock, 0);
+          tx.update(snapshot.ref, { variants, totalStock: total, inStock: total > 0 });
+        } else {
+          const stock = (data.totalStock as number | undefined) ?? 0;
+          if (stock < entry.total) {
+            throw new CheckoutRejection(
+              `${entry.lines[0]?.title.en ?? "An item"} sold out while you were checking out.`,
+              "sold-out",
+            );
+          }
+          tx.update(snapshot.ref, {
+            totalStock: stock - entry.total,
+            inStock: stock - entry.total > 0,
+          });
+        }
       });
 
       tx.set(orderRef, { ...order, createdAt: new Date(now), updatedAt: new Date(now) });
 
-      if (offer) {
-        tx.update(db.collection("offers").doc(offer.id), {
-          usageCount: offer.usageCount + 1,
+      if (offerRef) {
+        // `increment` rather than a read value: the read above guards the
+        // limit, and the atomic op guards the arithmetic.
+        tx.update(offerRef, { usageCount: FieldValue.increment(1) });
+      }
+
+      if (redemptionRef && offer && uid) {
+        tx.set(
+          redemptionRef,
+          {
+            offerId: offer.id,
+            uid,
+            count: FieldValue.increment(1),
+            orderIds: FieldValue.arrayUnion(orderRef.id),
+            firstUsedAt: redemptionSnap?.exists
+              ? (redemptionSnap.data()?.firstUsedAt ?? now)
+              : now,
+            lastUsedAt: now,
+          },
+          { merge: true },
+        );
+      }
+
+      if (claimRef) {
+        tx.set(claimRef, {
+          orderId: orderRef.id,
+          reference,
+          total: totals.total,
+          uid,
+          at: new Date(now),
         });
       }
+
+      return {
+        duplicate: false,
+        reference,
+        orderId: orderRef.id,
+        total: totals.total,
+      };
     });
 
     return NextResponse.json({
       ok: true,
-      reference,
-      orderId: orderRef.id,
-      total: totals.total,
+      reference: result.reference,
+      orderId: result.orderId,
+      total: result.total,
       persisted: true,
+      ...(result.duplicate ? { duplicate: true } : {}),
     });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "We could not place your order. Please try again.";
-    // 409: the request was well-formed but lost a race for stock.
-    return NextResponse.json({ ok: false, error: message }, { status: 409 });
+    const reason = error instanceof CheckoutRejection ? error.reason : "conflict";
+    // 409: the request was well-formed but lost a race for stock or a coupon.
+    return NextResponse.json({ ok: false, error: message, reason }, { status: 409 });
+  }
+}
+
+/** Carries a machine-readable reason alongside the human sentence. */
+class CheckoutRejection extends Error {
+  constructor(
+    message: string,
+    readonly reason: string,
+  ) {
+    super(message);
+    this.name = "CheckoutRejection";
   }
 }

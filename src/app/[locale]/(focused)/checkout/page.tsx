@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
 
-import { getActiveOffers, getShippingMethods } from "@/lib/catalog";
+import {
+  getActiveOffers,
+  getAllProducts,
+  getShippingClasses,
+  getShippingMethods,
+} from "@/lib/catalog";
+import { categoryPathsFor } from "@/lib/offers";
 import { CheckoutFlow } from "@/components/checkout/CheckoutFlow";
 import { isLocale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionaries";
@@ -20,7 +26,20 @@ export default async function CheckoutPage({ params }: { params: Promise<{ local
   const { locale: raw } = await params;
   const locale: Locale = isLocale(raw) ? raw : "en";
 
-  const [shippingMethods, offers] = await Promise.all([getShippingMethods(), getActiveOffers()]);
+  const [shippingMethods, shippingClasses, offers, products] = await Promise.all([
+    getShippingMethods(),
+    getShippingClasses(),
+    getActiveOffers(),
+    getAllProducts(),
+  ]);
 
-  return <CheckoutFlow shippingMethods={shippingMethods} offers={offers} locale={locale} />;
+  return (
+    <CheckoutFlow
+      shippingMethods={shippingMethods}
+      shippingClasses={shippingClasses}
+      offers={offers}
+      categoryPaths={categoryPathsFor(products)}
+      locale={locale}
+    />
+  );
 }
