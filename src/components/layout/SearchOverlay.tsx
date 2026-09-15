@@ -220,7 +220,7 @@ export function SearchOverlay({ locale = "en" }: { locale?: Locale }) {
               <div className="max-h-[60vh] overflow-y-auto pt-5">
                 {term.trim().length < 2 ? (
                   <div>
-                    <p className="text-eyebrow font-display text-mist mb-3 uppercase">
+                    <p className="text-eyebrow text-mist mb-3 uppercase">
                       {rtl ? "اقتراحات" : "Try"}
                     </p>
                     <div className="flex flex-wrap gap-2">

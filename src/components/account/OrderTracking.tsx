@@ -98,7 +98,7 @@ export function OrderTracking({
         <div className="bg-paper-raised border-line rounded-xl border p-6 md:p-7">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-eyebrow font-display text-mist uppercase">
+              <p className="text-eyebrow text-mist uppercase">
                 {rtl ? "رقم الطلب" : "Order"}
               </p>
               <p className="font-display text-ink mt-1 text-2xl font-semibold tracking-wide">
@@ -311,7 +311,7 @@ export function OrderTracking({
           </dl>
 
           <div className="border-line mt-5 border-t pt-5">
-            <p className="text-eyebrow font-display text-mist mb-2 uppercase">
+            <p className="text-eyebrow text-mist mb-2 uppercase">
               {rtl ? "التوصيل إلى" : "Delivering to"}
             </p>
             <p className="text-ink text-[0.8125rem] leading-relaxed">

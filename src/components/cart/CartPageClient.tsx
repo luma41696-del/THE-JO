@@ -477,7 +477,7 @@ export function CartPageClient({
 
             {/* Shipping method */}
             <fieldset className="mt-6">
-              <legend className="text-eyebrow font-display text-mist mb-3 uppercase">
+              <legend className="text-eyebrow text-mist mb-3 uppercase">
                 {rtl ? "الشحن" : "Delivery"}
               </legend>
               <div className="space-y-2">
@@ -599,7 +599,7 @@ export function CartPageClient({
                 </motion.div>
               ) : (
                 <>
-                  <label htmlFor="promo" className="text-eyebrow font-display text-mist mb-2 block uppercase">
+                  <label htmlFor="promo" className="text-eyebrow text-mist mb-2 block uppercase">
                     {rtl ? "رمز الخصم" : "Promo code"}
                   </label>
                   <div className="flex gap-2">

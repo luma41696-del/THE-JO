@@ -135,6 +135,7 @@ let support: typeof import("../src/app/api/support/route");
 let adminSupport: typeof import("../src/app/api/admin/support/route");
 let team: typeof import("../src/app/api/admin/team/route");
 let invite: typeof import("../src/app/api/gift/invite/route");
+let warehouse: typeof import("../src/app/api/admin/warehouse/route");
 let adminSdk: typeof import("../src/lib/firebase/admin");
 
 before(async () => {
@@ -144,6 +145,7 @@ before(async () => {
   adminSupport = await import("../src/app/api/admin/support/route");
   team = await import("../src/app/api/admin/team/route");
   invite = await import("../src/app/api/gift/invite/route");
+  warehouse = await import("../src/app/api/admin/warehouse/route");
   adminSdk = await import("../src/lib/firebase/admin");
 
   customer = await signUp("customer@example.test");
@@ -158,7 +160,7 @@ before(async () => {
 
 after(async () => {
   const db = adminSdk.getAdminDb();
-  for (const name of ["tickets", "auditLog", "giftCampaigns"]) {
+  for (const name of ["tickets", "auditLog", "giftCampaigns", "products"]) {
     const snap = await db.collection(name).get();
     await Promise.all(snap.docs.map((doc) => doc.ref.delete()));
   }
@@ -491,6 +493,136 @@ describe("appointing staff", () => {
     assert.equal(response.ok, false);
     assert.equal(response.httpStatus, 404);
     assert.match(response.error, /sign in to the shop once/i);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/*  Warehouse scheduling                                                      */
+/* -------------------------------------------------------------------------- */
+
+describe("warehouse scheduling", () => {
+  const productId = "e2e-scheduled-tee";
+
+  test("a schedule is stored inside the map, not as a dotted field name", async () => {
+    /*
+     * The bug this pins down: the route wrote `{"visibilitySchedule.showAt":
+     * n}` through `set(..., {merge: true})`. `update()` reads a dotted key as
+     * a path into a map; `set()` does not — it creates a top-level field whose
+     * *name* contains a dot. So every schedule landed beside
+     * `visibilitySchedule` rather than inside it, the reader never saw one,
+     * and the feature had never fired once.
+     */
+    const db = adminSdk.getAdminDb();
+    await db.collection("products").doc(productId).set({
+      title: { en: "Scheduled tee", ar: "تي شيرت مجدول" },
+      status: "active",
+      visibility: "visible",
+    });
+
+    const showAt = Date.UTC(2026, 9, 1, 6, 0, 0);
+    const hideAt = Date.UTC(2026, 9, 30, 21, 0, 0);
+
+    const response = await json<{ ok: boolean }>(
+      await warehouse.POST(
+        request("/api/admin/warehouse", {
+          method: "POST",
+          token: owner.token,
+          body: JSON.stringify({ ids: [productId], showAt, hideAt }),
+        }),
+      ),
+    );
+    assert.equal(response.ok, true);
+
+    const stored = (await db.collection("products").doc(productId).get()).data()!;
+
+    // The map, read the way the storefront reads it.
+    assert.equal(typeof stored.visibilitySchedule, "object");
+    assert.equal(stored.visibilitySchedule.showAt, showAt);
+    assert.equal(stored.visibilitySchedule.hideAt, hideAt);
+
+    // And nothing named with a literal dot, which is what used to be written.
+    assert.equal(
+      Object.keys(stored).some((k) => k.includes(".")),
+      false,
+      `no field name may contain a dot — found ${Object.keys(stored).join(", ")}`,
+    );
+  });
+
+  test("writing one bound does not erase the other", async () => {
+    const db = adminSdk.getAdminDb();
+    const newShow = Date.UTC(2026, 10, 5, 6, 0, 0);
+
+    await warehouse.POST(
+      request("/api/admin/warehouse", {
+        method: "POST",
+        token: owner.token,
+        body: JSON.stringify({ ids: [productId], showAt: newShow }),
+      }),
+    );
+
+    const stored = (await db.collection("products").doc(productId).get()).data()!;
+    assert.equal(stored.visibilitySchedule.showAt, newShow);
+    // `hideAt` was not in this request; a merged map must leave it alone.
+    assert.equal(stored.visibilitySchedule.hideAt, Date.UTC(2026, 9, 30, 21, 0, 0));
+  });
+
+  test("clearing one bound removes only that key", async () => {
+    const db = adminSdk.getAdminDb();
+
+    await warehouse.POST(
+      request("/api/admin/warehouse", {
+        method: "POST",
+        token: owner.token,
+        body: JSON.stringify({ ids: [productId], hideAt: null }),
+      }),
+    );
+
+    const stored = (await db.collection("products").doc(productId).get()).data()!;
+    assert.equal("hideAt" in stored.visibilitySchedule, false);
+    assert.equal(typeof stored.visibilitySchedule.showAt, "number");
+  });
+
+  test("clearing the schedule removes the map entirely", async () => {
+    const db = adminSdk.getAdminDb();
+
+    await warehouse.POST(
+      request("/api/admin/warehouse", {
+        method: "POST",
+        token: owner.token,
+        body: JSON.stringify({ ids: [productId], clearSchedule: true }),
+      }),
+    );
+
+    const stored = (await db.collection("products").doc(productId).get()).data()!;
+    assert.equal("visibilitySchedule" in stored, false);
+  });
+
+  test("moving to the warehouse does not touch stock", async () => {
+    const db = adminSdk.getAdminDb();
+    await db.collection("products").doc(productId).set({ totalStock: 42 }, { merge: true });
+
+    await warehouse.POST(
+      request("/api/admin/warehouse", {
+        method: "POST",
+        token: owner.token,
+        body: JSON.stringify({ ids: [productId], visibility: "hidden" }),
+      }),
+    );
+
+    const stored = (await db.collection("products").doc(productId).get()).data()!;
+    assert.equal(stored.visibility, "hidden");
+    assert.equal(stored.totalStock, 42, "hiding a product must never zero its stock");
+  });
+
+  test("a customer cannot move stock off sale", async () => {
+    const response = await warehouse.POST(
+      request("/api/admin/warehouse", {
+        method: "POST",
+        token: customer.token,
+        body: JSON.stringify({ ids: [productId], visibility: "hidden" }),
+      }),
+    );
+    assert.equal(response.status, 403);
   });
 });
 

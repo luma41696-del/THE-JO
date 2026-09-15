@@ -206,7 +206,7 @@ export function CategoryAccordion({
 
   return (
     <div className="border-line mt-2 border-t pt-2">
-      <p className="text-eyebrow font-display text-mist mb-1 py-2 uppercase">
+      <p className="text-eyebrow text-mist mb-1 py-2 uppercase">
         {rtl ? "الأقسام" : "Categories"}
       </p>
 
@@ -221,7 +221,7 @@ export function CategoryAccordion({
                   onClick={onNavigate}
                   className={cn(
                     "text-ink min-w-0 flex-1 py-3 text-lg font-semibold tracking-tight",
-                    rtl ? "font-arabic" : "font-display",
+                    "font-display",
                   )}
                 >
                   {t(department.name, locale)}

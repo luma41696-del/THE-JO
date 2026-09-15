@@ -61,7 +61,7 @@ export function BrandStory({ locale = "en" }: { locale?: Locale }) {
         {/* Copy */}
         <div>
           <Reveal>
-            <p className="text-eyebrow font-display text-brand mb-5 uppercase">
+            <p className="text-eyebrow text-brand mb-5 uppercase">
               {rtl ? "قصتنا" : "Our story"}
             </p>
           </Reveal>

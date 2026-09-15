@@ -185,7 +185,7 @@ export function AdminShell({
         )}
 
         <div className="flex items-center gap-2.5 px-1">
-          <span className="bg-brand font-display grid h-8 w-8 shrink-0 place-items-center rounded-full text-[0.6875rem] font-semibold text-white">
+          <span className="bg-brand grid h-8 w-8 shrink-0 place-items-center rounded-full text-[0.6875rem] font-semibold text-white">
             {initials}
           </span>
           <span className="min-w-0 flex-1">

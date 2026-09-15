@@ -284,7 +284,7 @@ export function BodyPanel({
           feed the same calculation rather than off in a settings page.
         */}
         <div className="mt-5">
-          <span className="text-eyebrow font-display text-mist mb-2 block uppercase">
+          <span className="text-eyebrow text-mist mb-2 block uppercase">
             {rtl ? "القَصّة المفضلة" : "Preferred fit"}
           </span>
           <div className="flex gap-2">

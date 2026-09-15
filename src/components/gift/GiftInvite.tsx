@@ -186,7 +186,7 @@ export function GiftInvite({ locale = "en" }: { locale?: Locale }) {
               {rtl ? "ليس الآن" : "Not now"}
             </button>
 
-            <p className="text-eyebrow font-display text-brand uppercase">
+            <p className="text-eyebrow text-brand uppercase">
               {rtl ? "هدية في انتظارك" : "A gift is waiting"}
             </p>
             <h2 className="font-display text-ink mt-1.5 text-xl font-semibold tracking-tight text-balance">

@@ -156,7 +156,16 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       disabled={isDisabled}
       aria-busy={loading || undefined}
       className={cn(
-        "font-display relative inline-flex cursor-pointer items-center justify-center overflow-hidden",
+        /*
+         * Buttons are set in the text face, not the display face.
+         *
+         * This class put Quadrillion on every button in the shop — and in
+         * Arabic, Baloo's display geometry at 13px inside a pill. A brand face
+         * used on every control stops reading as a brand face; it just becomes
+         * the interface font, and the headings it was reserved for lose the
+         * contrast that made them headings.
+         */
+        "relative inline-flex cursor-pointer items-center justify-center overflow-hidden",
         "rounded-pill font-semibold tracking-[0.06em] uppercase whitespace-nowrap",
         "transition-colors duration-300 select-none",
         "disabled:cursor-not-allowed disabled:opacity-55",

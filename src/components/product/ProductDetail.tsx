@@ -319,7 +319,7 @@ export function ProductDetail({
           */}
           {designs.length > 0 && (
             <fieldset className="mt-8">
-              <legend className="text-eyebrow font-display text-mist mb-3 uppercase">
+              <legend className="text-eyebrow text-mist mb-3 uppercase">
                 {rtl ? "التصميم" : "Design"}
                 <span className="text-ink ms-2 normal-case tracking-normal">
                   {design ? t(design.name, locale) : ""}
@@ -386,7 +386,7 @@ export function ProductDetail({
           {/* Colour — variable products only */}
           {variable && (
             <fieldset className="mt-8">
-              <legend className="text-eyebrow font-display text-mist mb-3 uppercase">
+              <legend className="text-eyebrow text-mist mb-3 uppercase">
                 {rtl ? "اللون" : "Colour"}
                 <span className="text-ink ms-2 normal-case tracking-normal">
                   {color ? t(color.name, locale) : ""}
@@ -435,7 +435,7 @@ export function ProductDetail({
           {variable && (
           <fieldset id="size-rail" className="mt-8 scroll-mt-32">
             <legend className="mb-3 flex w-full items-center justify-between">
-              <span className="text-eyebrow font-display text-mist uppercase">
+              <span className="text-eyebrow text-mist uppercase">
                 {rtl ? "المقاس" : "Size"}
                 {size && <span className="text-ink ms-2 normal-case tracking-normal">{size.label}</span>}
               </span>

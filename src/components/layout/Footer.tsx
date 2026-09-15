@@ -114,7 +114,7 @@ export function Footer({
             {COLUMNS.map((column, index) => (
               <Reveal key={column.title.en} delay={index * 0.06}>
                 <div>
-                  <h3 className="font-display text-eyebrow mb-5 text-white/45 uppercase">
+                  <h3 className="text-eyebrow mb-5 text-white/45 uppercase">
                     {column.title[locale]}
                   </h3>
                   <ul className="space-y-3">

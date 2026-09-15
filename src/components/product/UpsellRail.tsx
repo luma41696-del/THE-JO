@@ -35,7 +35,7 @@ export function UpsellRail({ products, current, locale = "en" }: UpsellRailProps
     <section className="ns-container pb-16 md:pb-24" aria-labelledby="upsell-heading">
       <Reveal>
         <div className="border-line rounded-xl border p-5 md:p-8">
-          <p className="text-eyebrow font-display text-brand mb-2 uppercase">
+          <p className="text-eyebrow text-brand mb-2 uppercase">
             {rtl ? "ترقية" : "Consider the upgrade"}
           </p>
           <h2

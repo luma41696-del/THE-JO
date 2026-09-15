@@ -1,9 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Instrument_Serif } from "next/font/google";
-import localFont from "next/font/local";
+import { Instrument_Serif } from "next/font/google";
 import { notFound } from "next/navigation";
 
 import "../globals.css";
+
+import { fontVariables } from "../fonts";
 
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import { LocaleProvider } from "@/components/providers/LocaleProvider";
@@ -26,16 +27,7 @@ import type { Locale } from "@/types";
  * The browser's per-glyph fallback then sets Arabic headings in Baloo with no
  * conditional CSS at all.
  */
-const quadrillion = localFont({
-  src: [
-    { path: "../../../public/fonts/Quadrillion-Sb.woff2", weight: "600", style: "normal" },
-    { path: "../../../public/fonts/Quadrillion-SbIt.woff2", weight: "600", style: "italic" },
-  ],
-  variable: "--font-quadrillion",
-  display: "swap",
-  adjustFontFallback: false,
-  fallback: ["Poppins", "ui-rounded", "system-ui", "sans-serif"],
-});
+
 
 /**
  * Baloo Bhaijaan 2 — the bilingual workhorse.
@@ -51,22 +43,7 @@ const quadrillion = localFont({
  * rendered text actually matches, and `swap` keeps text visible meanwhile. The
  * files carry a one-year immutable cache, so the cost is paid once.
  */
-const baloo = localFont({
-  src: [
-    { path: "../../../public/fonts/BalooBhaijaan2-Regular.woff2", weight: "400", style: "normal" },
-    { path: "../../../public/fonts/BalooBhaijaan2-Medium.woff2", weight: "500", style: "normal" },
-    { path: "../../../public/fonts/BalooBhaijaan2-SemiBold.woff2", weight: "600", style: "normal" },
-    { path: "../../../public/fonts/BalooBhaijaan2-Bold.woff2", weight: "700", style: "normal" },
-    { path: "../../../public/fonts/BalooBhaijaan2-ExtraBold.woff2", weight: "800", style: "normal" },
-  ],
-  variable: "--font-baloo",
-  display: "swap",
-  preload: false,
-  adjustFontFallback: false,
-  fallback: ["Segoe UI", "Tahoma", "sans-serif"],
-});
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
 /** Editorial accents only — pull quotes, campaign titles, the 404. */
 const instrument = Instrument_Serif({
@@ -170,7 +147,7 @@ export default async function LocaleLayout({
     <html
       lang={meta.tag}
       dir={meta.dir}
-      className={`${quadrillion.variable} ${baloo.variable} ${inter.variable} ${instrument.variable}`}
+      className={`${fontVariables} ${instrument.variable}`}
       suppressHydrationWarning
     >
       <body className="bg-paper text-ink min-h-screen antialiased">

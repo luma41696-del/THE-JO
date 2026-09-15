@@ -329,7 +329,7 @@ export function FilterBar({ categories, products, resultCount, locale = "en" }: 
 function Facet({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-eyebrow font-display text-mist mb-3 uppercase">{title}</h3>
+      <h3 className="text-eyebrow text-mist mb-3 uppercase">{title}</h3>
       {children}
     </div>
   );

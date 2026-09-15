@@ -60,7 +60,7 @@ export function BrandIntro() {
             <AnimatedLogo className="h-24 w-24" alwaysWave title={null} />
 
             <motion.span
-              className="font-display text-eyebrow text-smoke uppercase"
+              className="text-eyebrow text-smoke uppercase"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.65, duration: 0.5, ease: EASE.brand }}

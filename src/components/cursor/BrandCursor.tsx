@@ -257,7 +257,7 @@ export function BrandCursor() {
           {showLabel && (
             <motion.span
               key={label}
-              className="font-display bg-ink absolute rounded-pill px-2.5 py-1 text-[0.5625rem] font-semibold tracking-[0.16em] whitespace-nowrap text-white uppercase"
+              className="bg-ink absolute rounded-pill px-2.5 py-1 text-[0.5625rem] font-semibold tracking-[0.16em] whitespace-nowrap text-white uppercase"
               style={{ left: 0, top: 16, translateX: "-50%" }}
               initial={{ opacity: 0, y: -4, scale: 0.85 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}

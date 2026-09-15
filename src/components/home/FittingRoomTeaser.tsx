@@ -74,7 +74,7 @@ export function FittingRoomTeaser({
       <div className="relative grid gap-10 p-7 md:p-12 lg:grid-cols-[1fr_1.1fr] lg:gap-16 lg:p-16">
         {/* Copy */}
         <div className="flex flex-col justify-center">
-          <p className="text-eyebrow font-display text-brand-bright mb-5 flex items-center gap-3 uppercase">
+          <p className="text-eyebrow text-brand-bright mb-5 flex items-center gap-3 uppercase">
             <span className="bg-brand-bright inline-block h-1.5 w-1.5 animate-pulse rounded-full" />
             {rtl ? "غرفة القياس الذكية" : "AI Fitting Room"}
           </p>

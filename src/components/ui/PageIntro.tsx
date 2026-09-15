@@ -58,7 +58,8 @@ export function PageIntro({
           <h1
             className={cn(
               "text-display text-ink text-balance",
-              ar ? "font-arabic font-extrabold tracking-normal" : "font-display",
+              "font-display",
+              ar && "font-extrabold tracking-normal",
             )}
           >
             {title}

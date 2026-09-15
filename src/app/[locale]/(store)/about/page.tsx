@@ -77,7 +77,7 @@ export default async function AboutPage({ params }: { params: Promise<{ locale: 
           </nav>
 
           <div className="border-line mt-10 border-t pt-6">
-            <p className="text-eyebrow font-display text-mist mb-2 uppercase">
+            <p className="text-eyebrow text-mist mb-2 uppercase">
               {rtl ? "تواصل" : "Contact"}
             </p>
             <p className="text-ink-muted text-[0.875rem]">

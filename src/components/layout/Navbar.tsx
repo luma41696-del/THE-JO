@@ -337,7 +337,7 @@ function MobileNav({ categoryTree = [] }: { categoryTree?: CategoryNode[] }) {
                     onClick={() => setOpen(false)}
                     className={cn(
                       "text-ink block py-3 text-2xl font-semibold tracking-tight",
-                      locale === "ar" ? "font-arabic" : "font-display",
+                      "font-display",
                     )}
                   >
                     {item.label}

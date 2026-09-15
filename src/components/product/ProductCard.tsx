@@ -248,7 +248,7 @@ export function ProductCard({
 
         {soldOut && (
           <div className="bg-paper/70 absolute inset-0 z-20 grid place-items-center backdrop-blur-[2px]">
-            <span className="font-display text-eyebrow text-ink bg-paper-raised rounded-pill px-4 py-2 uppercase">
+            <span className="text-eyebrow text-ink bg-paper-raised rounded-pill px-4 py-2 uppercase">
               {locale === "ar" ? "نفدت الكمية" : "Sold out"}
             </span>
           </div>

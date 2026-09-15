@@ -339,7 +339,7 @@ export function SupportChat({ locale = "en" }: { locale?: Locale }) {
           </p>
 
           <label className="mt-4 block">
-            <span className="text-eyebrow font-display text-mist mb-1.5 block uppercase">
+            <span className="text-eyebrow text-mist mb-1.5 block uppercase">
               {rtl ? "الموضوع" : "Topic"}
             </span>
             <select
@@ -417,7 +417,7 @@ function Frame({ children, locale }: { children: React.ReactNode; locale: Locale
       className="border-line bg-paper rounded-xl border p-5 sm:p-6"
       aria-label={rtl ? "التواصل مع الدعم" : "Talk to support"}
     >
-      <p className="text-eyebrow font-display text-brand mb-1 uppercase">
+      <p className="text-eyebrow text-brand mb-1 uppercase">
         {rtl ? "الدعم" : "Support"}
       </p>
       <h2 className="font-display text-ink mb-4 text-xl font-semibold tracking-tight">

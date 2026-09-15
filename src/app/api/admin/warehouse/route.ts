@@ -121,13 +121,30 @@ export async function POST(request: Request) {
         update.visibilitySchedule = FieldValue.delete();
         update.visibilityOverride = FieldValue.delete();
       } else {
+        /*
+         * A nested object, not a dotted key.
+         *
+         * `update()` reads "visibilitySchedule.showAt" as a path into a map.
+         * `set()` does not — even with `{merge: true}` it creates a top-level
+         * field whose *name* contains a dot. So every schedule written here
+         * landed next to `visibilitySchedule` instead of inside it, and the
+         * reader (`product.visibilitySchedule?.showAt`) never saw one. The
+         * feature has never fired.
+         *
+         * A merged nested map is the fix that keeps `set`'s create-or-update
+         * behaviour: it merges field by field, so writing `showAt` alone does
+         * not erase `hideAt`, and `FieldValue.delete()` inside the map removes
+         * just that key.
+         */
+        const schedule: Record<string, unknown> = {};
         if (showAt !== undefined) {
-          update["visibilitySchedule.showAt"] =
-            showAt === null ? FieldValue.delete() : showAt;
+          schedule.showAt = showAt === null ? FieldValue.delete() : showAt;
         }
         if (hideAt !== undefined) {
-          update["visibilitySchedule.hideAt"] =
-            hideAt === null ? FieldValue.delete() : hideAt;
+          schedule.hideAt = hideAt === null ? FieldValue.delete() : hideAt;
+        }
+        if (Object.keys(schedule).length > 0) {
+          update.visibilitySchedule = schedule;
         }
         /*
          * A manual visibility change is itself an override. Without this, a

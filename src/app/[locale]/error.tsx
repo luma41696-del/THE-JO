@@ -43,7 +43,8 @@ export default function ErrorBoundary({
       <h1
         className={cn(
           "text-ink mt-10 text-2xl font-semibold tracking-tight md:text-3xl",
-          ar ? "font-arabic font-extrabold" : "font-display",
+          "font-display",
+          ar && "font-extrabold",
         )}
       >
         {t.errors.errorTitle}

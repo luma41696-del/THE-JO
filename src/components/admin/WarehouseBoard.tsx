@@ -445,7 +445,7 @@ export function WarehouseBoard({
                             style.tone,
                           )}
                         >
-                          {style.label}
+                          {t(style.label)}
                         </span>
                         {product.visibilityOverride && (
                           <span

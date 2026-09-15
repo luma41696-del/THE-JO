@@ -149,7 +149,7 @@ function PromoCard({
 
       <header className="relative">
         {banner.eyebrow && (
-          <p className={cn("text-eyebrow font-display mb-4 uppercase", tone.eyebrow)}>
+          <p className={cn("text-eyebrow mb-4 uppercase", tone.eyebrow)}>
             {t(banner.eyebrow, locale)}
           </p>
         )}

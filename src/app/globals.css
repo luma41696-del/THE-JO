@@ -46,11 +46,26 @@
      `ui` is Baloo in both scripts — buttons, badges and chips read as one
      family whichever language the shopper is in, which is what stops a
      bilingual interface feeling like two different products. */
-  --font-display: var(--font-quadrillion), var(--font-baloo), "Poppins", ui-rounded, system-ui, sans-serif;
-  --font-ui: var(--font-baloo), var(--font-quadrillion), ui-rounded, system-ui, sans-serif;
+  /*
+   * Cairo is the text face, in both languages, everywhere — body, menus,
+   * buttons, inputs, prices, tables, the bag, the checkout, the admin. One
+   * family covering Arabic and Latin means a bilingual page is one typeface
+   * rather than two that never quite agree, and it removes the per-language
+   * font swap this file used to need.
+   */
+  --font-sans: var(--font-cairo), "Segoe UI", Tahoma, sans-serif;
+  --font-ui: var(--font-cairo), "Segoe UI", Tahoma, sans-serif;
+  --font-arabic: var(--font-cairo), "Segoe UI", Tahoma, sans-serif;
+
+  /*
+   * The display face, for chosen headings only. Latin gets Quadrillion, the
+   * brand face; Arabic is swapped to Baloo below, because Quadrillion has no
+   * Arabic glyphs at all and per-glyph fallback would drop Arabic headings
+   * into a system font.
+   */
+  --font-display: var(--font-quadrillion), var(--font-cairo), "Poppins", ui-rounded, sans-serif;
+
   --font-editorial: var(--font-instrument), "Times New Roman", serif;
-  --font-sans: var(--font-inter), var(--font-baloo), ui-sans-serif, system-ui, sans-serif;
-  --font-arabic: var(--font-baloo), "Segoe UI", Tahoma, sans-serif;
 
   --text-hero: clamp(2.75rem, 8vw, 7rem);
   --text-hero--line-height: 0.92;
@@ -220,25 +235,60 @@
     overflow-wrap: break-word;
   }
 
-  /* Arabic copy gets Baloo and slightly looser leading automatically. Inter
-     has no Arabic coverage, so in RTL the body face is swapped rather than
-     relying on fallback — otherwise line-height and metrics come from Inter
-     and the Arabic sits badly in its box. */
+  /*
+   * Arabic text no longer needs its face swapped — Cairo carries both scripts,
+   * so `--font-sans` is already right in either direction. What Arabic still
+   * needs is room: its ascenders and descenders are taller than Latin's, and
+   * the line-height that suits Latin crowds them.
+   */
   [dir="rtl"] body,
   [lang="ar"],
   .font-ar {
-    font-family: var(--font-arabic);
-    line-height: 1.75;
+    line-height: 1.7;
   }
 
-  /* Arabic display text is set in Baloo ExtraBold: the Latin display face
-     reaches for weight through a condensed geometry Arabic does not have, so
-     matching presence means reaching for weight instead. */
+  /*
+   * Arabic headings are set in Baloo, because Quadrillion has no Arabic glyphs.
+   *
+   * Done by redefining the *variable* rather than overriding `.font-display`.
+   * Tailwind's utilities live in a later cascade layer than this one, so a
+   * rule targeting the class here loses to the utility no matter how specific
+   * it is — the first attempt at this left Arabic headings in Cairo. Custom
+   * properties are not layered, so swapping the value works and every
+   * consumer of the token follows.
+   *
+   * Scoped by the *element's* language as well as the page's, so an Arabic
+   * heading inside an English page is set correctly too — a bilingual shop has
+   * those on every product page.
+   */
+  [dir="rtl"],
+  [lang="ar"],
+  :lang(ar) {
+    --font-display: var(--font-baloo), var(--font-cairo), "Segoe UI", Tahoma, sans-serif;
+  }
+
+  /*
+   * Letter-spacing is a Latin device. Applied to Arabic it pulls apart letters
+   * that are meant to join, which is not a style choice — it breaks the word.
+   * This undoes the tracking the utility classes set, for Arabic only.
+   */
+  [dir="rtl"] h1,
+  [dir="rtl"] h2,
+  [dir="rtl"] h3,
+  [lang="ar"],
+  .font-ar {
+    letter-spacing: 0;
+  }
+
+  /*
+   * Baloo's heaviest cut is 800 and it is drawn, not synthesised — so Arabic
+   * headings reach for it rather than asking the browser to smear a lighter
+   * weight. Capped at 800 for the same reason: there is no 900 file.
+   */
   [dir="rtl"] h1,
   [dir="rtl"] h2,
   [dir="rtl"] h3 {
     font-weight: 800;
-    letter-spacing: 0;
   }
 
   /* Arabic numerals stay Latin-digit: prices, totals and order references are
@@ -398,27 +448,18 @@
   }
 
   /* -------------------------------------------------------------------------
-     The admin's typeface
+     The admin's typography
 
-     One family for the whole tool, in both scripts. Every font token is
-     redirected rather than the body's `font-family` being overridden, because
-     components reach for `font-display`, `font-ui` and `font-sans` by name —
-     setting the body alone would leave headings in the storefront's display
-     face and the admin in two typefaces at once.
-
-     `--font-arabic` points at Cairo too, which is the actual repair: the
-     `[dir="rtl"] body` swap further up cannot match in the admin, where the
-     direction is set on a div *inside* the body. With one family covering both
-     scripts there is nothing left to swap.
-
-     Scoped to `[data-admin-root]` so the storefront's identity is untouched.
+     The font tokens themselves are project-wide now — Cairo for text, the
+     display face for chosen headings — so the admin no longer redefines them.
+     What is left here is the admin's own density.
      ------------------------------------------------------------------------- */
-  [data-admin-root] {
-    --font-display: var(--font-cairo), "Segoe UI", Tahoma, sans-serif;
-    --font-ui: var(--font-cairo), "Segoe UI", Tahoma, sans-serif;
-    --font-sans: var(--font-cairo), "Segoe UI", Tahoma, sans-serif;
-    --font-arabic: var(--font-cairo), "Segoe UI", Tahoma, sans-serif;
-  }
+  /*
+   * Nothing to override any more: the tokens above are already Cairo for the
+   * whole project, and `--font-display` already swaps to Baloo for Arabic.
+   * This block used to pin the admin to Cairo *including* its headings, which
+   * would now flatten the one place the brand face belongs.
+   */
 
   /* Cairo's Arabic is already generously spaced; the extra leading the
      storefront adds for Baloo makes an operations table loose and costs rows

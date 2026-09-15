@@ -63,7 +63,7 @@ export function Newsletter({ locale = "en" }: { locale?: Locale }) {
       </div>
 
       <div className="relative mx-auto max-w-xl text-center">
-        <p className="text-eyebrow font-display text-brand mb-5 uppercase">
+        <p className="text-eyebrow text-brand mb-5 uppercase">
           {rtl ? "انضم إلينا" : "The list"}
         </p>
 

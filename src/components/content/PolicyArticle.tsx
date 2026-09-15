@@ -71,7 +71,7 @@ export function PolicyArticle({
 
           {siblings.length > 0 && (
             <nav className="mt-8" aria-label={rtl ? "صفحات ذات صلة" : "Related pages"}>
-              <p className="text-eyebrow font-display text-mist mb-3 uppercase">
+              <p className="text-eyebrow text-mist mb-3 uppercase">
                 {rtl ? "اقرأ أيضاً" : "Also here"}
               </p>
               <ul className="flex flex-wrap gap-2">

@@ -22,7 +22,7 @@ import type { Category, Product } from "@/types";
  * alphabetical list buries that behind the letter A.
  */
 
-type Filter = "all" | "low-stock" | "on-sale" | "draft" | string;
+type Filter = "all" | "low-stock" | "on-sale" | "draft" | "archived" | string;
 
 const LOW_STOCK = 8;
 
@@ -43,7 +43,14 @@ export function ProductsBoard({
       all: products.length,
       "low-stock": products.filter((p) => p.totalStock <= LOW_STOCK).length,
       "on-sale": products.filter((p) => p.compareAtPrice && p.compareAtPrice > p.price).length,
-      draft: products.filter((p) => p.status !== "active").length,
+      /*
+       * Split, because "not active" also caught every archived product — so
+       * the Draft filter mixed things a merchant is still writing with things
+       * they deliberately retired, and the count on the chip was wrong for
+       * both.
+       */
+      draft: products.filter((p) => p.status === "draft").length,
+      archived: products.filter((p) => p.status === "archived").length,
     }),
     [products],
   );
@@ -54,7 +61,8 @@ export function ProductsBoard({
     if (filter === "low-stock") list = list.filter((p) => p.totalStock <= LOW_STOCK);
     else if (filter === "on-sale")
       list = list.filter((p) => p.compareAtPrice && p.compareAtPrice > p.price);
-    else if (filter === "draft") list = list.filter((p) => p.status !== "active");
+    else if (filter === "draft") list = list.filter((p) => p.status === "draft");
+    else if (filter === "archived") list = list.filter((p) => p.status === "archived");
     else if (filter !== "all") list = list.filter((p) => p.categoryId === filter);
 
     const needle = search.trim().toLowerCase();
@@ -181,6 +189,7 @@ export function ProductsBoard({
     { value: "low-stock", label: t("products.lowStock") },
     { value: "on-sale", label: t("products.onSale") },
     { value: "draft", label: t("products.draft") },
+    { value: "archived", label: t("pe.statusArchived") },
     ...categories.map((c) => ({ value: c.id, label: pick(c.name, locale) })),
   ];
 

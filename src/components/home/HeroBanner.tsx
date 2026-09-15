@@ -180,7 +180,7 @@ export function HeroBanner({
               {banner.eyebrow && (
                 <p
                   className={cn(
-                    "text-eyebrow font-display mb-3 uppercase",
+                    "text-eyebrow mb-3 uppercase",
                     dark ? "text-white/80" : "text-ink/70",
                   )}
                 >

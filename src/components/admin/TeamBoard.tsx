@@ -261,7 +261,7 @@ export function TeamBoard() {
                 }}
               >
                 <label className="block">
-                  <span className="text-eyebrow font-display text-mist mb-1.5 block uppercase">
+                  <span className="text-eyebrow text-mist mb-1.5 block uppercase">
                     {t("team.email")}
                   </span>
                   <input
@@ -275,7 +275,7 @@ export function TeamBoard() {
                 </label>
 
                 <label className="block">
-                  <span className="text-eyebrow font-display text-mist mb-1.5 block uppercase">
+                  <span className="text-eyebrow text-mist mb-1.5 block uppercase">
                     {t("team.role")}
                   </span>
                   <select

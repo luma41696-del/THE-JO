@@ -449,7 +449,7 @@ export function FittingRoom({
           <div className="relative flex h-full flex-col p-6 md:p-8">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-eyebrow font-display text-brand-bright flex items-center gap-2 uppercase">
+                <p className="text-eyebrow text-brand-bright flex items-center gap-2 uppercase">
                   <span className="bg-brand-bright h-1.5 w-1.5 animate-pulse rounded-full" />
                   {rtl ? "غرفة القياس" : "Fitting room"}
                 </p>
@@ -786,7 +786,7 @@ export function FittingRoom({
           {/* ---- Sizes: its own panel, never part of the render ------- */}
           {recommendations.length > 0 && (
             <div className="bg-brand-veil rounded-xl p-5">
-              <h3 className="text-eyebrow font-display text-brand mb-1 uppercase">
+              <h3 className="text-eyebrow text-brand mb-1 uppercase">
                 {rtl ? "المقاسات المقترحة" : "Your sizes"}
               </h3>
               <p className="text-smoke mb-3 text-[0.75rem]">
