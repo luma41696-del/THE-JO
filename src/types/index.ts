@@ -161,6 +161,13 @@ export type ProductVisibility = "visible" | "hidden";
  */
 export type SaleState = "auto" | "sold-out";
 
+/** One quantity break. See `lib/product-options` for how they are applied. */
+export interface PriceTier {
+  /** Units from which this tier applies. Two or more; one is just the price. */
+  minQuantity: number;
+  unitPrice: number;
+}
+
 /** A pending, scheduled change of visibility. */
 export interface VisibilitySchedule {
   /** Show the product at this instant, if set. */
@@ -302,6 +309,15 @@ export interface Product {
    * action.
    */
   saleState?: SaleState;
+
+  /**
+   * Quantity breaks — "three or more, eleven dinars each".
+   *
+   * Evaluated on the server at checkout, never in the browser where a price is
+   * only a suggestion. A tier never raises the unit price: a mistyped ladder
+   * that charges more for buying more is a bug the customer pays for.
+   */
+  priceTiers?: PriceTier[];
 
   /**
    * Hard cap on units of this product in a single order.

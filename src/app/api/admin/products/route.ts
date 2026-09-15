@@ -7,14 +7,27 @@ import { money } from "@/lib/pricing";
 import { isValidGtin } from "@/lib/product";
 import { getCategories } from "@/lib/catalog";
 import { categoryPathFor } from "@/lib/categories";
+import {
+  duplicateSkus,
+  isHex,
+  normaliseSku,
+  tierProblems,
+  type PriceTier,
+} from "@/lib/product-options";
 import type {
   Localized,
   Product,
+  ProductColor,
   ProductDesign,
   ProductImage,
+  ProductSize,
   ProductType,
   ProductVariant,
+  SizeSystem,
 } from "@/types";
+
+/** The size systems the type allows, for validating what the editor sends. */
+const SIZE_SYSTEMS: SizeSystem[] = ["alpha", "numeric", "waist", "shoe", "one-size"];
 
 /**
  * Catalogue writes.
@@ -47,8 +60,11 @@ interface Body {
   tags?: string[];
 
   images?: ProductImage[];
+  colors?: ProductColor[];
+  sizes?: ProductSize[];
   variants?: ProductVariant[];
   designs?: ProductDesign[];
+  priceTiers?: PriceTier[] | null;
   type?: ProductType;
   sku?: string;
   gtin?: string | null;
@@ -172,6 +188,96 @@ export async function POST(request: Request) {
     : undefined;
 
   /*
+   * Colours and sizes.
+   *
+   * These were never read from the body — only seeded as empty arrays on
+   * create. A product made in the admin therefore could not have a colour, a
+   * size, or a variant that resolved to anything, and the editor's option
+   * table had nothing to render. This is the missing half.
+   *
+   * Ids are normalised but never regenerated: a variant refers to a colour by
+   * id, and so does every line of every past order.
+   */
+  const colors = Array.isArray(body.colors)
+    ? body.colors
+        .filter((c) => c && typeof c.id === "string" && c.id.trim())
+        .map((c) => ({
+          id: String(c.id).trim().slice(0, 24),
+          name: {
+            en: String(c.name?.en ?? "").trim().slice(0, 40),
+            ar: String(c.name?.ar ?? "").trim().slice(0, 40),
+          },
+          hex: isHex(String(c.hex ?? "")) ? String(c.hex).trim() : "#CCCCCC",
+          ...(c.hexSecondary && isHex(String(c.hexSecondary))
+            ? { hexSecondary: String(c.hexSecondary).trim() }
+            : {}),
+        }))
+        .slice(0, 30)
+    : undefined;
+
+  if (colors) {
+    const missingName = colors.find((c) => !c.name.en && !c.name.ar);
+    if (missingName) return bad(`Colour "${missingName.id}" needs a name.`);
+    const ids = new Set<string>();
+    for (const c of colors) {
+      if (ids.has(c.id)) return bad(`Two colours share the id "${c.id}".`);
+      ids.add(c.id);
+    }
+  }
+
+  const sizes = Array.isArray(body.sizes)
+    ? body.sizes
+        .filter((s) => s && typeof s.id === "string" && s.id.trim())
+        .map((s) => ({
+          id: String(s.id).trim().slice(0, 24),
+          label: String(s.label ?? "").trim().slice(0, 24) || String(s.id),
+          system: (SIZE_SYSTEMS.includes(String(s.system) as SizeSystem)
+            ? String(s.system)
+            : "alpha") as SizeSystem,
+          ...(s.measurements && typeof s.measurements === "object"
+            ? { measurements: s.measurements }
+            : {}),
+        }))
+        .slice(0, 40)
+    : undefined;
+
+  if (sizes) {
+    const ids = new Set<string>();
+    for (const s of sizes) {
+      if (ids.has(s.id)) return bad(`Two sizes share the id "${s.id}".`);
+      ids.add(s.id);
+    }
+  }
+
+  /*
+   * Quantity tiers. `null` clears them; omitted leaves them as they are.
+   */
+  const priceTiers =
+    body.priceTiers === null
+      ? null
+      : Array.isArray(body.priceTiers)
+        ? body.priceTiers
+            .filter((t) => t && Number.isFinite(Number(t.minQuantity)))
+            /*
+             * Not clamped. Rounding a "1" up to a "2" would silently change
+             * what the merchant asked for, and a tier starting at one unit is
+             * a mistake worth naming rather than quietly correcting — it is
+             * just the price.
+             */
+            .map((t) => ({
+              minQuantity: Math.floor(Number(t.minQuantity)),
+              unitPrice: money(Number(t.unitPrice) || 0, "JOD"),
+            }))
+            .sort((a, b) => a.minQuantity - b.minQuantity)
+            .slice(0, 8)
+        : undefined;
+
+  if (priceTiers) {
+    const problems = tierProblems(priceTiers);
+    if (problems.length > 0) return bad(problems[0]!);
+  }
+
+  /*
    * Variant stock, when the editor sends it.
    *
    * `totalStock` is derived from the rows rather than accepted alongside them:
@@ -270,6 +376,22 @@ export async function POST(request: Request) {
   }
 
   if (variants) {
+    /*
+     * Two rows answering to one code means stock decrements hit whichever is
+     * found first and a picking list is ambiguous. Checked here because the
+     * generator is not the only way rows arrive — imports and hand edits both
+     * bypass it.
+     */
+    const dupes = duplicateSkus(variants);
+    if (dupes.length > 0) {
+      return bad(`Two variants share the code ${dupes[0]}. Every variant needs its own.`);
+    }
+
+    const noSku = variants.find((v) => !normaliseSku(v.sku));
+    if (noSku) return bad("Every variant needs a code.");
+  }
+
+  if (variants) {
     const bad = variants.find((v) => v.gtin && !isValidGtin(v.gtin));
     if (bad) {
       return NextResponse.json(
@@ -318,6 +440,12 @@ export async function POST(request: Request) {
     compareAtPrice: compareAt && compareAt > 0 ? money(compareAt, "JOD") : undefined,
     currency: "JOD" as const,
     ...(images ? { images } : {}),
+    ...(colors ? { colors } : {}),
+    ...(sizes ? { sizes } : {}),
+    // `null` clears the ladder; omitted leaves whatever is stored.
+    ...(priceTiers === undefined
+      ? {}
+      : { priceTiers: priceTiers === null ? FieldValue.delete() : priceTiers }),
     ...(variants ? { variants } : {}),
     ...(designs ? { designs } : {}),
     totalStock: derivedStock ?? totalStock,
@@ -397,8 +525,11 @@ export async function POST(request: Request) {
               // Only seed what the payload did not supply, so a create that
               // arrives with imagery does not have it wiped.
               ...(images ? {} : { images: [] }),
-              colors: [],
-              sizes: [],
+              // Same rule as images: seed only what the payload did not send.
+              // These were unconditional, so a create that arrived *with*
+              // colours had them overwritten by an empty array on the way in.
+              ...(colors ? {} : { colors: [] }),
+              ...(sizes ? {} : { sizes: [] }),
             }),
       },
       { merge: true },

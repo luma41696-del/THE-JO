@@ -19,11 +19,14 @@ import { AdminPageHeader } from "./AdminShell";
 import { useAdminLocale } from "./AdminLocale";
 import { Panel } from "./AdminUI";
 import { Button } from "@/components/ui/Button";
+import { OptionsEditor } from "./OptionsEditor";
 import type {
   Category,
   Product,
+  ProductColor,
   ProductDesign,
   ProductImage,
+  ProductSize,
   ProductType,
   ProductVariant,
   ShippingClass,
@@ -150,6 +153,13 @@ export function ProductEditor({
    * that actually had none had no way to know, and nothing they typed was ever
    * saved. These are the real rows now.
    */
+  /*
+   * Options are local state like images and variants: they are edited
+   * together and saved with the product, so that adding a colour and pricing
+   * its rows is one save rather than three.
+   */
+  const [colors, setColors] = useState<ProductColor[]>(product?.colors ?? []);
+  const [sizes, setSizes] = useState<ProductSize[]>(product?.sizes ?? []);
   const [variants, setVariants] = useState<ProductVariant[]>(product?.variants ?? []);
 
   /*
@@ -343,6 +353,9 @@ export function ProductEditor({
           compareAtPrice: draft.compareAtPrice === "" ? null : draft.compareAtPrice,
           totalStock: draft.totalStock,
           images,
+          // Sent even when empty, so removing the last colour clears it rather
+          // than leaving the old array in place.
+          ...(draft.type === "variable" ? { colors, sizes } : {}),
           // Only sent for a variable product; a simple one keeps its own total.
           ...(draft.type === "variable" && variants.length > 0 ? { variants } : {}),
           // Sent even when empty, so removing the last design actually clears
@@ -722,7 +735,30 @@ export function ProductEditor({
           {/* A simple product has no matrix to show. An empty variants table
               under a "Stock is held per variant" heading reads as data that
               failed to load, rather than a product type that has none. */}
-          {product && draft.type === "variable" && (
+          {/*
+            Options and their units. No longer gated on `product` existing:
+            choosing colours and sizes is part of writing a product, and making
+            a merchant save an empty shell first before they can say what they
+            are selling is the wrong order.
+          */}
+          {draft.type === "variable" && (
+            <Panel title={t("pe.variants")} description={t("pe.variantsHint")}>
+              <div className="mb-6">
+                <OptionsEditor
+                  baseSku={draft.sku || draft.slug}
+                  colors={colors}
+                  sizes={sizes}
+                  designs={designs}
+                  variants={variants}
+                  onColorsChange={setColors}
+                  onSizesChange={setSizes}
+                  onVariantsChange={setVariants}
+                />
+              </div>
+            </Panel>
+          )}
+
+          {product && draft.type === "variable" && variants.length > 0 && (
             <Panel title={t("pe.variants")} description={t("pe.variantsHint")}>
               {/*
                 One design's table at a time. A colour × size × design cube

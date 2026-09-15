@@ -37,6 +37,22 @@ process.env.FIREBASE_ADMIN_PROJECT_ID = PROJECT_ID;
 process.env.FIREBASE_ADMIN_CLIENT_EMAIL = `e2e@${PROJECT_ID}.iam.gserviceaccount.com`;
 
 /*
+ * The client config, which some route modules pull in transitively — the
+ * product save route reads the category tree through `lib/catalog`, and that
+ * imports the browser SDK's config. These are public identifiers, not
+ * credentials, and nothing in this run reaches Google: the Firestore and Auth
+ * emulator hosts above intercept every call. They exist only so the module's
+ * own "did you copy .env.example" guard does not throw at import time.
+ */
+process.env.NEXT_PUBLIC_FIREBASE_API_KEY ??= "emulator";
+process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ??= `${PROJECT_ID}.firebaseapp.com`;
+process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ??= PROJECT_ID;
+process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ??= `${PROJECT_ID}.appspot.com`;
+process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ??= "0";
+process.env.NEXT_PUBLIC_FIREBASE_APP_ID ??= "1:0:web:emulator";
+process.env.NEXT_PUBLIC_FIREBASE_USE_EMULATORS ??= "true";
+
+/*
  * A throwaway key, generated here rather than checked in.
  *
  * `getAdminApp` builds its credential with `cert()`, which parses the PEM — so
@@ -137,6 +153,7 @@ let team: typeof import("../src/app/api/admin/team/route");
 let invite: typeof import("../src/app/api/gift/invite/route");
 let warehouse: typeof import("../src/app/api/admin/warehouse/route");
 let productState: typeof import("../src/app/api/admin/products/state/route");
+let products: typeof import("../src/app/api/admin/products/route");
 let adminSdk: typeof import("../src/lib/firebase/admin");
 
 before(async () => {
@@ -148,6 +165,7 @@ before(async () => {
   invite = await import("../src/app/api/gift/invite/route");
   warehouse = await import("../src/app/api/admin/warehouse/route");
   productState = await import("../src/app/api/admin/products/state/route");
+  products = await import("../src/app/api/admin/products/route");
   adminSdk = await import("../src/lib/firebase/admin");
 
   customer = await signUp("customer@example.test");
@@ -495,6 +513,151 @@ describe("appointing staff", () => {
     assert.equal(response.ok, false);
     assert.equal(response.httpStatus, 404);
     assert.match(response.error, /sign in to the shop once/i);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/*  Options and variants survive a save                                       */
+/* -------------------------------------------------------------------------- */
+
+describe("colours, sizes and variants round-trip", () => {
+  const id = "e2e-options-tee";
+
+  /*
+   * Every save carries the product's required fields. The route validates the
+   * whole document on each write, so a "just change the variants" call still
+   * has to be a complete product — otherwise the failure under test is masked
+   * by a missing title.
+   */
+  const required = {
+    slug: "e2e-options-tee",
+    title: { en: "Options tee", ar: "تي شيرت الخيارات" },
+    categoryId: "tees",
+    type: "variable",
+    price: 12,
+    status: "draft",
+  };
+
+  const save = async (body: Record<string, unknown>) =>
+    json<{ ok: boolean; error?: string; id?: string }>(
+      await products.POST(
+        request("/api/admin/products", {
+          method: "POST",
+          token: owner.token,
+          body: JSON.stringify({ id, ...required, ...body }),
+        }),
+      ),
+    );
+
+  test("a product saved with colours and sizes keeps them", async () => {
+    /*
+     * The bug this pins: `colors` and `sizes` were never read from the body —
+     * only seeded as empty arrays on create. A product made in the admin could
+     * therefore never have an option, and its variant table had nothing to
+     * render.
+     */
+    const result = await save({
+      slug: "e2e-options-tee",
+      title: { en: "Options tee", ar: "تي شيرت الخيارات" },
+      categoryId: "tees",
+      type: "variable",
+      price: 12,
+      status: "draft",
+      colors: [
+        { id: "white", name: { en: "White", ar: "أبيض" }, hex: "#FBFAF3" },
+        { id: "cobalt", name: { en: "Cobalt", ar: "كوبالت" }, hex: "#1F44B8" },
+      ],
+      sizes: [
+        { id: "m", label: "M", system: "alpha" },
+        { id: "l", label: "L", system: "alpha" },
+      ],
+      variants: [
+        { sku: "TEE-WHT-M", colorId: "white", sizeId: "m", stock: 5 },
+        { sku: "TEE-WHT-L", colorId: "white", sizeId: "l", stock: 3, priceOverride: 13 },
+        { sku: "TEE-COB-M", colorId: "cobalt", sizeId: "m", stock: 0 },
+      ],
+    });
+    assert.equal(result.ok, true, result.error);
+
+    const stored = (await adminSdk.getAdminDb().collection("products").doc(id).get()).data()!;
+    assert.equal(stored.colors.length, 2);
+    assert.equal(stored.colors[1].id, "cobalt");
+    assert.equal(stored.colors[1].name.ar, "كوبالت");
+    assert.equal(stored.sizes.length, 2);
+    assert.equal(stored.variants.length, 3);
+  });
+
+  test("each unit keeps its own price and count", async () => {
+    const stored = (await adminSdk.getAdminDb().collection("products").doc(id).get()).data()!;
+    const rows = stored.variants as { sku: string; stock: number; priceOverride?: number }[];
+
+    assert.equal(rows.find((r) => r.sku === "TEE-WHT-L")!.priceOverride, 13);
+    // A unit without an override has none stored — it sells at the product price.
+    assert.equal("priceOverride" in rows.find((r) => r.sku === "TEE-WHT-M")!, false);
+    assert.equal(rows.find((r) => r.sku === "TEE-COB-M")!.stock, 0);
+  });
+
+  test("totalStock is derived from the rows, never accepted alongside them", async () => {
+    // Two numbers that must agree eventually will not; the rows are the ones
+    // the checkout decrements, so they are the ones that count.
+    const stored = (await adminSdk.getAdminDb().collection("products").doc(id).get()).data()!;
+    assert.equal(stored.totalStock, 8);
+  });
+
+  test("two units sharing a code are refused", async () => {
+    const result = await save({
+      variants: [
+        { sku: "TEE-DUP", colorId: "white", sizeId: "m", stock: 1 },
+        { sku: "tee dup", colorId: "cobalt", sizeId: "m", stock: 1 },
+      ],
+    });
+    assert.equal(result.ok, false);
+    assert.match(result.error ?? "", /code/i);
+  });
+
+  test("a unit with no code is refused", async () => {
+    const result = await save({
+      variants: [{ sku: "   ", colorId: "white", sizeId: "m", stock: 1 }],
+    });
+    assert.equal(result.ok, false);
+  });
+
+  test("two colours sharing an id are refused", async () => {
+    const result = await save({
+      colors: [
+        { id: "white", name: { en: "White", ar: "أبيض" }, hex: "#FFFFFF" },
+        { id: "white", name: { en: "Off white", ar: "أبيض مكسور" }, hex: "#EEEEEE" },
+      ],
+    });
+    assert.equal(result.ok, false);
+    assert.match(result.error ?? "", /id/i);
+  });
+
+  test("an unrenderable hex falls back rather than being stored", async () => {
+    await save({
+      colors: [{ id: "murky", name: { en: "Murky", ar: "غامق" }, hex: "not-a-colour" }],
+    });
+    const stored = (await adminSdk.getAdminDb().collection("products").doc(id).get()).data()!;
+    assert.match(stored.colors[0].hex, /^#[0-9A-Fa-f]{6}$/);
+  });
+
+  test("quantity tiers are stored sorted, and a nonsense tier is refused", async () => {
+    const ok = await save({
+      priceTiers: [
+        { minQuantity: 6, unitPrice: 10 },
+        { minQuantity: 3, unitPrice: 11 },
+      ],
+    });
+    assert.equal(ok.ok, true, ok.error);
+
+    const stored = (await adminSdk.getAdminDb().collection("products").doc(id).get()).data()!;
+    assert.deepEqual(
+      (stored.priceTiers as { minQuantity: number }[]).map((t) => t.minQuantity),
+      [3, 6],
+    );
+
+    const bad = await save({ priceTiers: [{ minQuantity: 1, unitPrice: 11 }] });
+    assert.equal(bad.ok, false);
   });
 });
 

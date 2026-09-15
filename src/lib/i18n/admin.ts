@@ -996,6 +996,33 @@ export const ADMIN_STRINGS = {
   "orders.ordersWord": { en: "orders", ar: "طلباً" },
   "order.paidBy": { en: "Paid by", ar: "دُفع بـ" },
 
+  /* ---- product options ---- */
+  "opt.colours": { en: "Colours", ar: "الألوان" },
+  "opt.sizes": { en: "Sizes", ar: "المقاسات" },
+  "opt.customColour": { en: "Another colour…", ar: "لون آخر…" },
+  "opt.customSize": { en: "Size…", ar: "مقاس…" },
+  "opt.swatch": { en: "Swatch colour", ar: "لون العيّنة" },
+  "opt.units": { en: "Sellable units", ar: "وحدات البيع" },
+  "opt.combinations": { en: "combinations", ar: "تركيبة" },
+  "opt.existing": { en: "already built", ar: "مبنية" },
+  "opt.generate": { en: "Build the table", ar: "بناء الجدول" },
+  "opt.unit": { en: "Unit", ar: "الوحدة" },
+  "opt.tooMany": {
+    en: "That is more units than one product can be edited as. Reduce an axis.",
+    ar: "عدد الوحدات أكبر مما يمكن تحريره في منتج واحد. قلّل أحد المحاور.",
+  },
+  "opt.duplicateSku": {
+    en: "Two units share a code",
+    ar: "وحدتان تحملان الرمز نفسه",
+  },
+  "opt.priceAll": { en: "Price…", ar: "السعر…" },
+  "opt.stockAll": { en: "Stock…", ar: "الكمية…" },
+  "opt.applyAll": { en: "Apply to all", ar: "طبّق على الكل" },
+  "opt.priceHint": {
+    en: "A blank price means this unit sells at the product's price. Fill one in only where the unit differs.",
+    ar: "السعر الفارغ يعني أن هذه الوحدة تُباع بسعر المنتج. املأه فقط حيث تختلف الوحدة.",
+  },
+
   /* ---- access ---- */
   "team.title": { en: "Who can get in", ar: "من يملك الدخول" },
   "team.subtitle": {
