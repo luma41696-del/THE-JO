@@ -10,6 +10,8 @@ import { EASE, transition } from "@/lib/motion";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { signOut } from "@/lib/firebase/auth";
 import { NetSaleMark } from "@/components/brand/NetSaleMark";
+import { useAdminLocale } from "./AdminLocale";
+import type { AdminKey } from "@/lib/i18n/admin";
 
 /**
  * Admin chrome.
@@ -19,44 +21,46 @@ import { NetSaleMark } from "@/components/brand/NetSaleMark";
  * the admin is *operated*, and an operator needs every destination visible and
  * in the same place on every screen, not revealed on scroll.
  *
- * Internal tooling stays in English. A half-translated operations surface is
- * worse than one language done properly, and the audience is a team rather
- * than the shopper.
+ * The chrome is bilingual; the trading boards are not. That boundary is drawn
+ * on purpose and stated to the operator when they switch — see
+ * `lib/i18n/admin.ts`. "A half-translated admin is worse than one language
+ * done properly" was a fair defence of leaving it alone, but not a reason to
+ * refuse an Arabic-speaking operator the parts that can be done properly.
  */
 
-const NAV: { group: string; items: { href: string; label: string; icon: ReactNode }[] }[] = [
+const NAV: { group: AdminKey; items: { href: string; label: AdminKey; icon: ReactNode }[] }[] = [
   {
-    group: "Trade",
+    group: "nav.trade",
     items: [
-      { href: "/admin", label: "Dashboard", icon: <ChartIcon /> },
-      { href: "/admin/orders", label: "Orders", icon: <BagIcon /> },
-      { href: "/admin/invoices", label: "Invoices", icon: <DocIcon /> },
-      { href: "/admin/behaviour", label: "Behaviour", icon: <ChartIcon /> },
+      { href: "/admin", label: "nav.dashboard", icon: <ChartIcon /> },
+      { href: "/admin/orders", label: "nav.orders", icon: <BagIcon /> },
+      { href: "/admin/invoices", label: "nav.invoices", icon: <DocIcon /> },
+      { href: "/admin/behaviour", label: "nav.behaviour", icon: <ChartIcon /> },
     ],
   },
   {
-    group: "Catalogue",
+    group: "nav.catalogue",
     items: [
-      { href: "/admin/products", label: "Products", icon: <TagIcon /> },
-      { href: "/admin/categories", label: "Categories", icon: <TagIcon /> },
-      { href: "/admin/warehouse", label: "Seasonal warehouse", icon: <BoxIcon /> },
-      { href: "/admin/offers", label: "Offers & campaigns", icon: <SparkIcon /> },
-      { href: "/admin/gift", label: "Gift game", icon: <SparkIcon /> },
-      { href: "/admin/reviews", label: "Reviews", icon: <ChatIcon /> },
+      { href: "/admin/products", label: "nav.products", icon: <TagIcon /> },
+      { href: "/admin/categories", label: "nav.categories", icon: <TagIcon /> },
+      { href: "/admin/warehouse", label: "nav.warehouse", icon: <BoxIcon /> },
+      { href: "/admin/offers", label: "nav.offers", icon: <SparkIcon /> },
+      { href: "/admin/gift", label: "nav.gift", icon: <SparkIcon /> },
+      { href: "/admin/reviews", label: "nav.reviews", icon: <ChatIcon /> },
     ],
   },
   {
-    group: "People",
+    group: "nav.people",
     items: [
-      { href: "/admin/customers", label: "Customers", icon: <UsersIcon /> },
-      { href: "/admin/support", label: "Support", icon: <ChatIcon /> },
+      { href: "/admin/customers", label: "nav.customers", icon: <UsersIcon /> },
+      { href: "/admin/support", label: "nav.support", icon: <ChatIcon /> },
     ],
   },
   {
-    group: "Shop",
+    group: "nav.shop",
     items: [
-      { href: "/admin/shipping", label: "Delivery", icon: <BoxIcon /> },
-      { href: "/admin/settings", label: "Settings", icon: <DocIcon /> },
+      { href: "/admin/shipping", label: "nav.shipping", icon: <BoxIcon /> },
+      { href: "/admin/settings", label: "nav.settings", icon: <DocIcon /> },
     ],
   },
 ];
@@ -72,6 +76,7 @@ export function AdminShell({
   const pathname = usePathname();
   const router = useLocalizedRouter();
   const { user, profile } = useAuth();
+  const { t, locale, setLocale, rtl } = useAdminLocale();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const initials = (profile?.displayName ?? user?.email ?? "?")
@@ -95,7 +100,7 @@ export function AdminShell({
             net&nbsp;sale
           </span>
           <span className="text-mist block text-[0.6875rem] tracking-[0.1em] uppercase">
-            Operations
+            {t("shell.operations")}
           </span>
         </span>
       </Link>
@@ -104,7 +109,7 @@ export function AdminShell({
         {NAV.map((section) => (
           <div key={section.group}>
             <p className="text-mist mb-2 px-3 text-[0.625rem] font-medium tracking-[0.14em] uppercase">
-              {section.group}
+              {t(section.group)}
             </p>
             <ul className="flex flex-col gap-0.5">
               {section.items.map((item) => {
@@ -131,7 +136,7 @@ export function AdminShell({
                       <span className={cn("shrink-0", active ? "text-white" : "text-mist")}>
                         {item.icon}
                       </span>
-                      {item.label}
+                      {t(item.label)}
                     </Link>
                   </li>
                 );
@@ -142,10 +147,43 @@ export function AdminShell({
       </nav>
 
       <div className="border-line mt-4 border-t pt-4">
+        {/*
+          The language switch, with the honest caveat attached. An operator who
+          picks Arabic and finds the orders board unchanged should have been
+          told, not left wondering whether something failed to load.
+        */}
+        <div className="mb-3">
+          <div
+            className="rounded-pill bg-paper-sunken flex p-0.5"
+            role="group"
+            aria-label={t("shell.language")}
+          >
+            {(["en", "ar"] as const).map((code) => (
+              <button
+                key={code}
+                type="button"
+                onClick={() => setLocale(code)}
+                aria-pressed={locale === code}
+                className={cn(
+                  "rounded-pill flex-1 cursor-pointer py-1 text-[0.6875rem] tracking-[0.1em] uppercase transition-colors",
+                  locale === code ? "bg-ink text-white" : "text-mist hover:text-ink",
+                )}
+              >
+                {code === "en" ? "English" : "العربية"}
+              </button>
+            ))}
+          </div>
+          {rtl && (
+            <p className="text-mist mt-2 text-[0.6875rem] leading-relaxed">
+              {t("shell.partial")}
+            </p>
+          )}
+        </div>
+
         {!live && (
           <p className="bg-brand-mist text-brand-deep mb-3 rounded-md px-3 py-2 text-[0.6875rem] leading-relaxed">
-            <strong className="font-semibold">Sample data.</strong> Firestore has no
-            orders yet, so these screens are showing a generated 120-day history.
+            <strong className="font-semibold">{t("shell.sampleTitle")}</strong>{" "}
+            {t("shell.sampleBody")}
           </p>
         )}
 
@@ -155,7 +193,7 @@ export function AdminShell({
           </span>
           <span className="min-w-0 flex-1">
             <span className="text-ink block truncate text-[0.75rem] font-medium">
-              {profile?.displayName ?? "Staff"}
+              {profile?.displayName ?? t("shell.staff")}
             </span>
             <span className="text-mist block truncate text-[0.6875rem]">{user?.email}</span>
           </span>
@@ -166,7 +204,7 @@ export function AdminShell({
             href="/"
             className="text-smoke hover:text-ink flex-1 rounded-md px-2 py-1.5 text-[0.75rem] transition-colors"
           >
-            View store →
+            {t("shell.viewStore")} →
           </Link>
           <button
             type="button"
@@ -174,7 +212,7 @@ export function AdminShell({
             className="text-smoke hover:text-alert cursor-pointer rounded-md px-2 py-1.5 text-[0.75rem] transition-colors"
             data-cursor="hover"
           >
-            Sign out
+            {t("shell.signOut")}
           </button>
         </div>
       </div>
@@ -182,7 +220,14 @@ export function AdminShell({
   );
 
   return (
-    <div className="bg-paper min-h-screen">
+    /*
+     * Direction is set here, not on <html>, because the language is chosen in
+     * the browser after the server has already rendered. The layout is built
+     * from logical properties (`start`, `end`, `ps`, `pe`) throughout, so the
+     * rail moves to the right and the whole shell mirrors from this one
+     * attribute.
+     */
+    <div className="bg-paper min-h-screen" dir={rtl ? "rtl" : "ltr"}>
       {/* Desktop rail */}
       <aside className="border-line bg-paper-raised fixed inset-y-0 start-0 z-30 hidden w-64 flex-col border-e p-5 lg:flex">
         {rail}

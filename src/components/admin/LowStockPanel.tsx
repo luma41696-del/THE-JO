@@ -1,8 +1,11 @@
+"use client";
+
 import { Link } from "@/components/ui/Link";
 
 import { cn } from "@/lib/utils";
 import { alertedProductCount, type StockAlert } from "@/lib/stock";
 import { Panel } from "./AdminUI";
+import { useAdminLocale } from "./AdminLocale";
 
 /**
  * Low stock, per variant.
@@ -23,23 +26,25 @@ export function LowStockPanel({
   alerts: StockAlert[];
   threshold: number;
 }) {
+  const { t, locale } = useAdminLocale();
   const products = alertedProductCount(alerts);
 
   return (
     <Panel
-      title="Stock needing attention"
+      title={t("stock.title")}
       description={
         alerts.length === 0
-          ? `Nothing at or below ${threshold} units.`
-          : `${alerts.length} variant${alerts.length === 1 ? "" : "s"} across ${products} product${
-              products === 1 ? "" : "s"
-            }, at or below ${threshold} units.`
+          ? t("stock.clear")
+          : locale === "ar"
+            ? `${alerts.length} متغيّراً في ${products} منتجاً، عند ${threshold} قطعة أو أقل.`
+            : `${alerts.length} variant${alerts.length === 1 ? "" : "s"} across ${products} product${
+                products === 1 ? "" : "s"
+              }, at or below ${threshold} units.`
       }
     >
       {alerts.length === 0 ? (
         <p className="text-mist text-[0.8125rem]">
-          Every active variant is above the threshold. Change it under Settings
-          → Delivery and returns.
+          {t("stock.clearBody")}
         </p>
       ) : (
         <ul className="divide-line divide-y">
@@ -53,7 +58,7 @@ export function LowStockPanel({
                     : "bg-sand text-ink",
                 )}
               >
-                {alert.state === "out" ? "None" : alert.stock}
+                {alert.state === "out" ? t("stock.none") : alert.stock}
               </span>
 
               <span className="min-w-0 flex-1">
@@ -61,12 +66,12 @@ export function LowStockPanel({
                   href={`/admin/products/${alert.productId}`}
                   className="text-ink block truncate text-[0.8125rem] font-medium"
                 >
-                  {alert.title.en}
+                  {alert.title[locale] ?? alert.title.en}
                 </Link>
                 <span className="text-smoke block truncate text-[0.75rem]">
                   {[alert.designName, alert.colorName, alert.sizeLabel]
                     .filter(Boolean)
-                    .join(" · ") || "Single item"}
+                    .join(" · ") || t("stock.singleItem")}
                 </span>
               </span>
 

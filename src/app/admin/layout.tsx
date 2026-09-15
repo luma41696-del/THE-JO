@@ -8,6 +8,7 @@ import { AuthProvider } from "@/components/providers/AuthProvider";
 import { LocaleProvider } from "@/components/providers/LocaleProvider";
 import { AdminGate } from "@/components/admin/AdminGate";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { AdminLocaleProvider } from "@/components/admin/AdminLocale";
 import { getAdminOrders } from "@/lib/admin/data";
 import { requireAdminSession } from "@/lib/firebase/session";
 
@@ -15,13 +16,15 @@ import { requireAdminSession } from "@/lib/firebase/session";
  * Admin shell.
  *
  * Deliberately outside the `[locale]` tree: operations tooling is read by the
- * team, not by shoppers, and a half-translated admin is worse than one language
- * done properly. `middleware.ts` skips `/admin` so it is never redirected into
- * a localised path.
+ * team, not by shoppers. `middleware.ts` skips `/admin` so it is never
+ * redirected into a localised path.
  *
  * It still provides `LocaleProvider` — fixed to English — because shared
- * components (`Link`, `Button`, price formatting) read from it. Without the
- * provider those would throw.
+ * components (`Link`, `Button`, price formatting) read from it, and because
+ * prices and dates in an operations tool should not change shape with the
+ * operator's reading language. `AdminLocaleProvider` carries that separately:
+ * the operator's language is a preference on their machine, not part of the
+ * URL the way a shopper's is.
  *
  * No brand curtain and no custom cursor here. Both are storefront theatre; an
  * operator processing forty orders wants the system pointer and no interstitial.
@@ -75,7 +78,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <LocaleProvider locale="en">
           <AuthProvider>
             <AdminGate>
-              <AdminShell live={live}>{children}</AdminShell>
+              <AdminLocaleProvider>
+                <AdminShell live={live}>{children}</AdminShell>
+              </AdminLocaleProvider>
             </AdminGate>
           </AuthProvider>
         </LocaleProvider>

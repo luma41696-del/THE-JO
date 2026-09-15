@@ -7,6 +7,7 @@ import { getIdToken } from "@/lib/firebase/auth";
 import { AdminPageHeader } from "./AdminShell";
 import { Panel } from "./AdminUI";
 import { Button } from "@/components/ui/Button";
+import { useAdminLocale } from "./AdminLocale";
 import type { StoreSettings } from "@/data/site-content";
 
 /**
@@ -25,6 +26,24 @@ interface Row {
 }
 
 export function SettingsBoard({ settings }: { settings: StoreSettings }) {
+  const { t, locale } = useAdminLocale();
+
+  /*
+   * The preview quotes the storefront, and the storefront is bilingual — so it
+   * quotes the sentence in the operator's own language. An Arabic-speaking
+   * merchant shown the English string cannot check the thing the preview
+   * exists to let them check.
+   */
+  const preview = {
+    free: (n: number) =>
+      locale === "ar" ? `«توصيل مجاني فوق ${n} ديناراً»` : `"Free delivery over ${n} JOD"`,
+    returns: (n: number) =>
+      locale === "ar" ? `«إرجاع خلال ${n} يوماً»` : `"Returns within ${n} days"`,
+    lowStock: (n: number) =>
+      locale === "ar"
+        ? `ينبّه على أي لون أو مقاس أو تصميم عند ${n} — لا على إجمالي المنتج`
+        : `Flags any colour, size or design down to ${n} — not the product total`,
+  };
   const [form, setForm] = useState<StoreSettings>(settings);
   const [social, setSocial] = useState<Row[]>(settings.social);
   const [saving, setSaving] = useState(false);
@@ -67,7 +86,7 @@ export function SettingsBoard({ settings }: { settings: StoreSettings }) {
       setSaved(true);
       if (data.persisted === false) {
         setError(
-          "Validated but not written — Firebase Admin is not configured, so there is nowhere to save to yet.",
+          t("common.notWritten"),
         );
       }
     } catch (err) {
@@ -82,45 +101,45 @@ export function SettingsBoard({ settings }: { settings: StoreSettings }) {
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        title="Store settings"
-        description="The numbers and details the storefront quotes back to customers."
+        title={t("settings.title")}
+        description={t("settings.subtitle")}
       />
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* ---- Promises ------------------------------------------------ */}
         <Panel
-          title="Delivery and returns"
-          description="Changing these rewrites the sentences that quote them."
+          title={t("settings.deliveryPanel")}
+          description={t("settings.deliveryPanelHint")}
         >
           <div className="space-y-4">
             <NumberRow
-              label="Free delivery over"
+              label={t("settings.freeOver")}
               suffix="JOD"
               value={form.freeShippingThreshold}
               onChange={(v) => patch("freeShippingThreshold", v)}
               /* The composed sentence, so the merchant edits the promise. */
-              preview={`"Free delivery over ${form.freeShippingThreshold} JOD"`}
+              preview={preview.free(form.freeShippingThreshold)}
             />
 
             <NumberRow
-              label="Return window"
-              suffix="days"
+              label={t("settings.returnWindow")}
+              suffix={t("settings.days")}
               value={form.returnWindowDays}
               onChange={(v) => patch("returnWindowDays", v)}
-              preview={`"Returns within ${form.returnWindowDays} days"`}
+              preview={preview.returns(form.returnWindowDays)}
             />
 
             <NumberRow
-              label="Low-stock alert at"
-              suffix="units per variant"
+              label={t("settings.lowStock")}
+              suffix={t("settings.lowStockSuffix")}
               value={form.lowStockThreshold}
               onChange={(v) => patch("lowStockThreshold", v)}
-              preview={`Flags any colour, size or design down to ${form.lowStockThreshold} — not the product total`}
+              preview={preview.lowStock(form.lowStockThreshold)}
             />
 
             <div>
               <span className="text-ink-muted mb-1.5 block text-[0.8125rem]">
-                Standard delivery
+                {t("settings.standardDelivery")}
               </span>
               <div className="flex items-center gap-2">
                 <input
@@ -133,7 +152,7 @@ export function SettingsBoard({ settings }: { settings: StoreSettings }) {
                   aria-label="Fastest delivery in business days"
                   className="border-line focus:border-brand bg-paper w-20 rounded-sm border px-2 py-1.5 text-center text-[0.8125rem] tabular-nums outline-none"
                 />
-                <span className="text-mist text-[0.8125rem]">to</span>
+                <span className="text-mist text-[0.8125rem]">{t("settings.to")}</span>
                 <input
                   type="number"
                   min={0}
@@ -144,12 +163,11 @@ export function SettingsBoard({ settings }: { settings: StoreSettings }) {
                   aria-label="Slowest delivery in business days"
                   className="border-line focus:border-brand bg-paper w-20 rounded-sm border px-2 py-1.5 text-center text-[0.8125rem] tabular-nums outline-none"
                 />
-                <span className="text-mist text-[0.8125rem]">business days</span>
+                <span className="text-mist text-[0.8125rem]">{t("settings.businessDays")}</span>
               </div>
               {minDays > maxDays && (
                 <p className="text-alert mt-1 text-[0.75rem]">
-                  The fastest day cannot be later than the slowest — this would
-                  read as “{minDays}–{maxDays} days” on the product page.
+                  {t("settings.dayOrder")} — “{minDays}–{maxDays}”.
                 </p>
               )}
             </div>
@@ -157,32 +175,32 @@ export function SettingsBoard({ settings }: { settings: StoreSettings }) {
         </Panel>
 
         {/* ---- Contact ------------------------------------------------- */}
-        <Panel title="Contact" description="Shown on the contact page and in the footer.">
+        <Panel title={t("settings.contact")} description={t("settings.contactHint")}>
           <div className="space-y-4">
             <TextRow
-              label="Email"
+              label={t("settings.email")}
               type="email"
               value={form.contact.email}
               onChange={(v) => patchContact("email", v)}
             />
             <TextRow
-              label="Phone"
+              label={t("settings.phone")}
               value={form.contact.phone}
               onChange={(v) => patchContact("phone", v)}
             />
             <TextRow
-              label="WhatsApp"
+              label={t("settings.whatsapp")}
               value={form.contact.whatsapp ?? ""}
               onChange={(v) => patchContact("whatsapp", v)}
-              hint="Leave empty to hide the WhatsApp link."
+              hint={t("settings.whatsappHint")}
             />
             <BilingualRow
-              label="Opening hours"
+              label={t("settings.hours")}
               value={form.contact.hours}
               onChange={(v) => patchContact("hours", v)}
             />
             <BilingualRow
-              label="Address"
+              label={t("settings.address")}
               value={form.contact.address}
               onChange={(v) => patchContact("address", v)}
             />
@@ -190,7 +208,7 @@ export function SettingsBoard({ settings }: { settings: StoreSettings }) {
         </Panel>
 
         {/* ---- Social -------------------------------------------------- */}
-        <Panel title="Social links" description="Full https links only.">
+        <Panel title={t("settings.social")} description={t("settings.socialHint")}>
           <ul className="space-y-2">
             {social.map((row, index) => (
               <li key={index} className="flex items-center gap-2">
@@ -236,27 +254,26 @@ export function SettingsBoard({ settings }: { settings: StoreSettings }) {
             onClick={() => setSocial((current) => [...current, { label: "", href: "" }])}
             className="text-brand mt-3 cursor-pointer text-[0.8125rem] underline-offset-4 hover:underline"
           >
-            Add a link
+            {t("settings.addLink")}
           </button>
 
           {social.some((r) => r.href && !/^https?:\/\//i.test(r.href)) && (
             <p className="text-alert mt-2 text-[0.75rem]">
-              Every link must start with http:// or https://. These are rendered
-              in the footer of every page.
+              {t("settings.socialInvalid")}
             </p>
           )}
         </Panel>
 
         {/* ---- Legal --------------------------------------------------- */}
-        <Panel title="Trading details" description="Used on invoices and the terms page.">
+        <Panel title={t("settings.legal")} description={t("settings.legalHint")}>
           <div className="space-y-4">
             <TextRow
-              label="Trading name"
+              label={t("settings.tradingName")}
               value={form.legal.tradingName}
               onChange={(v) => patch("legal", { ...form.legal, tradingName: v })}
             />
             <BilingualRow
-              label="Country"
+              label={t("settings.country")}
               value={form.legal.country}
               onChange={(v) => patch("legal", { ...form.legal, country: v })}
             />
@@ -265,11 +282,11 @@ export function SettingsBoard({ settings }: { settings: StoreSettings }) {
       </div>
 
       <div className="flex items-center gap-4">
-        <Button variant="brand" loading={saving} success={saved} successLabel="Saved" onClick={save}>
-          Save settings
+        <Button variant="brand" loading={saving} success={saved} successLabel={t("common.saved")} onClick={save}>
+          {t("settings.save")}
         </Button>
         <p className="text-mist text-[0.8125rem]">
-          Saving refreshes every page that quotes these numbers.
+          {t("settings.saveHint")}
         </p>
       </div>
 

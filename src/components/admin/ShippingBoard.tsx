@@ -7,6 +7,7 @@ import { getIdToken } from "@/lib/firebase/auth";
 import { AdminPageHeader } from "./AdminShell";
 import { Panel } from "./AdminUI";
 import { Button } from "@/components/ui/Button";
+import { useAdminLocale } from "./AdminLocale";
 import type { ShippingMethod, ShippingZone } from "@/types";
 
 /**
@@ -27,6 +28,7 @@ export function ShippingBoard({
   /** The shop-wide free-delivery threshold, shown as the inherited default. */
   storeThreshold: number;
 }) {
+  const { t } = useAdminLocale();
   const [methods, setMethods] = useState<ShippingMethod[]>(initialMethods);
   const [zones, setZones] = useState<ShippingZone[]>(initialZones);
   const [saving, setSaving] = useState(false);
@@ -81,7 +83,7 @@ export function ShippingBoard({
       setSaved(true);
       if (data.persisted === false) {
         setError(
-          "Validated but not written — Firebase Admin is not configured, so there is nowhere to save to yet.",
+          t("common.notWritten"),
         );
       }
     } catch (err) {
@@ -94,20 +96,20 @@ export function ShippingBoard({
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        title="Delivery"
-        description="What carriage costs, how long it takes, and where you deliver."
+        title={t("shipping.title")}
+        description={t("shipping.subtitle")}
       />
 
       {/* ---- Methods --------------------------------------------------- */}
-      <Panel title="Methods" description="The speeds a customer can choose between.">
+      <Panel title={t("shipping.methods")} description={t("shipping.methodsHint")}>
         <div className="overflow-x-auto">
           <table className="w-full text-[0.8125rem]">
             <thead>
               <tr className="text-mist text-[0.625rem] tracking-[0.12em] uppercase">
-                <th className="pb-2 text-start font-medium">Method</th>
-                <th className="pb-2 text-center font-medium">Price</th>
-                <th className="pb-2 text-center font-medium">Days</th>
-                <th className="pb-2 text-center font-medium">Free above</th>
+                <th className="pb-2 text-start font-medium">{t("shipping.method")}</th>
+                <th className="pb-2 text-center font-medium">{t("shipping.price")}</th>
+                <th className="pb-2 text-center font-medium">{t("shipping.daysCol")}</th>
+                <th className="pb-2 text-center font-medium">{t("shipping.freeAbove")}</th>
               </tr>
             </thead>
             <tbody className="divide-line divide-y">
@@ -153,21 +155,18 @@ export function ShippingBoard({
           </table>
         </div>
         <p className="text-mist mt-3 text-[0.75rem]">
-          An empty “free above” means this method is never free on its own. The
-          shop-wide threshold is {storeThreshold} JOD, set under Settings.
+          {t("shipping.freeAboveHint")} {storeThreshold} JOD.
         </p>
       </Panel>
 
       {/* ---- Zones ----------------------------------------------------- */}
       <Panel
-        title="Zones"
-        description="Matched against the city or region a customer types. An address matching none pays the method price."
+        title={t("shipping.zones")}
+        description={t("shipping.zonesHint")}
       >
         {zones.length === 0 && (
           <p className="text-mist text-[0.8125rem]">
-            No zones. Every address is charged the method price — which is a
-            fine way to run a shop, until the south starts costing more than it
-            earns.
+            {t("shipping.noZones")}
           </p>
         )}
 
@@ -177,7 +176,7 @@ export function ShippingBoard({
               <div className="grid gap-2 sm:grid-cols-2">
                 <input
                   value={zone.name.en}
-                  placeholder="Zone name (English)"
+                  placeholder={t("shipping.zoneNameEn")}
                   onChange={(e) => patchZone(zone.id, { name: { ...zone.name, en: e.target.value } })}
                   aria-label={`English name for ${zone.id}`}
                   className="border-line focus:border-brand bg-paper rounded-sm border px-2 py-1.5 text-[0.8125rem] outline-none"
@@ -194,7 +193,7 @@ export function ShippingBoard({
 
               <label className="mt-2 block">
                 <span className="text-mist mb-1 block text-[0.6875rem] tracking-[0.1em] uppercase">
-                  Cities and regions, comma separated
+                  {t("shipping.areas")}
                 </span>
                 <input
                   value={zone.areas.join(", ")}
@@ -206,15 +205,14 @@ export function ShippingBoard({
                 />
                 {/* Customers type their own address, in either language. */}
                 <span className="text-mist mt-1 block text-[0.75rem]">
-                  List both spellings — a customer typing عمّان must match the
-                  same zone as one typing Amman.
+                  {t("shipping.areasHint")}
                 </span>
               </label>
 
               <div className="mt-3 flex flex-wrap items-end gap-4">
                 <label className="text-center">
                   <span className="text-mist block text-[0.6875rem] tracking-[0.1em] uppercase">
-                    Surcharge
+                    {t("shipping.surcharge")}
                   </span>
                   <Num
                     value={zone.surcharge}
@@ -237,7 +235,7 @@ export function ShippingBoard({
 
                 <label className="text-center">
                   <span className="text-mist block text-[0.6875rem] tracking-[0.1em] uppercase">
-                    Extra days
+                    {t("shipping.extraDays")}
                   </span>
                   <Num
                     value={zone.extraDays ?? ""}
@@ -255,7 +253,7 @@ export function ShippingBoard({
                     onChange={(e) => patchZone(zone.id, { excluded: e.target.checked })}
                     className="accent-brand"
                   />
-                  <span className="text-ink-muted text-[0.8125rem]">Do not deliver here</span>
+                  <span className="text-ink-muted text-[0.8125rem]">{t("shipping.excluded")}</span>
                 </label>
 
                 <button
@@ -263,14 +261,13 @@ export function ShippingBoard({
                   onClick={() => setZones((c) => c.filter((z) => z.id !== zone.id))}
                   className="text-mist hover:text-alert ms-auto cursor-pointer pb-1.5 text-[0.8125rem] underline-offset-4 hover:underline"
                 >
-                  Remove zone
+                  {t("shipping.removeZone")}
                 </button>
               </div>
 
               {zone.excluded && (
                 <p className="text-alert mt-2 text-[0.75rem]">
-                  Checkout will refuse addresses here, at the address step and
-                  again on the server.
+                  {t("shipping.excludedHint")}
                 </p>
               )}
             </li>
@@ -282,16 +279,16 @@ export function ShippingBoard({
           onClick={addZone}
           className="text-brand mt-4 cursor-pointer text-[0.8125rem] underline-offset-4 hover:underline"
         >
-          Add a zone
+          {t("shipping.addZone")}
         </button>
       </Panel>
 
       <div className="flex items-center gap-4">
-        <Button variant="brand" loading={saving} success={saved} successLabel="Saved" onClick={save}>
-          Save delivery rates
+        <Button variant="brand" loading={saving} success={saved} successLabel={t("common.saved")} onClick={save}>
+          {t("shipping.save")}
         </Button>
         <p className="text-mist text-[0.8125rem]">
-          The cart, the checkout and the server all quote from these.
+          {t("shipping.saveHint")}
         </p>
       </div>
 
