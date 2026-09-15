@@ -7,7 +7,7 @@ import {
   uploadBytesResumable,
 } from "firebase/storage";
 
-import { getStorageClient } from "@/lib/firebase/client";
+import { getStorageClient } from "@/lib/firebase/storage";
 import type { ProductImage } from "@/types";
 
 /**

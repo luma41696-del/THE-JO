@@ -5,7 +5,6 @@ import { onIdTokenChanged, type User } from "firebase/auth";
 
 import { getFirebaseAuth, initAnalytics, initAppCheck } from "@/lib/firebase/client";
 import { analyticsAllowed, useConsent } from "@/lib/analytics/consent";
-import { ensureProfile, fetchProfile } from "@/lib/firebase/auth";
 import { syncAdminSession } from "@/lib/firebase/session-client";
 import { useWishlist } from "@/lib/store/wishlist";
 import type { UserProfile } from "@/types";
@@ -76,6 +75,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       try {
+        /*
+         * Loaded only once there is a user. Firestore is ~190KB, and a signed
+         * out visitor — which is most first-time visitors — never reads a
+         * document from the browser at all.
+         */
+        const { ensureProfile } = await import("@/lib/firebase/profile");
         const nextProfile = await ensureProfile(nextUser);
         setProfile(nextProfile);
         // A guest who wishlisted before signing in keeps those items.
@@ -99,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       status,
       refreshProfile: async () => {
         if (!user) return;
+        const { fetchProfile } = await import("@/lib/firebase/profile");
         setProfile(await fetchProfile(user.uid));
       },
     }),

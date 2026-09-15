@@ -22,7 +22,7 @@ import {
   type QueryConstraint,
 } from "firebase/firestore";
 
-import { getDb } from "@/lib/firebase/client";
+import { getDb } from "@/lib/firebase/db";
 import {
   bannerConverter,
   categoryConverter,

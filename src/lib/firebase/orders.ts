@@ -9,7 +9,7 @@ import {
   where,
 } from "firebase/firestore";
 
-import { getDb } from "./client";
+import { getDb } from "./db";
 import { orderConverter } from "./converters";
 import type { Order, OrderStatus } from "@/types";
 

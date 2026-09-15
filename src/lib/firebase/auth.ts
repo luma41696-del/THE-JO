@@ -8,14 +8,11 @@ import {
   signInWithPopup,
   signOut as fbSignOut,
   updateProfile,
-  type User,
 } from "firebase/auth";
-import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 
-import { getDb, getFirebaseAuth } from "./client";
-import { userConverter } from "./converters";
+import { getFirebaseAuth } from "./client";
 import { syncAdminSession } from "./session-client";
-import type { Locale, UserProfile } from "@/types";
+import type { Locale } from "@/types";
 
 /**
  * Auth actions.
@@ -73,89 +70,16 @@ function toAuthError(error: unknown): AuthError {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Profile                                                                   */
-/* -------------------------------------------------------------------------- */
-
-function profileRef(uid: string) {
-  return doc(getDb(), "users", uid).withConverter(userConverter);
-}
-
-/**
- * Create the profile document if this is a first sign-in. Uses `merge` so a
- * second call can never clobber addresses or a fit profile.
- */
-export async function ensureProfile(user: User, locale: Locale = "en"): Promise<UserProfile> {
-  const ref = profileRef(user.uid);
-  const snap = await getDoc(ref);
-
-  if (snap.exists()) {
-    const existing = snap.data();
-    // Keep the denormalised auth fields fresh without touching anything else.
-    await updateDoc(doc(getDb(), "users", user.uid), {
-      email: user.email,
-      displayName: user.displayName,
-      photoURL: user.photoURL,
-      updatedAt: serverTimestamp(),
-    });
-    return existing;
-  }
-
-  const fresh: UserProfile = {
-    uid: user.uid,
-    email: user.email,
-    displayName: user.displayName,
-    photoURL: user.photoURL,
-    locale,
-    currency: (process.env.NEXT_PUBLIC_DEFAULT_CURRENCY as UserProfile["currency"]) || "JOD",
-    addresses: [],
-    wishlist: [],
-    marketingOptIn: false,
-    // Authoritative role lives in the custom claim; this mirror is read-only.
-    role: "customer",
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  };
-
-  await setDoc(
-    doc(getDb(), "users", user.uid),
-    {
-      email: fresh.email,
-      displayName: fresh.displayName,
-      photoURL: fresh.photoURL,
-      locale: fresh.locale,
-      currency: fresh.currency,
-      addresses: [],
-      wishlist: [],
-      marketingOptIn: false,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true },
-  );
-
-  return fresh;
-}
-
-export async function fetchProfile(uid: string): Promise<UserProfile | null> {
-  const snap = await getDoc(profileRef(uid));
-  return snap.exists() ? snap.data() : null;
-}
-
-export async function updateProfileDoc(uid: string, patch: Partial<UserProfile>) {
-  const { uid: _uid, role: _role, createdAt: _createdAt, ...safe } = patch;
-  void _uid;
-  void _role;
-  void _createdAt;
-  await updateDoc(doc(getDb(), "users", uid), { ...safe, updatedAt: serverTimestamp() });
-}
-
-/* -------------------------------------------------------------------------- */
 /*  Actions                                                                   */
 /* -------------------------------------------------------------------------- */
 
 export async function signIn(email: string, password: string) {
   try {
     const credential = await signInWithEmailAndPassword(getFirebaseAuth(), email, password);
+    // Imported here rather than at the top: this is the one path that needs
+    // Firestore, and it must not be in the bundle of every page that only
+    // wants a token.
+    const { ensureProfile } = await import("./profile");
     await ensureProfile(credential.user);
     return credential.user;
   } catch (error) {
@@ -170,6 +94,7 @@ export async function signUp(name: string, email: string, password: string, loca
   try {
     const credential = await createUserWithEmailAndPassword(getFirebaseAuth(), email, password);
     await updateProfile(credential.user, { displayName: name.trim() });
+    const { ensureProfile } = await import("./profile");
     await ensureProfile(credential.user, locale);
     return credential.user;
   } catch (error) {
@@ -183,6 +108,7 @@ export async function signInWithGoogle(locale: Locale = "en") {
   provider.setCustomParameters({ prompt: "select_account" });
   try {
     const credential = await signInWithPopup(getFirebaseAuth(), provider);
+    const { ensureProfile } = await import("./profile");
     await ensureProfile(credential.user, locale);
     return credential.user;
   } catch (error) {

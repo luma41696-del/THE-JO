@@ -105,7 +105,7 @@ function merge(stored: Partial<StoreSettings> | undefined): StoreSettings {
  */
 export async function getStoreSettings(): Promise<StoreSettings> {
   try {
-    const { getDb } = await import("@/lib/firebase/client");
+    const { getDb } = await import("@/lib/firebase/db");
     const { doc, getDoc } = await import("firebase/firestore");
 
     const snapshot = await withTimeout(getDoc(doc(getDb(), "settings", "store")), READ_TIMEOUT_MS);

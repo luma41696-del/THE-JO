@@ -18,20 +18,11 @@ import {
   setPersistence,
   type Auth,
 } from "firebase/auth";
-import {
-  connectFirestoreEmulator,
-  initializeFirestore,
-  persistentLocalCache,
-  persistentMultipleTabManager,
-  type Firestore,
-} from "firebase/firestore";
-import { connectStorageEmulator, getStorage, type FirebaseStorage } from "firebase/storage";
-import { connectFunctionsEmulator, getFunctions, type Functions } from "firebase/functions";
 
 import { appCheckSiteKey, firebaseConfig, useEmulators } from "./config";
 import { analyticsAllowed } from "@/lib/analytics/consent";
 
-let emulatorsConnected = false;
+let authEmulatorConnected = false;
 
 export function getFirebaseApp(): FirebaseApp {
   return getApps().length ? getApp() : initializeApp(firebaseConfig);
@@ -47,50 +38,18 @@ export function getFirebaseAuth(): Auth {
     void setPersistence(auth, browserLocalPersistence).catch(() => {});
   }
 
-  if (useEmulators && !emulatorsConnected) {
+  /*
+   * Connected once. The guard used to be a shared `emulatorsConnected` flag
+   * that only `getFunctionsClient` ever set — and nothing called that, so the
+   * flag was permanently false and this re-ran on every call.
+   */
+  if (useEmulators && !authEmulatorConnected) {
     connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+    authEmulatorConnected = true;
   }
   return auth;
 }
 
-let firestore: Firestore | undefined;
-
-export function getDb(): Firestore {
-  if (firestore) return firestore;
-
-  firestore = initializeFirestore(getFirebaseApp(), {
-    // Offline cache means a returning shopper sees their last catalogue view
-    // instantly, and the cart survives a dropped connection mid-checkout.
-    localCache:
-      typeof window !== "undefined"
-        ? persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-        : undefined,
-    // Corporate proxies and some mobile networks break gRPC streaming.
-    experimentalAutoDetectLongPolling: true,
-  });
-
-  if (useEmulators && !emulatorsConnected) {
-    connectFirestoreEmulator(firestore, "127.0.0.1", 8080);
-  }
-  return firestore;
-}
-
-export function getStorageClient(): FirebaseStorage {
-  const storage = getStorage(getFirebaseApp());
-  if (useEmulators && !emulatorsConnected) {
-    connectStorageEmulator(storage, "127.0.0.1", 9199);
-  }
-  return storage;
-}
-
-export function getFunctionsClient(region = "europe-west1"): Functions {
-  const functions = getFunctions(getFirebaseApp(), region);
-  if (useEmulators && !emulatorsConnected) {
-    connectFunctionsEmulator(functions, "127.0.0.1", 5001);
-    emulatorsConnected = true;
-  }
-  return functions;
-}
 
 /* -------------------------------------------------------------------------- */
 /*  Browser-only products                                                     */
