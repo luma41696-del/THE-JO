@@ -641,6 +641,72 @@ describe("colours, sizes and variants round-trip", () => {
     assert.match(stored.colors[0].hex, /^#[0-9A-Fa-f]{6}$/);
   });
 
+  test("a second window's save is refused rather than silently overwriting", async () => {
+    /*
+     * Two people with the same product open. Without this, the second save
+     * wins and the first person's work disappears with no error and no trace —
+     * discovered later, if at all, as a wrong price.
+     */
+    const db = adminSdk.getAdminDb();
+    const before = (await db.collection("products").doc(id).get()).data()!;
+    const staleVersion = Number(
+      before.updatedAt?.toMillis?.() ?? before.updatedAt ?? 0,
+    );
+
+    // The other window saves first.
+    const first = await save({ price: 15 });
+    assert.equal(first.ok, true, first.error);
+
+    // Ours still holds the version we loaded.
+    const second = await json<{ ok: boolean; conflict?: boolean; error?: string }>(
+      await products.POST(
+        request("/api/admin/products", {
+          method: "POST",
+          token: owner.token,
+          body: JSON.stringify({
+            id,
+            ...required,
+            price: 99,
+            expectedUpdatedAt: staleVersion,
+          }),
+        }),
+      ),
+    );
+
+    assert.equal(second.ok, false);
+    assert.equal(second.conflict, true);
+    assert.equal(second.httpStatus, 409);
+
+    // And the first writer's value is still there.
+    const after = (await db.collection("products").doc(id).get()).data()!;
+    assert.equal(after.price, 15, "the losing save must not have landed");
+  });
+
+  test("a save that carries the current version goes through", async () => {
+    const db = adminSdk.getAdminDb();
+    const current = (await db.collection("products").doc(id).get()).data()!;
+    const version = Number(current.updatedAt?.toMillis?.() ?? current.updatedAt ?? 0);
+
+    const result = await json<{ ok: boolean; error?: string }>(
+      await products.POST(
+        request("/api/admin/products", {
+          method: "POST",
+          token: owner.token,
+          body: JSON.stringify({ id, ...required, price: 16, expectedUpdatedAt: version }),
+        }),
+      ),
+    );
+    assert.equal(result.ok, true, result.error);
+    assert.equal((await db.collection("products").doc(id).get()).data()!.price, 16);
+  });
+
+  test("a caller with no version — an import — is not blocked", async () => {
+    // A script that never read the document is not claiming to know its
+    // version, and refusing those would only punish the careful caller.
+    const result = await save({ price: 17 });
+    assert.equal(result.ok, true, result.error);
+  });
+
   test("quantity tiers are stored sorted, and a nonsense tier is refused", async () => {
     const ok = await save({
       priceTiers: [

@@ -65,6 +65,8 @@ interface Body {
   variants?: ProductVariant[];
   designs?: ProductDesign[];
   priceTiers?: PriceTier[] | null;
+  /** The `updatedAt` the editor loaded, for conflict detection. */
+  expectedUpdatedAt?: number;
   type?: ProductType;
   sku?: string;
   gtin?: string | null;
@@ -502,6 +504,56 @@ export async function POST(request: Request) {
       : db.collection("products").doc();
 
     const existing = body.id ? await ref.get() : null;
+
+    /*
+     * Optimistic concurrency, before anything is written.
+     *
+     * The editor is a long-lived form: a merchant can have a product open for
+     * twenty minutes while a colleague edits the same one in another window.
+     * A plain merge write means the second save silently overwrites the first,
+     * and nobody finds out until a price is wrong.
+     *
+     * The client sends the `updatedAt` it loaded. If the stored document has
+     * moved on, this refuses and hands back what is there now, so the editor
+     * can show the difference rather than quietly winning.
+     *
+     * `expectedUpdatedAt` is optional: an import or a script that has not read
+     * the document is not pretending to know its version, and blocking those
+     * would be a check that only punishes the careful caller.
+     */
+    if (existing?.exists && body.expectedUpdatedAt !== undefined) {
+      const stored = existing.data()?.updatedAt;
+      const storedMs =
+        stored instanceof Date
+          ? stored.getTime()
+          : typeof stored?.toMillis === "function"
+            ? stored.toMillis()
+            : Number(stored) || 0;
+
+      /*
+       * Compared exactly, in milliseconds.
+       *
+       * A tolerance was the obvious thing to write and it is wrong: two saves
+       * inside the same second are precisely the concurrent edit this exists
+       * to catch, and a one-second window let the second one through. The
+       * value survives the round trip without loss — Firestore stores a
+       * Timestamp, `serialise` hands the client milliseconds, and the client
+       * sends that number back.
+       */
+      if (storedMs > 0 && storedMs !== Number(body.expectedUpdatedAt)) {
+        return NextResponse.json(
+          {
+            ok: false,
+            conflict: true,
+            error:
+              "This product was changed by someone else while you were editing. " +
+              "Reload to see their version before saving.",
+            storedUpdatedAt: storedMs,
+          },
+          { status: 409 },
+        );
+      }
+    }
 
     // Firestore rejects undefined. Omitted editor fields preserve old values;
     // explicitly cleared fields must be deleted because this is a merge write.

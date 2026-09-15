@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { motion } from "motion/react";
 
@@ -129,7 +129,7 @@ export function ProductEditor({
   categories: Category[];
   shippingClasses?: ShippingClass[];
 }) {
-  const { t } = useAdminLocale();
+  const { t, locale } = useAdminLocale();
   const router = useLocalizedRouter();
   const [draft, setDraft] = useState<Draft>(() => toDraft(product));
   const [saving, setSaving] = useState(false);
@@ -158,6 +158,29 @@ export function ProductEditor({
    * together and saved with the product, so that adding a colour and pricing
    * its rows is one save rather than three.
    */
+  /*
+   * The version this form was built from, frozen at mount.
+   *
+   * Not read from `product` at save time: the prop can be refreshed by a
+   * router navigation underneath an open form, and comparing against a value
+   * that moved with the document would defeat the check entirely.
+   */
+  /**
+   * Where this session's uploads land.
+   *
+   * A saved product uses its own id. A new one gets a draft folder, so images
+   * can be added before the product exists — the document stores the resulting
+   * URL, and nothing depends on the folder name matching an id afterwards.
+   */
+  const [uploadFolder] = useState(
+    () => product?.id ?? `draft-${Math.random().toString(36).slice(2, 10)}`,
+  );
+
+  const [loadedAt] = useState<number>(() => product?.updatedAt ?? 0);
+  const [conflict, setConflict] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  const [recovered, setRecovered] = useState(false);
+
   const [colors, setColors] = useState<ProductColor[]>(product?.colors ?? []);
   const [sizes, setSizes] = useState<ProductSize[]>(product?.sizes ?? []);
   const [variants, setVariants] = useState<ProductVariant[]>(product?.variants ?? []);
@@ -215,21 +238,23 @@ export function ProductEditor({
     patchDesign(id, { available: false });
   }
 
+  /**
+   * Add a design from a file.
+   *
+   * The name and the alt text used to be three stacked `window.prompt` calls
+   * before the upload even began — cancel the second and the first was lost.
+   * The design arrives with a placeholder name now, and both names and the alt
+   * text are editable in the row, where the merchant can see the thumbnail
+   * they are naming.
+   */
   async function addDesign(file: File) {
-    if (!product) return;
-    const name = window.prompt("Design name (English)")?.trim();
-    if (!name) return;
-    const nameAr = window.prompt("اسم التصميم (بالعربية)")?.trim() || name;
-    const alt = window.prompt("Describe the thumbnail for screen readers", `${name} — `)?.trim();
-    if (!alt) {
-      setUploadError(t("pe.designAltRequired"));
-      return;
-    }
+    const name = file.name.replace(/\.[^.]+$/, "").slice(0, 40) || "Design";
+    const nameAr = name;
 
     setDesignBusy(true);
     setUploadError(null);
     try {
-      const thumbnail = await uploadProductImage(product.id, file, alt);
+      const thumbnail = await uploadProductImage(uploadFolder, file, "");
       const id = `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-${Date.now()
         .toString(36)
         .slice(-4)}`;
@@ -247,8 +272,25 @@ export function ProductEditor({
     }
   }
 
+  /**
+   * Take the files now, ask for the words after.
+   *
+   * Two things changed here. It no longer requires a saved product — uploading
+   * into a folder named for a draft is fine, because the product stores the
+   * resulting *URL* and nothing depends on the folder matching an id. Making a
+   * merchant save an empty shell before they can add a photograph was an
+   * ordering problem, not a technical one.
+   *
+   * And it no longer interrogates them through `window.prompt`, once per file,
+   * modally, with no way back. Alt text is still required — it is required at
+   * *publish*, in a field beside the picture where the merchant can see what
+   * they are describing. A blocking prompt asking someone to describe a file
+   * they have not looked at yet produces "IMG_4821", which is worse than
+   * nothing: a screen reader announces it in full and the listener learns
+   * less than from silence.
+   */
   async function handleFiles(list: FileList | null) {
-    if (!list || list.length === 0 || !product) return;
+    if (!list || list.length === 0) return;
     setUploadError(null);
     setUploading(true);
 
@@ -256,24 +298,8 @@ export function ProductEditor({
       const files = Array.from(list);
       for (let i = 0; i < files.length; i += 1) {
         const file = files[i]!;
-        /*
-         * Alt text is asked for, never derived. "IMG_4821.jpg" as alt text is
-         * worse than none — a screen reader announces it in full and the
-         * listener learns nothing.
-         */
-        const alt =
-          window.prompt(
-            `Describe image ${i + 1} of ${files.length} for screen readers`,
-            draft.titleEn ? `${draft.titleEn} — ` : "",
-          ) ?? "";
-        if (!alt.trim()) {
-          setUploadError(t("pe.imageAltRequired"));
-          break;
-        }
-
-        const uploaded = await uploadProductImage(product.id, file, alt, {
-          onProgress: (fraction) =>
-            setUploadProgress((i + fraction) / files.length),
+        const uploaded = await uploadProductImage(uploadFolder, file, "", {
+          onProgress: (fraction) => setUploadProgress((i + fraction) / files.length),
         });
         setImages((current) => [...current, uploaded]);
       }
@@ -285,6 +311,11 @@ export function ProductEditor({
       setUploading(false);
       setUploadProgress(0);
     }
+  }
+
+  /** Alt text, edited in place against the picture it describes. */
+  function setImageAlt(url: string, alt: string) {
+    setImages((current) => current.map((img) => (img.url === url ? { ...img, alt } : img)));
   }
 
   function moveImage(index: number, delta: number) {
@@ -309,6 +340,120 @@ export function ProductEditor({
     if (image) void deleteProductImage(image.url).catch(() => {});
   }
   const [saved, setSaved] = useState(false);
+
+  /* ---- keeping the work ------------------------------------------------ */
+
+  /**
+   * Where an unsaved draft lives between visits.
+   *
+   * Per product, and `new` for one that does not exist yet — two half-written
+   * products must not overwrite each other's recovery copy.
+   */
+  const draftKey = `net-sale:product-draft:${product?.id ?? "new"}`;
+
+  /** Everything the form holds, as one comparable value. */
+  const snapshot = useMemo(
+    () => JSON.stringify({ draft, images, colors, sizes, variants, designs }),
+    [draft, images, colors, sizes, variants, designs],
+  );
+
+  const [baseline] = useState(snapshot);
+  const dirty = snapshot !== baseline && !saved;
+
+  /*
+   * A local copy, written as they type.
+   *
+   * This is **not** an autosave to the shop — nothing reaches customers, and a
+   * half-written product is never published by a timer. It is a recovery copy
+   * for the laptop that sleeps, the tab that is closed by accident, and the
+   * session that expires mid-edit. The save button remains the only thing that
+   * publishes anything.
+   */
+  useEffect(() => {
+    if (!dirty) return;
+    const timer = setTimeout(() => {
+      try {
+        window.localStorage.setItem(
+          draftKey,
+          JSON.stringify({ at: Date.now(), from: loadedAt, snapshot }),
+        );
+      } catch {
+        // Storage full or blocked. The form still works; only recovery is lost.
+      }
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [snapshot, dirty, draftKey, loadedAt]);
+
+  /*
+   * Offer the recovery copy on the way back in.
+   *
+   * Only when it is newer than the stored product — a draft from before
+   * somebody else's save is stale, and restoring it would undo their work
+   * without the merchant realising.
+   */
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(draftKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { at: number; from: number; snapshot: string };
+      if (parsed.snapshot === baseline) {
+        window.localStorage.removeItem(draftKey);
+        return;
+      }
+      if (parsed.from !== loadedAt) {
+        // The product moved on since this draft was written.
+        window.localStorage.removeItem(draftKey);
+        return;
+      }
+      setRecovered(true);
+    } catch {
+      /* unreadable copy; ignore it */
+    }
+    // Runs once on mount: the offer is about what was there before this visit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function restoreDraft() {
+    try {
+      const raw = window.localStorage.getItem(draftKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { snapshot: string };
+      const value = JSON.parse(parsed.snapshot) as {
+        draft: Draft;
+        images: ProductImage[];
+        colors: ProductColor[];
+        sizes: ProductSize[];
+        variants: ProductVariant[];
+        designs: ProductDesign[];
+      };
+      setDraft(value.draft);
+      setImages(value.images ?? []);
+      setColors(value.colors ?? []);
+      setSizes(value.sizes ?? []);
+      setVariants(value.variants ?? []);
+      setDesigns(value.designs ?? []);
+    } catch {
+      /* nothing to restore */
+    }
+    setRecovered(false);
+  }
+
+  function discardDraft() {
+    try {
+      window.localStorage.removeItem(draftKey);
+    } catch {
+      /* nothing to remove */
+    }
+    setRecovered(false);
+  }
+
+  /* The browser's own warning. Ours cannot be styled, and should not be. */
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
   const [error, setError] = useState<string | null>(null);
 
   const isNew = !product;
@@ -319,17 +464,40 @@ export function ProductEditor({
     setSaved(false);
   }
 
+  /*
+   * What is still needed before this can be *published*.
+   *
+   * Deliberately not what is needed to save. A merchant writing a product over
+   * two sittings has to be able to keep a half-finished draft — refusing the
+   * save is how an afternoon of typing gets lost to a closed tab. The
+   * requirement lands where it starts costing something: the moment a shopper
+   * could see it.
+   */
   const missing: string[] = [];
   if (!draft.titleEn.trim()) missing.push("English title");
   if (!draft.titleAr.trim()) missing.push("Arabic title");
   if (!draft.slug.trim()) missing.push("slug");
   if (draft.price <= 0) missing.push("price");
+  if (images.length === 0) missing.push("an image");
+  if (images.some((image) => !image.alt.trim())) missing.push("a description for every image");
 
   async function save() {
-    if (missing.length > 0) {
-      setError(`Still needed: ${missing.join(", ")}.`);
+    /*
+     * Publishing is held to the list; saving a draft is not. A draft with
+     * nothing but a title is a legitimate thing to keep.
+     */
+    if (draft.status === "active" && missing.length > 0) {
+      setError(`Still needed before publishing: ${missing.join(", ")}.`);
       return;
     }
+    if (!draft.titleEn.trim() && !draft.titleAr.trim()) {
+      // One name, in either language, so the draft has something to be listed by.
+      setError("A draft still needs a name in one language.");
+      return;
+    }
+    // A second click while the first is in flight would write twice and, with
+    // a new product, create two.
+    if (saving) return;
 
     setSaving(true);
     setError(null);
@@ -344,6 +512,9 @@ export function ProductEditor({
         },
         body: JSON.stringify({
           id: product?.id,
+          // The version this form was built from. The route refuses the write
+          // if the document has moved on, rather than overwriting silently.
+          ...(product ? { expectedUpdatedAt: loadedAt } : {}),
           slug: draft.slug.trim(),
           title: { en: draft.titleEn.trim(), ar: draft.titleAr.trim() },
           subtitle: { en: draft.subtitleEn.trim(), ar: draft.subtitleAr.trim() },
@@ -378,7 +549,20 @@ export function ProductEditor({
         error?: string;
         persisted?: boolean;
         id?: string;
+        conflict?: boolean;
       };
+      /*
+       * A conflict is not a failure to report as one. The merchant's typing is
+       * still on screen and still valid; what changed is that somebody else
+       * got there first, and the only safe move is to say so plainly rather
+       * than retry into an overwrite.
+       */
+      if (response.status === 409 || data.conflict) {
+        setConflict(true);
+        setError(data.error ?? "Someone else saved this while you were editing.");
+        return;
+      }
+
       if (!response.ok || !data.ok) throw new Error(data.error ?? "Save failed");
 
       setSaved(true);
@@ -386,7 +570,15 @@ export function ProductEditor({
         setError(
           "Validated but not written — Firebase Admin is not configured, so there is nowhere to save to yet.",
         );
-      } else if (isNew && data.id) {
+        // Not stored, so the recovery copy stays: it is the only surviving copy.
+        return;
+      }
+
+      // Written for real, so the recovery copy has done its job.
+      setLastSavedAt(Date.now());
+      discardDraft();
+
+      if (isNew && data.id) {
         router.push(`/admin/products/${data.id}`);
       } else {
         router.refresh();
@@ -417,6 +609,21 @@ export function ProductEditor({
                 </Button>
               </Link>
             )}
+            {/*
+              The state of the work, next to the button that changes it. A
+              merchant who has typed for ten minutes should be able to see
+              whether any of it has reached the shop.
+            */}
+            <span className="text-mist me-1 text-[0.6875rem] whitespace-nowrap">
+              {dirty
+                ? t("pe.unsaved")
+                : lastSavedAt
+                  ? `${t("pe.savedAt")} ${new Date(lastSavedAt).toLocaleTimeString(
+                      locale === "ar" ? "ar-JO" : "en-GB",
+                      { hour: "2-digit", minute: "2-digit" },
+                    )}`
+                  : ""}
+            </span>
             <Button
               variant="brand"
               size="sm"
@@ -431,7 +638,39 @@ export function ProductEditor({
         }
       />
 
-      {error && (
+      {/*
+        A recovery copy from a previous visit. Offered, never applied
+        automatically: silently replacing what is on screen with an older
+        draft is its own kind of data loss.
+      */}
+      {recovered && (
+        <div className="border-line bg-paper-raised mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
+          <p className="text-ink-muted text-[0.8125rem]">{t("pe.recovered")}</p>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={restoreDraft}>
+              {t("pe.restoreDraft")}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={discardDraft}>
+              {t("pe.discardDraft")}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/*
+        Somebody else got there first. Reloading is the only safe move, and it
+        is offered as a button rather than left as an instruction.
+      */}
+      {conflict && (
+        <div className="bg-alert/10 mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md p-3">
+          <p className="text-alert text-[0.8125rem]">{t("pe.conflict")}</p>
+          <Button variant="secondary" size="sm" onClick={() => router.refresh()}>
+            {t("pe.reload")}
+          </Button>
+        </div>
+      )}
+
+      {error && !conflict && (
         <motion.p
           role="alert"
           className="bg-alert/10 text-alert mb-4 rounded-md p-3 text-[0.8125rem]"
@@ -497,8 +736,8 @@ export function ProductEditor({
             >
               <div className="flex flex-wrap gap-3">
                 {images.map((image, index) => (
+                  <div key={image.url} className="w-24">
                   <div
-                    key={image.url}
                     className="bg-paper-sunken group relative h-32 w-24 overflow-hidden rounded-md"
                   >
                     <Image
@@ -549,6 +788,24 @@ export function ProductEditor({
                         →
                       </button>
                     </div>
+                  </div>
+
+                  {/*
+                    Alt text, beside the picture it describes rather than in a
+                    prompt before the upload. A red edge where it is missing:
+                    publishing is blocked until every image has one, and the
+                    merchant can see at a glance which.
+                  */}
+                  <input
+                    value={image.alt}
+                    onChange={(event) => setImageAlt(image.url, event.target.value)}
+                    placeholder={t("pe.altPlaceholder")}
+                    aria-label={`${t("pe.altPlaceholder")} ${index + 1}`}
+                    className={cn(
+                      "focus:border-brand bg-paper text-ink placeholder:text-mist mt-1 w-24 rounded-md border px-1.5 py-1 text-[0.625rem] outline-none transition-colors",
+                      image.alt.trim() ? "border-line" : "border-alert",
+                    )}
+                  />
                   </div>
                 ))}
 

@@ -965,6 +965,24 @@ export const ADMIN_STRINGS = {
   "pe.productType": { en: "Product type", ar: "نوع المنتج" },
   "pe.shippingClass": { en: "Shipping class", ar: "فئة الشحن" },
   "pe.beforePublishing": { en: "Before publishing", ar: "قبل النشر" },
+  "pe.recovered": {
+    en: "You have unsaved changes to this product from an earlier visit.",
+    ar: "لديك تعديلات غير محفوظة على هذا المنتج من زيارة سابقة.",
+  },
+  "pe.restoreDraft": { en: "Restore them", ar: "استعادتها" },
+  "pe.discardDraft": { en: "Discard", ar: "تجاهل" },
+  "pe.conflict": {
+    en: "Someone else saved this product while you were editing. Reload to see their version before saving yours.",
+    ar: "حفظ شخص آخر هذا المنتج أثناء تحريرك. أعد التحميل لترى نسخته قبل حفظ نسختك.",
+  },
+  "pe.reload": { en: "Reload", ar: "إعادة تحميل" },
+  "pe.unsaved": { en: "Unsaved changes", ar: "تعديلات غير محفوظة" },
+  "pe.savedAt": { en: "Saved", ar: "حُفظ" },
+  "pe.altPlaceholder": { en: "Describe it…", ar: "صف الصورة…" },
+  "pe.altMissing": {
+    en: "Every image needs a description before this can be published.",
+    ar: "كل صورة تحتاج وصفاً قبل النشر.",
+  },
   "reviews.verified": { en: "Verified purchase", ar: "شراء موثّق" },
   "reviews.postReply": { en: "Post reply", ar: "انشر الرد" },
 
