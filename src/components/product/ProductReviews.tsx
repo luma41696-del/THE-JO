@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/format";
 import { getIdToken } from "@/lib/firebase/auth";
+import { errorMessage } from "@/lib/errors";
 import { ACCEPT_ATTRIBUTE, uploadReviewImage } from "@/lib/firebase/upload";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { Link } from "@/components/ui/Link";
@@ -377,7 +378,12 @@ function ReviewComposer({
       );
       setImages((current) => [...current, uploaded]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "That photo could not be uploaded.");
+      setError(
+        errorMessage(err, locale, {
+          en: "That photo could not be uploaded.",
+          ar: "تعذّر رفع الصورة.",
+        }),
+      );
     } finally {
       setUploading(false);
     }
@@ -417,7 +423,12 @@ function ReviewComposer({
       setDone(data.message?.[locale] ?? (rtl ? "شكراً لك." : "Thank you."));
       window.setTimeout(onDone, 1800);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save your review.");
+      setError(
+        errorMessage(err, locale, {
+          en: "Your review could not be saved.",
+          ar: "تعذّر حفظ تقييمك.",
+        }),
+      );
     } finally {
       setBusy(false);
     }

@@ -5,6 +5,7 @@ import Image from "next/image";
 
 import { cn } from "@/lib/utils";
 import { getIdToken } from "@/lib/firebase/auth";
+import { errorMessage, readJson } from "@/lib/errors";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { useConsent } from "@/lib/analytics/consent";
 import { Button } from "@/components/ui/Button";
@@ -114,17 +115,23 @@ export function BodyPanel({
           },
           body: JSON.stringify({ fitProfile: next }),
         });
-        const data = (await response.json()) as { ok?: boolean; error?: string };
-        if (!response.ok || !data.ok) throw new Error(data.error ?? "Could not save.");
+        await readJson(response);
         setSaved(true);
         window.setTimeout(() => setSaved(false), 1600);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Could not save your measurements.");
+        setError(
+          errorMessage(err, locale, {
+            en: "Your measurements could not be saved.",
+            ar: "تعذّر حفظ قياساتك.",
+          }),
+        );
       } finally {
         setSaving(false);
       }
     },
-    [uid],
+    // `locale` matters: the callback composes the failure message, and a
+    // stale closure would report it in the language the page opened in.
+    [uid, locale],
   );
 
   useEffect(() => {
@@ -152,10 +159,14 @@ export function BodyPanel({
         method: "DELETE",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      const data = (await response.json()) as { ok?: boolean; error?: string };
-      if (!response.ok || !data.ok) throw new Error(data.error ?? "Could not delete.");
+      await readJson(response);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not delete your measurements.");
+      setError(
+        errorMessage(err, locale, {
+          en: "Your measurements could not be deleted.",
+          ar: "تعذّر حذف قياساتك.",
+        }),
+      );
     }
   }
 
@@ -184,7 +195,12 @@ export function BodyPanel({
       setStoredPhoto(url);
       setCheck(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "That photo could not be saved.");
+      setError(
+        errorMessage(err, locale, {
+          en: "That photo could not be saved.",
+          ar: "تعذّر حفظ الصورة.",
+        }),
+      );
     } finally {
       setUploading(false);
     }
@@ -198,7 +214,12 @@ export function BodyPanel({
       setStoredPhoto(null);
       setCheck(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not remove the photo.");
+      setError(
+        errorMessage(err, locale, {
+          en: "That photo could not be removed.",
+          ar: "تعذّر حذف الصورة.",
+        }),
+      );
     }
   }
 

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/format";
 import { getIdToken } from "@/lib/firebase/auth";
+import { errorMessage } from "@/lib/errors";
 import { useCoupon } from "@/lib/store/coupon";
 import { t } from "@/lib/format";
 import { Link } from "@/components/ui/Link";
@@ -58,10 +59,15 @@ export function MyGifts({ locale = "en" }: { locale?: Locale }) {
       if (!response.ok || !data.ok) throw new Error(data.error ?? "Could not load your gifts.");
       setGifts(data.gifts ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load your gifts.");
+      setError(
+        errorMessage(err, locale, {
+          en: "Your gifts could not be loaded.",
+          ar: "تعذّر تحميل هداياك.",
+        }),
+      );
       setGifts([]);
     }
-  }, []);
+  }, [locale]);
 
   useEffect(() => {
     void load();

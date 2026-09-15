@@ -60,6 +60,14 @@ const EMPTY_ADDRESS: Omit<Address, "id" | "isDefault"> = {
   countryCode: "JO",
 };
 
+/**
+ * An error carrying a message the server wrote for a customer.
+ *
+ * The distinction matters at the catch: our own messages are worth showing
+ * verbatim, a browser's are not.
+ */
+class CheckoutError extends Error {}
+
 export function CheckoutFlow({
   shippingMethods,
   shippingClasses = [],
@@ -278,7 +286,9 @@ export function CheckoutFlow({
       };
 
       if (!response.ok || !data.ok || !data.reference) {
-        throw new Error(data.error || "Checkout failed");
+        // Tagged as ours, so the catch can tell a message we wrote from a
+        // browser string like "Failed to fetch".
+        throw new CheckoutError(data.error || "");
       }
 
       setPlaced({ reference: data.reference, total: data.total ?? totals.total });
@@ -312,12 +322,23 @@ export function CheckoutFlow({
       clearCoupon();
       idempotencyKey.current = null;
     } catch (error) {
+      /*
+       * Only a message the *server* sent is shown verbatim — those are
+       * written for customers ("Only 2 of that remain", "That coupon has
+       * expired") and are worth reading.
+       *
+       * Anything else is a browser string. A dropped connection throws a
+       * TypeError reading "Failed to fetch", and showing that put untranslated
+       * English in front of an Arabic customer at the payment step, where it
+       * reads as the shop breaking rather than the network dropping.
+       */
+      const fromServer = error instanceof CheckoutError && error.message;
       setServerError(
-        error instanceof Error
+        fromServer
           ? error.message
           : rtl
-            ? "تعذّر إتمام الطلب."
-            : "We could not place the order.",
+            ? "تعذّر الاتصال. تحقّق من اتصالك وأعد المحاولة — لن يُسجّل طلبك مرتين."
+            : "We could not reach the shop. Check your connection and try again — your order cannot be placed twice.",
       );
     } finally {
       setSubmitting(false);

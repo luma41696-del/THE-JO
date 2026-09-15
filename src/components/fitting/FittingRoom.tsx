@@ -13,6 +13,7 @@ import { avatarFromProfile } from "@/lib/fitting/avatar";
 import { SKIP_TEXT, isBuyable, suggestLook, type SkipReason } from "@/lib/fitting/suggest";
 import { hasDesigns, resolveSelection } from "@/lib/product";
 import { getIdToken } from "@/lib/firebase/auth";
+import { ApiError, errorMessage, readJson } from "@/lib/errors";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { useCart } from "@/lib/store/cart";
 import { useUI } from "@/lib/store/ui";
@@ -361,15 +362,20 @@ export function FittingRoom({
         },
         body: JSON.stringify({ outfit: { items } }),
       });
-      const data = (await response.json()) as { ok?: boolean; id?: string; error?: string };
-      if (!response.ok || !data.ok || !data.id) throw new Error(data.error ?? "Could not save.");
+      const data = await readJson<{ ok?: boolean; id?: string; error?: string }>(response);
+      if (!data.id) throw new ApiError("");
 
       setSavedOutfits((current) => [
         { id: data.id!, uid, items, createdAt: Date.now() },
         ...current,
       ]);
     } catch (error) {
-      setLookError(error instanceof Error ? error.message : "Could not save this look.");
+      setLookError(
+        errorMessage(error, locale, {
+          en: "This look could not be saved.",
+          ar: "تعذّر حفظ هذه الإطلالة.",
+        }),
+      );
     } finally {
       setSavingLook(false);
     }
@@ -386,10 +392,14 @@ export function FittingRoom({
         method: "DELETE",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      const data = (await response.json()) as { ok?: boolean; error?: string };
-      if (!response.ok || !data.ok) throw new Error(data.error ?? "Could not delete.");
+      await readJson(response);
     } catch (error) {
-      setLookError(error instanceof Error ? error.message : "Could not delete that look.");
+      setLookError(
+        errorMessage(error, locale, {
+          en: "That look could not be deleted.",
+          ar: "تعذّر حذف الإطلالة.",
+        }),
+      );
     }
   }
 
