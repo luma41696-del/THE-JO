@@ -29,6 +29,20 @@ import type { Locale } from "@/types";
  * served the English page about as often as not.
  */
 
+/**
+ * Regenerate hourly.
+ *
+ * Without this Next renders the sitemap **once at build time**, so it would
+ * describe the catalogue as it stood at the last deploy. A shop that hides a
+ * product on Tuesday would keep pointing crawlers at it until someone
+ * happened to ship code — which is exactly the "sitemap lists pages that do
+ * not exist" failure the visibility filter above is meant to prevent.
+ *
+ * An hour matches the storefront's own ISR window, so the sitemap and the
+ * pages it points at go stale and refresh together rather than disagreeing.
+ */
+export const revalidate = 3600;
+
 /** Routes with no data behind them. */
 const STATIC_PATHS = [
   { path: "", priority: 1, changeFrequency: "daily" as const },
