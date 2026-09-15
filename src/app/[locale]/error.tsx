@@ -4,6 +4,7 @@ import { useEffect } from "react";
 
 import { Link } from "@/components/ui/Link";
 import { useI18n } from "@/components/providers/LocaleProvider";
+import { reportError } from "@/lib/monitoring/report";
 import { BrandWave } from "@/components/brand/BrandWave";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
@@ -27,9 +28,11 @@ export default function ErrorBoundary({
   const ar = locale === "ar";
 
   useEffect(() => {
-    // Replace with your error reporter (Sentry, Firebase Crashlytics, …).
-    console.error("[net sale] Route error", error.digest ?? error.message);
-  }, [error]);
+    // Reported, not just logged. A `console.error` on a live shop goes into a
+    // browser nobody is watching — the customer knew the page broke and no
+    // one else ever did.
+    reportError(error, "route", locale);
+  }, [error, locale]);
 
   return (
     <div className="ns-container flex min-h-screen flex-col items-center justify-center py-24 text-center">

@@ -20,6 +20,7 @@ import {
   demoTickets,
   type CustomerSummary,
 } from "@/data/demo-operations";
+import type { ErrorReport } from "@/lib/monitoring/fingerprint";
 import type {
   AnalyticsEvent,
   Banner,
@@ -185,6 +186,29 @@ export const getOrderNotifications = cache(async (orderId: string): Promise<Noti
     return snap.docs
       .map((d) => serialise<Notification>({ ...d.data(), id: d.id }))
       .sort((a, b) => b.queuedAt - a.queuedAt);
+  } catch {
+    return [];
+  }
+});
+
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Crash reports, worst first.
+ *
+ * No demo fallback: an empty list must mean "nothing has crashed", never
+ * "here are some plausible-looking failures". Inventing errors would send
+ * somebody hunting a bug that does not exist.
+ */
+export const getErrorReports = cache(async (): Promise<ErrorReport[]> => {
+  try {
+    const { getAdminDb } = await import("@/lib/firebase/admin");
+    const snap = await getAdminDb()
+      .collection("errorReports")
+      .orderBy("count", "desc")
+      .limit(50)
+      .get();
+    return snap.docs.map((d) => serialise<ErrorReport>(d.data()));
   } catch {
     return [];
   }

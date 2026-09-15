@@ -4,6 +4,8 @@ import { useEffect } from "react";
 
 import "./globals.css";
 
+import { reportError } from "@/lib/monitoring/report";
+
 /**
  * The last line of defence.
  *
@@ -30,8 +32,13 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Replace with your error reporter (Sentry, Firebase Crashlytics, …).
-    console.error("[net sale] Global error", error.digest ?? error.message);
+    /*
+     * The one import this file makes, and it is deliberate: `reportError` is
+     * dependency-free for exactly this reason. Everything else here stays
+     * inline, because the reason we are rendering may be that a provider, a
+     * stylesheet or the router failed.
+     */
+    reportError(error, "global");
   }, [error]);
 
   return (

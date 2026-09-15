@@ -1,11 +1,13 @@
 import { Dashboard } from "@/components/admin/Dashboard";
 import { LowStockPanel } from "@/components/admin/LowStockPanel";
+import { ErrorReports } from "@/components/admin/ErrorReports";
 import {
   adminNow,
   getAdminCategories,
   getAdminOrders,
   getAdminProducts,
   getAdminTickets,
+  getErrorReports,
 } from "@/lib/admin/data";
 import { getStoreSettings } from "@/lib/settings";
 import { lowStockAlerts } from "@/lib/stock";
@@ -13,13 +15,14 @@ import { lowStockAlerts } from "@/lib/stock";
 export const metadata = { title: "Dashboard" };
 
 export default async function AdminDashboardPage() {
-  const [{ rows: orders, live }, { rows: tickets }, categories, products, settings] =
+  const [{ rows: orders, live }, { rows: tickets }, categories, products, settings, errors] =
     await Promise.all([
       getAdminOrders(),
       getAdminTickets(),
       getAdminCategories(),
       getAdminProducts(),
       getStoreSettings(),
+      getErrorReports(),
     ]);
 
   const categoryNames = Object.fromEntries(categories.map((c) => [c.id, c.name.en]));
@@ -46,8 +49,14 @@ export default async function AdminDashboardPage() {
         opens, which is the point — a reorder list nobody navigates to is a
         reorder list nobody reads.
       */}
-      <div className="mt-6">
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <LowStockPanel alerts={alerts} threshold={settings.lowStockThreshold} />
+        {/*
+          Beside the buying queue rather than buried on its own page. Both
+          answer "what needs a person today", and an error list nobody
+          navigates to is an error list nobody reads.
+        */}
+        <ErrorReports reports={errors} />
       </div>
     </>
   );

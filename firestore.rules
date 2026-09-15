@@ -383,6 +383,22 @@ service cloud.firestore {
     }
 
     /* ---------------------------------------------------------------- */
+    /*  Error reports — staff read, server write                         */
+    /* ---------------------------------------------------------------- */
+
+    match /errorReports/{fingerprint} {
+      allow read: if isStaff();
+
+      /*
+       * Written only by `/api/errors` with the Admin SDK. A collection every
+       * visitor could write to is a collection every visitor could fill, and
+       * one they could edit is one where a real crash can be made to
+       * disappear.
+       */
+      allow write: if false;
+    }
+
+    /* ---------------------------------------------------------------- */
     /*  Counters — server-only sequences                                 */
     /* ---------------------------------------------------------------- */
 
