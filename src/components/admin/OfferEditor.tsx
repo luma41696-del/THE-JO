@@ -8,6 +8,8 @@ import { transition } from "@/lib/motion";
 import { getIdToken } from "@/lib/firebase/auth";
 import { offerStatus } from "@/lib/offers";
 import { Button } from "@/components/ui/Button";
+import { useAdminLocale } from "./AdminLocale";
+import type { AdminKey } from "@/lib/i18n/admin";
 import type { Category, Offer, OfferStatus, OfferType, Product } from "@/types";
 
 /**
@@ -58,11 +60,11 @@ function fromLocalInput(value: string): number {
   return guess - drift;
 }
 
-const STATUS_LABELS: Record<OfferStatus, string> = {
-  draft: "Draft — not usable yet",
-  active: "Active — customers can use it",
-  paused: "Paused — kept, but refused",
-  archived: "Archived — closed for good",
+const STATUS_KEYS: Record<OfferStatus, AdminKey> = {
+  draft: "oe.statusDraft",
+  active: "oe.statusActive",
+  paused: "oe.statusPaused",
+  archived: "oe.statusArchived",
 };
 
 export interface OfferEditorProps {
@@ -161,6 +163,7 @@ export function OfferEditor({
   onClose,
   onSaved,
 }: OfferEditorProps) {
+  const { t } = useAdminLocale();
   const [draft, setDraft] = useState<Draft>(() => toDraft(offer));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -186,32 +189,38 @@ export function OfferEditor({
    */
   const summary = useMemo(() => {
     const bits: string[] = [];
-    if (isFree) bits.push("Free delivery");
+    if (isFree) bits.push(t("oe.freeDelivery"));
     else if (isPercentage) {
-      bits.push(`${draft.value}% off`);
-      if (draft.maxDiscount !== "") bits.push(`up to ${draft.maxDiscount} JOD`);
-    } else bits.push(`${draft.value} JOD off`);
+      bits.push(`${draft.value}% ${t("oe.sumOff")}`);
+      if (draft.maxDiscount !== "") bits.push(`${t("oe.sumUpTo")} ${draft.maxDiscount} JOD`);
+    } else bits.push(`${draft.value} JOD ${t("oe.sumOff")}`);
 
     const scope = draft.appliesToCategoryIds.length + draft.appliesToProductIds.length;
-    bits.push(scope === 0 ? "on everything" : `on ${scope} selected ${scope === 1 ? "group" : "groups"}`);
+    bits.push(
+      scope === 0
+        ? t("oe.sumEverything")
+        : scope === 1
+          ? t("oe.sumOnGroup")
+          : `${scope} ${t("oe.sumOnGroups")}`,
+    );
 
     const excluded = draft.excludesCategoryIds.length + draft.excludesProductIds.length;
-    if (excluded > 0) bits.push(`excluding ${excluded}`);
-    if (draft.minSubtotal !== "") bits.push(`over ${draft.minSubtotal} JOD`);
-    if (draft.firstOrderOnly) bits.push("first order only");
-    if (draft.assignedUid) bits.push("one account only");
-    if (draft.perUserLimit !== "") bits.push(`${draft.perUserLimit} per customer`);
-    if (draft.usageLimit !== "") bits.push(`${draft.usageLimit} in total`);
-    bits.push(draft.stackable ? "stacks with sales" : "does not stack with sales");
+    if (excluded > 0) bits.push(`${t("oe.sumExcluding")} ${excluded}`);
+    if (draft.minSubtotal !== "") bits.push(`${t("oe.sumOver")} ${draft.minSubtotal} JOD`);
+    if (draft.firstOrderOnly) bits.push(t("oe.sumFirstOrder"));
+    if (draft.assignedUid) bits.push(t("oe.sumOneAccount"));
+    if (draft.perUserLimit !== "") bits.push(`${draft.perUserLimit} ${t("oe.sumPerCustomer")}`);
+    if (draft.usageLimit !== "") bits.push(`${draft.usageLimit} ${t("oe.sumInTotal")}`);
+    bits.push(draft.stackable ? t("oe.sumStacks") : t("oe.sumNoStack"));
     return bits.join(" · ");
-  }, [draft, isFree, isPercentage]);
+  }, [draft, isFree, isPercentage, t]);
 
   async function save() {
     setError(null);
 
-    if (!draft.code.trim()) return setError("A code is required.");
+    if (!draft.code.trim()) return setError(t("oe.codeRequired"));
     if (!draft.titleEn.trim() || !draft.titleAr.trim()) {
-      return setError("A title is required in both English and Arabic.");
+      return setError(t("oe.titleRequired"));
     }
 
     setSaving(true);
@@ -255,11 +264,11 @@ export function OfferEditor({
         error?: string;
         persisted?: boolean;
       };
-      if (!response.ok || !data.ok) throw new Error(data.error ?? "Save failed");
+      if (!response.ok || !data.ok) throw new Error(data.error ?? t("oe.saveFailed"));
 
       if (data.persisted === false) {
         setError(
-          "Validated, but not stored: Firebase Admin is not configured in this environment.",
+          t("oe.notStored"),
         );
         setSaving(false);
         return;
@@ -268,7 +277,7 @@ export function OfferEditor({
       onSaved();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "The coupon could not be saved.");
+      setError(err instanceof Error ? err.message : t("oe.saveError"));
     } finally {
       setSaving(false);
     }
@@ -287,7 +296,7 @@ export function OfferEditor({
           />
           <motion.aside
             role="dialog"
-            aria-label={offer ? `Edit ${offer.code}` : "New coupon"}
+            aria-label={offer ? `${t("oe.edit")} ${offer.code}` : t("oe.newCoupon")}
             className="bg-paper border-line fixed inset-y-0 end-0 z-[160] flex w-full max-w-lg flex-col border-s"
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
@@ -297,7 +306,7 @@ export function OfferEditor({
             <header className="border-line flex items-center justify-between border-b px-5 py-4">
               <div>
                 <h2 className="font-display text-ink text-lg font-semibold">
-                  {offer ? `Edit ${offer.code}` : "New coupon"}
+                  {offer ? `${t("oe.edit")} ${offer.code}` : t("oe.newCoupon")}
                 </h2>
                 {offer && (
                   <p className="text-mist mt-0.5 text-[0.75rem] tabular-nums">
@@ -308,7 +317,7 @@ export function OfferEditor({
               <button
                 type="button"
                 onClick={onClose}
-                aria-label="Close"
+                aria-label={t("common.close")}
                 className="text-mist hover:text-ink cursor-pointer p-2 transition-colors"
               >
                 ✕
@@ -317,7 +326,7 @@ export function OfferEditor({
 
             <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
               <div className="grid gap-4">
-                <Row label="Code" hint="Upper-case, no spaces. This is what customers type.">
+                <Row label={t("oe.codeLabel")} hint={t("oe.codeHint")}>
                   <input
                     value={draft.code}
                     onChange={(e) => set("code", e.target.value.toUpperCase())}
@@ -326,21 +335,21 @@ export function OfferEditor({
                   />
                 </Row>
 
-                <Row label="Reward">
+                <Row label={t("oe.reward")}>
                   <select
                     value={draft.type}
                     onChange={(e) => set("type", e.target.value as OfferType)}
                     className={inputClass}
                   >
-                    <option value="percentage">Percentage off</option>
-                    <option value="fixed">Fixed amount off</option>
-                    <option value="free-shipping">Free delivery</option>
+                    <option value="percentage">{t("oe.percentageOff")}</option>
+                    <option value="fixed">{t("oe.fixedOff")}</option>
+                    <option value="free-shipping">{t("oe.freeDelivery")}</option>
                   </select>
                 </Row>
 
                 {!isFree && (
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <Row label={isPercentage ? "Percent off" : "Amount off (JOD)"}>
+                    <Row label={isPercentage ? t("oe.percentOff") : t("oe.amountOff")}>
                       <input
                         type="number"
                         min={0}
@@ -352,8 +361,8 @@ export function OfferEditor({
                     </Row>
                     {isPercentage && (
                       <Row
-                        label="Cap (JOD)"
-                        hint="Blank means uncapped — rarely what you want."
+                        label={t("oe.cap")}
+                        hint={t("oe.capHint")}
                       >
                         <input
                           type="number"
@@ -371,7 +380,7 @@ export function OfferEditor({
                 )}
 
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Row label="Title (English)">
+                  <Row label={t("oe.titleEn")}>
                     <input
                       value={draft.titleEn}
                       onChange={(e) => set("titleEn", e.target.value)}
@@ -389,7 +398,7 @@ export function OfferEditor({
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Row label="Starts" hint="Amman time">
+                  <Row label={t("oe.startsLabel")} hint={t("oe.ammanTime")}>
                     <input
                       type="datetime-local"
                       value={draft.startsAt}
@@ -397,7 +406,7 @@ export function OfferEditor({
                       className={inputClass}
                     />
                   </Row>
-                  <Row label="Ends" hint="Amman time">
+                  <Row label={t("oe.endsLabel")} hint={t("oe.ammanTime")}>
                     <input
                       type="datetime-local"
                       value={draft.endsAt}
@@ -408,7 +417,7 @@ export function OfferEditor({
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-3">
-                  <Row label="Min spend">
+                  <Row label={t("oe.minSpend")}>
                     <input
                       type="number"
                       min={0}
@@ -420,7 +429,7 @@ export function OfferEditor({
                       className={inputClass}
                     />
                   </Row>
-                  <Row label="Total limit">
+                  <Row label={t("oe.totalLimit")}>
                     <input
                       type="number"
                       min={0}
@@ -432,7 +441,7 @@ export function OfferEditor({
                       className={inputClass}
                     />
                   </Row>
-                  <Row label="Per customer">
+                  <Row label={t("oe.perCustomer")}>
                     <input
                       type="number"
                       min={0}
@@ -447,8 +456,8 @@ export function OfferEditor({
                 </div>
 
                 <MultiSelect
-                  label="Applies to categories"
-                  hint="Empty means the whole catalogue."
+                  label={t("oe.appliesCategories")}
+                  hint={t("oe.appliesHint")}
                   options={categories.map((c) => ({
                     id: c.id,
                     label: `${"— ".repeat(c.depth)}${c.name.en}`,
@@ -458,8 +467,8 @@ export function OfferEditor({
                 />
 
                 <MultiSelect
-                  label="Excluded categories"
-                  hint="Wins over the includes above."
+                  label={t("oe.excludedCategories")}
+                  hint={t("oe.excludedHint")}
                   options={categories.map((c) => ({
                     id: c.id,
                     label: `${"— ".repeat(c.depth)}${c.name.en}`,
@@ -469,15 +478,15 @@ export function OfferEditor({
                 />
 
                 <MultiSelect
-                  label="Excluded products"
+                  label={t("oe.excludedProducts")}
                   options={products.map((p) => ({ id: p.id, label: p.title.en }))}
                   selected={draft.excludesProductIds}
                   onChange={(v) => set("excludesProductIds", v)}
                 />
 
                 <Row
-                  label="Restrict to one account (uid)"
-                  hint="For a personal gift or apology code. Leave blank for everyone."
+                  label={t("oe.restrictUid")}
+                  hint={t("oe.restrictHint")}
                 >
                   <input
                     value={draft.assignedUid}
@@ -494,9 +503,9 @@ export function OfferEditor({
                     className="accent-brand mt-0.5"
                   />
                   <span className="text-ink text-[0.8125rem]">
-                    First order only
+                    {t("oe.firstOrderOnly")}
                     <span className="text-mist block text-[0.6875rem]">
-                      Refused once the account has a completed order.
+                      {t("oe.firstOrderHint")}
                     </span>
                   </span>
                 </label>
@@ -509,22 +518,22 @@ export function OfferEditor({
                     className="accent-brand mt-0.5"
                   />
                   <span className="text-ink text-[0.8125rem]">
-                    May combine with sale prices
+                    {t("oe.stackable")}
                     <span className="text-mist block text-[0.6875rem]">
-                      Off by default. Stacking a code on a sale is how 20% and 30% become 50%.
+                      {t("oe.stackableHint")}
                     </span>
                   </span>
                 </label>
 
-                <Row label="Status">
+                <Row label={t("gift.statusLabel")}>
                   <select
                     value={draft.status}
                     onChange={(e) => set("status", e.target.value as OfferStatus)}
                     className={inputClass}
                   >
-                    {(Object.keys(STATUS_LABELS) as OfferStatus[]).map((s) => (
+                    {(Object.keys(STATUS_KEYS) as OfferStatus[]).map((s) => (
                       <option key={s} value={s}>
-                        {STATUS_LABELS[s]}
+                        {t(STATUS_KEYS[s])}
                       </option>
                     ))}
                   </select>
@@ -532,7 +541,7 @@ export function OfferEditor({
 
                 <div className="bg-paper-sunken rounded-md p-3.5">
                   <p className="text-mist text-[0.6875rem] tracking-[0.12em] uppercase">
-                    In plain words
+                    {t("oe.inPlainWords")}
                   </p>
                   <p className="text-ink mt-1.5 text-[0.8125rem]">{summary}</p>
                 </div>
@@ -551,10 +560,10 @@ export function OfferEditor({
                 onClick={onClose}
                 className="text-smoke hover:text-ink cursor-pointer text-[0.8125rem]"
               >
-                Cancel
+                {t("common.cancel")}
               </button>
               <Button variant="brand" size="md" loading={saving} onClick={save}>
-                {offer ? "Save changes" : "Create coupon"}
+                {offer ? t("oe.saveChanges") : t("oe.createCoupon")}
               </Button>
             </footer>
           </motion.aside>
@@ -607,6 +616,7 @@ function MultiSelect({
   selected: string[];
   onChange: (next: string[]) => void;
 }) {
+  const { t } = useAdminLocale();
   const [query, setQuery] = useState("");
   const shown = useMemo(
     () =>
@@ -621,7 +631,9 @@ function MultiSelect({
       <span className="text-ink-muted mb-1.5 block text-[0.75rem]">
         {label}
         {selected.length > 0 && (
-          <span className="text-brand ms-2 tabular-nums">{selected.length} selected</span>
+          <span className="text-brand ms-2 tabular-nums">
+            {selected.length} {t("oe.selected")}
+          </span>
         )}
       </span>
 
@@ -629,14 +641,14 @@ function MultiSelect({
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Filter…"
+          placeholder={t("oe.filter")}
           className={cn(inputClass, "mb-2")}
         />
       )}
 
       <div className="border-line max-h-40 overflow-y-auto rounded-md border p-2">
         {shown.length === 0 ? (
-          <p className="text-mist p-2 text-[0.75rem]">Nothing matches.</p>
+          <p className="text-mist p-2 text-[0.75rem]">{t("oe.nothingMatches")}</p>
         ) : (
           shown.map((option) => {
             const on = selected.includes(option.id);

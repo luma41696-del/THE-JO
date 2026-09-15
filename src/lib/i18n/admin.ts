@@ -3,25 +3,26 @@ import type { Locale } from "@/types";
 /**
  * Admin strings.
  *
- * The shell used to say, in a comment, that "a half-translated admin is worse
- * than one language done properly" — and it was right, as a defence of leaving
- * it alone. It is not a reason to refuse an Arabic-speaking operator the parts
- * that *can* be done properly.
+ * This file used to describe a boundary: the chrome was translated, and the
+ * eleven operational boards were "honestly in English", on the argument that a
+ * board translated halfway is worse than one that is not translated at all.
  *
- * So the boundary is drawn deliberately rather than by neglect:
+ * The argument was sound and the boundary is now gone — every board is here.
+ * Orders, products, customers, invoices, support, reviews, offers, the gift
+ * game, the warehouse, behaviour, categories, access, and all four editors.
+ * The shell no longer warns the operator that half the tool will stay English,
+ * because it no longer does.
  *
- *   **Translated** — the chrome every screen shows (navigation, account,
- *   sign out), and the screens added since this decision: Settings, Delivery,
- *   and the low-stock queue.
+ * What is deliberately *not* translated:
  *
- *   **English** — the eleven operational boards that predate it (orders,
- *   products, invoices, offers, reviews, behaviour and the rest). They are
- *   dense, and a board translated halfway is genuinely worse than one that is
- *   honestly in English.
- *
- * Which screens are which is visible to the operator, not hidden: switching to
- * Arabic says so. Adding a board to the translated set is adding its keys
- * here, not rebuilding anything.
+ *   - **Shop data.** A product's title, a category's name and a coupon's code
+ *     are the merchant's own words. They are shown in the operator's language
+ *     where the record carries both, and verbatim where it does not.
+ *   - **Field labels that name a language.** "الاسم (عربي)" labels the Arabic
+ *     input whichever language the tool is in; translating it would leave two
+ *     identically-labelled boxes.
+ *   - **Examples and placeholders** — SUMMER20, name@example.com, a sample
+ *     path. They are illustrations of a format, not sentences.
  */
 
 export type AdminDict = Record<string, Record<Locale, string>>;
@@ -61,15 +62,932 @@ export const ADMIN_STRINGS = {
     en: "Firestore has no orders yet, so these screens are showing a generated 120-day history.",
     ar: "لا توجد طلبات في Firestore بعد، لذا تعرض هذه الشاشات سجلاً مولّداً لمئة وعشرين يوماً.",
   },
-  /*
-   * Said out loud when Arabic is chosen. An operator who switches languages
-   * and finds half the tool unchanged should have been told, not left to
-   * wonder whether something failed to load.
-   */
-  "shell.partial": {
-    en: "Settings, Delivery, Access and the dashboard queue are in Arabic. The trading boards are English.",
-    ar: "الإعدادات والتوصيل والصلاحيات وقائمة المخزون بالعربية. أما شاشات التشغيل الأخرى فبالإنجليزية.",
+
+
+  /* ------------------------------------------------------------------ */
+  /*  Statuses — rendered on nearly every board                          */
+  /* ------------------------------------------------------------------ */
+
+  "status.order.pending": { en: "Awaiting payment", ar: "بانتظار الدفع" },
+  "status.order.paid": { en: "Paid", ar: "مدفوع" },
+  "status.order.processing": { en: "Processing", ar: "قيد التجهيز" },
+  "status.order.packed": { en: "Packed", ar: "مُغلَّف" },
+  "status.order.shipped": { en: "Shipped", ar: "شُحن" },
+  "status.order.out-for-delivery": { en: "Out for delivery", ar: "خرج للتوصيل" },
+  "status.order.delivered": { en: "Delivered", ar: "وصل" },
+  "status.order.cancelled": { en: "Cancelled", ar: "ملغى" },
+  "status.order.refunded": { en: "Refunded", ar: "مُسترجع" },
+
+  "status.ticket.open": { en: "Open", ar: "مفتوحة" },
+  "status.ticket.pending": { en: "Waiting", ar: "بانتظار العميل" },
+  "status.ticket.resolved": { en: "Resolved", ar: "تم الحل" },
+  "status.ticket.closed": { en: "Closed", ar: "مغلقة" },
+
+  "status.invoice.draft": { en: "Draft", ar: "مسودة" },
+  "status.invoice.issued": { en: "Issued", ar: "صادرة" },
+  "status.invoice.paid": { en: "Paid", ar: "مدفوعة" },
+  "status.invoice.credited": { en: "Credited", ar: "إشعار دائن" },
+
+  "priority.low": { en: "Low", ar: "منخفضة" },
+  "priority.normal": { en: "Normal", ar: "عادية" },
+  "priority.high": { en: "High", ar: "مرتفعة" },
+  "priority.urgent": { en: "Urgent", ar: "عاجلة" },
+
+  /* ------------------------------------------------------------------ */
+  /*  Shared vocabulary — one key per word, reused across the boards     */
+  /* ------------------------------------------------------------------ */
+
+  "common.search": { en: "Search", ar: "بحث" },
+  "common.export": { en: "Export", ar: "تصدير" },
+  "common.all": { en: "All", ar: "الكل" },
+  "common.of": { en: "of", ar: "من" },
+  "common.empty": { en: "Nothing here yet.", ar: "لا شيء هنا بعد." },
+  "common.noMatch": { en: "Nothing matches your search.", ar: "لا نتائج مطابقة لبحثك." },
+  "common.save": { en: "Save", ar: "حفظ" },
+  "common.cancel": { en: "Cancel", ar: "إلغاء" },
+  "common.delete": { en: "Delete", ar: "حذف" },
+  "common.close": { en: "Close", ar: "إغلاق" },
+  "common.edit": { en: "Edit", ar: "تعديل" },
+  "common.add": { en: "Add", ar: "إضافة" },
+  "common.none": { en: "None", ar: "لا شيء" },
+  "common.other": { en: "Other", ar: "أخرى" },
+
+  "col.order": { en: "Order", ar: "الطلب" },
+  "col.reference": { en: "Reference", ar: "الرقم المرجعي" },
+  "col.customer": { en: "Customer", ar: "العميل" },
+  "col.email": { en: "Email", ar: "البريد" },
+  "col.city": { en: "City", ar: "المدينة" },
+  "col.placed": { en: "Placed", ar: "تاريخ الطلب" },
+  "col.date": { en: "Date", ar: "التاريخ" },
+  "col.status": { en: "Status", ar: "الحالة" },
+  "col.payment": { en: "Payment", ar: "الدفع" },
+  "col.total": { en: "Total", ar: "الإجمالي" },
+  "col.subtotal": { en: "Subtotal", ar: "المجموع الفرعي" },
+  "col.shipping": { en: "Shipping", ar: "الشحن" },
+  "col.tax": { en: "Tax", ar: "الضريبة" },
+  "col.items": { en: "Items", ar: "القطع" },
+  "col.units": { en: "Units", ar: "الوحدات" },
+  "col.revenue": { en: "Revenue", ar: "الإيرادات" },
+  "col.orders": { en: "Orders", ar: "الطلبات" },
+  "col.product": { en: "Product", ar: "المنتج" },
+  "col.tracking": { en: "Tracking", ar: "رقم التتبّع" },
+
+  /* ---- dashboard ---- */
+  "dash.title": { en: "Dashboard", ar: "لوحة المتابعة" },
+  "dash.subtitle": {
+    en: "Trading performance and today's queue.",
+    ar: "أداء المبيعات وقائمة اليوم.",
   },
+  "dash.averageOrder": { en: "Average order", ar: "متوسط الطلب" },
+  "dash.unitsSold": { en: "Units sold", ar: "الوحدات المباعة" },
+  "dash.needsFulfilment": { en: "Needs fulfilment", ar: "بانتظار التجهيز" },
+  "dash.needsFulfilmentHint": {
+    en: "Oldest first — these are paid and waiting.",
+    ar: "الأقدم أولاً — هذه مدفوعة وتنتظر.",
+  },
+  "dash.queueEmpty": {
+    en: "Nothing waiting. Every paid order has been packed.",
+    ar: "لا شيء ينتظر. كل طلب مدفوع تم تغليفه.",
+  },
+  "dash.fulfilmentQueue": { en: "Fulfilment queue", ar: "مراحل التجهيز" },
+  "dash.paidNotStarted": { en: "Paid, not started", ar: "مدفوع، لم يبدأ" },
+  "dash.inTransit": { en: "In transit", ar: "في الطريق" },
+  "dash.bestSellers": { en: "Best sellers", ar: "الأكثر مبيعاً" },
+  "dash.bestSellersHint": {
+    en: "By units — revenue ranks them differently.",
+    ar: "بعدد الوحدات — الترتيب بالإيراد يختلف.",
+  },
+  "dash.revenueByCategory": { en: "Revenue by category", ar: "الإيراد حسب القسم" },
+  "dash.revenueByCategoryHint": {
+    en: "Share of kept revenue in the window.",
+    ar: "حصة كل قسم من الإيراد المحتفظ به في الفترة.",
+  },
+  "dash.unitsByCategory": { en: "Units by category", ar: "الوحدات حسب القسم" },
+  "dash.unitsByCategoryHint": {
+    en: "Volume, which does not track revenue.",
+    ar: "الكمية، وهي لا تسير مع الإيراد بالضرورة.",
+  },
+
+  /* ---- orders ---- */
+  "orders.title": { en: "Orders", ar: "الطلبات" },
+  "orders.subtitle": {
+    en: "Every order, with the queue that still needs a person first.",
+    ar: "كل الطلبات، وما يحتاج تدخّلاً بشرياً في المقدمة.",
+  },
+  "orders.needsAction": { en: "Needs action", ar: "يحتاج إجراء" },
+  "orders.searchLabel": { en: "Search orders", ar: "ابحث في الطلبات" },
+  "orders.searchPlaceholder": {
+    en: "Reference, customer, tracking…",
+    ar: "الرقم المرجعي، العميل، التتبّع…",
+  },
+  "orders.queueClear": {
+    en: "Nothing waiting — every paid order has been dealt with.",
+    ar: "لا شيء ينتظر — كل طلب مدفوع عولج.",
+  },
+  "orders.noneInState": { en: "No orders in this state.", ar: "لا طلبات في هذه الحالة." },
+
+  /* ---- one order ---- */
+  "order.updateFailed": { en: "Update failed", ar: "فشل التحديث" },
+  "order.savedLocally": {
+    en: "Saved locally only — Firebase Admin is not configured, so this change was not written to Firestore.",
+    ar: "حُفظ محلياً فقط — لم يُهيّأ Firebase Admin، فلم يُكتب هذا التغيير في Firestore.",
+  },
+  "order.updateError": { en: "Could not update the order.", ar: "تعذّر تحديث الطلب." },
+  "order.trackingPlaceholder": { en: "Tracking number", ar: "رقم التتبّع" },
+  "order.noAction": { en: "No further action", ar: "لا إجراء إضافي" },
+  "order.cancel": { en: "Cancel order", ar: "إلغاء الطلب" },
+  "order.markAs": { en: "Mark", ar: "اجعله" },
+  "order.items": { en: "Items", ar: "القطع" },
+  "order.lines": { en: "lines", ar: "سطر" },
+  "order.history": { en: "History", ar: "السجل" },
+  "order.totals": { en: "Totals", ar: "الإجماليات" },
+  "order.discount": { en: "Discount", ar: "الخصم" },
+  "order.delivery": { en: "Delivery", ar: "التوصيل" },
+  "order.free": { en: "Free", ar: "مجاني" },
+
+  "dash.range.7d": { en: "7 days", ar: "٧ أيام" },
+  "dash.range.30d": { en: "30 days", ar: "٣٠ يوماً" },
+  "dash.range.90d": { en: "90 days", ar: "٩٠ يوماً" },
+  "dash.range.12m": { en: "12 months", ar: "١٢ شهراً" },
+  "dash.vsPrevious": { en: "vs previous", ar: "مقارنة بالسابقة" },
+  "dash.days": { en: "days", ar: "يوماً" },
+  "dash.open": { en: "Open", ar: "افتح" },
+  "dash.ticketNeedsReply": { en: "ticket needs a reply", ar: "محادثة تنتظر رداً" },
+  "dash.ticketsNeedReply": { en: "tickets need a reply", ar: "محادثات تنتظر رداً" },
+  "dash.salesExport": { en: "net sale — sales", ar: "نت سيل — المبيعات" },
+
+  /* ---- products ---- */
+  "products.title": { en: "Products", ar: "المنتجات" },
+  "products.subtitle": { en: "The catalogue, lowest stock first.", ar: "الكتالوج، الأقل مخزوناً أولاً." },
+  "products.lowStock": { en: "Low stock", ar: "مخزون منخفض" },
+  "products.onSale": { en: "On sale", ar: "عليه تخفيض" },
+  "products.draft": { en: "Draft", ar: "مسودة" },
+  "col.category": { en: "Category", ar: "القسم" },
+  "col.price": { en: "Price", ar: "السعر" },
+  "col.stock": { en: "Stock", ar: "المخزون" },
+  "col.variants": { en: "Variants", ar: "الخيارات" },
+  "col.titleEn": { en: "Title (EN)", ar: "الاسم (إنجليزي)" },
+  "col.titleAr": { en: "Title (AR)", ar: "الاسم (عربي)" },
+  "col.slug": { en: "Slug", ar: "المعرّف" },
+  "col.compareAt": { en: "Compare at", ar: "السعر قبل الخصم" },
+  "col.colours": { en: "Colours", ar: "الألوان" },
+  "col.sizes": { en: "Sizes", ar: "المقاسات" },
+
+  /* ---- customers ---- */
+  "customers.title": { en: "Customers", ar: "العملاء" },
+  "customers.subtitle": {
+    en: "Derived from the order history, so these figures can never disagree with it.",
+    ar: "مشتقّة من سجل الطلبات، فلا يمكن أن تخالفه هذه الأرقام.",
+  },
+  "customers.repeatRate": { en: "Repeat rate", ar: "نسبة التكرار" },
+  "customers.returning": { en: "returning", ar: "عائد" },
+  "customers.revenueFromRepeats": { en: "Revenue from repeats", ar: "إيراد العملاء المتكررين" },
+  "customers.averageLifetime": { en: "Average lifetime value", ar: "متوسط القيمة الدائمة" },
+  "customers.lifetimeValue": { en: "Lifetime value", ar: "القيمة الدائمة" },
+  "customers.lastOrder": { en: "Last order", ar: "آخر طلب" },
+  "customers.firstOrder": { en: "First order", ar: "أول طلب" },
+  "customers.name": { en: "Name", ar: "الاسم" },
+  "customers.repeat": { en: "repeat", ar: "متكرر" },
+  "customers.searchLabel": { en: "Search customers", ar: "ابحث في العملاء" },
+  "customers.searchPlaceholder": { en: "Name, email, city…", ar: "الاسم، البريد، المدينة…" },
+  "customers.empty": { en: "No customers yet.", ar: "لا عملاء بعد." },
+  "customers.daysAgo": { en: "d ago", ar: " يوماً" },
+
+  /* ---- invoices ---- */
+  "invoices.title": { en: "Invoices", ar: "الفواتير" },
+  "invoices.subtitle": {
+    en: "Sequential and gapless. A credited invoice is reversed, never removed.",
+    ar: "متسلسلة بلا فجوات. الفاتورة الدائنة تُعكس ولا تُحذف أبداً.",
+  },
+  "invoices.invoice": { en: "Invoice", ar: "الفاتورة" },
+  "invoices.billedTo": { en: "Billed to", ar: "الفاتورة باسم" },
+  "invoices.issued": { en: "Issued", ar: "تاريخ الإصدار" },
+
+  /* ---- reviews ---- */
+  "reviews.title": { en: "Reviews", ar: "التقييمات" },
+  "reviews.subtitle": {
+    en: "Publish, hold or reply. Customer words and ratings are never edited.",
+    ar: "انشر أو علّق أو ردّ. كلام العميل وتقييمه لا يُعدَّلان أبداً.",
+  },
+  "reviews.published": { en: "Published", ar: "منشور" },
+  "reviews.pending": { en: "Pending", ar: "بانتظار المراجعة" },
+  "reviews.hidden": { en: "Hidden", ar: "مخفي" },
+  "reviews.waiting": { en: "Waiting", ar: "بالانتظار" },
+  "reviews.withReviews": { en: "Products with reviews", ar: "منتجات لها تقييمات" },
+  "reviews.updateFailed": { en: "Update failed", ar: "فشل التحديث" },
+  "reviews.notStored": {
+    en: "Validated, but not stored: Firebase Admin is not configured here.",
+    ar: "تم التحقق دون تخزين: لم يُهيّأ Firebase Admin هنا.",
+  },
+  "reviews.updateError": { en: "The review could not be updated.", ar: "تعذّر تحديث التقييم." },
+  "reviews.hideReason": {
+    en: "Why is this being hidden? The author is shown this.",
+    ar: "لماذا يُخفى هذا؟ سيُعرض السبب على كاتبه.",
+  },
+  "reviews.queueClear": { en: "Nothing waiting. The queue is clear.", ar: "لا شيء ينتظر. القائمة فارغة." },
+  "reviews.empty": { en: "No reviews here yet.", ar: "لا تقييمات هنا بعد." },
+  "reviews.replyPlaceholder": { en: "Answer as net sale…", ar: "ردّ باسم نت سيل…" },
+  "reviews.editReply": { en: "Edit reply", ar: "تعديل الرد" },
+  "reviews.reply": { en: "Reply", ar: "ردّ" },
+
+  /* ---- support board ---- */
+  "support.title": { en: "Support", ar: "الدعم" },
+  "support.subtitle": {
+    en: "Answered in runs — the thread opens beside the list, not instead of it.",
+    ar: "يُجاب على دفعات — المحادثة تفتح بجانب القائمة لا بدلاً منها.",
+  },
+  "support.needsReply": { en: "Needs reply", ar: "يحتاج رداً" },
+  "support.awaitingCustomer": { en: "Awaiting customer", ar: "بانتظار العميل" },
+  "support.medianFirstReply": { en: "Median first reply", ar: "وسيط زمن أول رد" },
+  "support.replyPlaceholder": { en: "Write a reply…", ar: "اكتب رداً…" },
+  "support.replyNotSaved": { en: "The reply was not saved.", ar: "لم يُحفظ الرد." },
+  "support.replyNotSavedAdmin": {
+    en: "Not saved: Firebase Admin is not configured in this environment.",
+    ar: "لم يُحفظ: لم يُهيّأ Firebase Admin في هذه البيئة.",
+  },
+  "support.replyError": { en: "The reply could not be saved.", ar: "تعذّر حفظ الرد." },
+  "support.statusNotSaved": { en: "The status was not saved.", ar: "لم تُحفظ الحالة." },
+  "support.statusNotSavedAdmin": {
+    en: "Not saved: Firebase Admin is not configured.",
+    ar: "لم يُحفظ: لم يُهيّأ Firebase Admin.",
+  },
+  "support.statusError": { en: "The status could not be saved.", ar: "تعذّر حفظ الحالة." },
+
+  /* ---- panels ---- */
+  "errors.title": { en: "Errors", ar: "الأعطال" },
+  "errors.none": { en: "Nothing has crashed.", ar: "لم يقع أي عطل." },
+  "errors.fault": { en: "distinct fault", ar: "عطل مميّز" },
+  "errors.faults": { en: "distinct faults", ar: "أعطال مميّزة" },
+  "errors.occurrence": { en: "occurrence", ar: "حدوث" },
+  "errors.occurrences": { en: "occurrences", ar: "مرات حدوث" },
+  "errors.explainer": {
+    en: "Error boundaries report here automatically. An empty list means no page has thrown since reporting was switched on — not that nothing is being watched.",
+    ar: "تُبلّغ حدود الأخطاء هنا تلقائياً. القائمة الفارغة تعني أن لا صفحة أخفقت منذ تفعيل التبليغ — لا أن شيئاً لا يُراقب.",
+  },
+  "notify.title": { en: "Messages", ar: "الرسائل" },
+  "notify.configured": {
+    en: "What was sent to this customer about this order.",
+    ar: "ما أُرسل إلى هذا العميل بخصوص هذا الطلب.",
+  },
+  "notify.notConfigured": {
+    en: "No mail provider is configured, so nothing is being sent.",
+    ar: "لا مزوّد بريد مهيّأ، فلا شيء يُرسل.",
+  },
+  "notify.empty": {
+    en: "Nothing yet. A message goes out when the order is paid, dispatched, delivered or refunded.",
+    ar: "لا شيء بعد. تُرسل رسالة عند الدفع أو الشحن أو التسليم أو الاسترجاع.",
+  },
+
+  "invoices.count": { en: "Invoices", ar: "عدد الفواتير" },
+  "invoices.netBilled": { en: "Net billed", ar: "صافي المفوتر" },
+  "invoices.taxCollected": { en: "Tax collected", ar: "الضريبة المحصّلة" },
+  "invoices.credited": { en: "Credited", ar: "الإشعارات الدائنة" },
+  "invoices.searchLabel": { en: "Search invoices", ar: "ابحث في الفواتير" },
+  "invoices.searchPlaceholder": {
+    en: "Invoice number, order, customer…",
+    ar: "رقم الفاتورة، الطلب، العميل…",
+  },
+  "invoices.empty": { en: "No invoices yet.", ar: "لا فواتير بعد." },
+  "invoices.ledger": { en: "net sale — invoice ledger", ar: "نت سيل — سجل الفواتير" },
+
+  /* ---- the gate ---- */
+  "gate.checking": { en: "Checking access", ar: "جارٍ التحقق من الصلاحية" },
+  "gate.signInTitle": { en: "Sign in to continue", ar: "سجّل الدخول للمتابعة" },
+  "gate.signInBody": {
+    en: "The admin is only reachable by a signed-in account with a staff or admin role.",
+    ar: "لوحة الإدارة متاحة فقط لحساب مسجّل الدخول يحمل صلاحية موظف أو مدير.",
+  },
+  "gate.signIn": { en: "Sign in", ar: "تسجيل الدخول" },
+  "gate.deniedTitle": {
+    en: "This account does not have admin access",
+    ar: "هذا الحساب لا يملك صلاحية الدخول",
+  },
+  "gate.signedInAs": { en: "Signed in as", ar: "مسجّل الدخول باسم" },
+  "gate.withRole": { en: "with the role", ar: "بصلاحية" },
+  "gate.grantFrom": {
+    en: "An existing admin can grant it from Access in the admin. If nobody has admin yet, it is granted from a trusted machine:",
+    ar: "يستطيع مدير حالي منحها من شاشة الصلاحيات. وإن لم يكن هناك مدير بعد، تُمنح من جهاز موثوق:",
+  },
+  "gate.thenSignOut": {
+    en: "Either way, sign out and back in so the new token carries the claim.",
+    ar: "في الحالتين، سجّل الخروج ثم الدخول ليحمل الرمز الجديد الصلاحية.",
+  },
+  "gate.backToStore": { en: "Back to the store", ar: "العودة إلى المتجر" },
+  "gate.devBypass": {
+    en: "Development preview — access checks are bypassed. Writes still require a verified admin token and will be refused.",
+    ar: "معاينة تطوير — فحوص الصلاحية متجاوَزة. أما الكتابة فتتطلب رمز مدير موثّقاً وستُرفض.",
+  },
+
+  "products.new": { en: "New product", ar: "منتج جديد" },
+  "products.searchLabel": { en: "Search products", ar: "ابحث في المنتجات" },
+  "products.searchPlaceholder": {
+    en: "Title, slug, tag…",
+    ar: "الاسم، المعرّف، الوسم…",
+  },
+  "products.empty": { en: "No products here.", ar: "لا منتجات هنا." },
+
+  /* ---- behaviour ---- */
+  "beh.title": { en: "Shopping behaviour", ar: "سلوك التسوّق" },
+  "beh.subtitle": {
+    en: "What visitors did, and where the ones who did not buy stopped.",
+    ar: "ما فعله الزوّار، وأين توقّف من لم يشترِ.",
+  },
+  "beh.sessions": { en: "Sessions", ar: "الجلسات" },
+  "beh.conversion": { en: "Conversion", ar: "معدّل التحويل" },
+  "beh.noResults": { en: "Searches with no results", ar: "عمليات بحث بلا نتائج" },
+  "beh.funnel": { en: "Funnel", ar: "مسار الشراء" },
+  "beh.funnelHint": {
+    en: "Sessions reaching each step, not events.",
+    ar: "الجلسات التي بلغت كل خطوة، لا عدد الأحداث.",
+  },
+  "beh.searchedNotFound": { en: "Searched for, not found", ar: "بُحث عنه ولم يوجد" },
+  "beh.searchedNotFoundHint": {
+    en: "Every line is something a customer wanted and the shop did not show.",
+    ar: "كل سطر شيء أراده عميل ولم يعرضه المتجر.",
+  },
+  "beh.exits": { en: "Where sessions ended", ar: "أين انتهت الجلسات" },
+  "beh.exitsHint": {
+    en: "Last page of visits that did not order.",
+    ar: "آخر صفحة في الزيارات التي لم تُنهِ طلباً.",
+  },
+  "beh.mostViewed": { en: "Most viewed", ar: "الأكثر مشاهدة" },
+  "beh.mostViewedHint": { en: "Unique sessions, not refreshes.", ar: "جلسات فريدة، لا تحديثات." },
+  "beh.devices": { en: "Devices", ar: "الأجهزة" },
+  "beh.devicesHint": { en: "Sessions by screen size.", ar: "الجلسات حسب حجم الشاشة." },
+  "beh.sources": { en: "Where they came from", ar: "من أين جاؤوا" },
+  "beh.sourcesHint": { en: "Sessions by source.", ar: "الجلسات حسب المصدر." },
+  "beh.coupons": { en: "Coupon attempts", ar: "محاولات الكوبونات" },
+  "beh.couponsHint": {
+    en: "Applied, and why the rest were refused.",
+    ar: "ما طُبّق، ولماذا رُفض الباقي.",
+  },
+  "beh.topSearches": { en: "Top searches", ar: "أكثر عمليات البحث" },
+  "beh.topSearchesHint": {
+    en: "What people looked for and found.",
+    ar: "ما بحث عنه الناس ووجدوه.",
+  },
+  "beh.overTime": { en: "Sessions over time", ar: "الجلسات عبر الزمن" },
+
+  /* ---- warehouse ---- */
+  "wh.title": { en: "Seasonal warehouse", ar: "المستودع الموسمي" },
+  "wh.subtitle": {
+    en: "Move stock off the shopfront and back, without changing what it is.",
+    ar: "أخرِج البضاعة من الواجهة وأعدها، دون تغيير ما هي عليه.",
+  },
+  "wh.season.winter": { en: "Winter", ar: "شتاء" },
+  "wh.season.spring": { en: "Spring", ar: "ربيع" },
+  "wh.season.summer": { en: "Summer", ar: "صيف" },
+  "wh.season.autumn": { en: "Autumn", ar: "خريف" },
+  "wh.season.all-season": { en: "All season", ar: "كل المواسم" },
+  "wh.state.live": { en: "Live", ar: "معروض" },
+  "wh.state.out-of-stock": { en: "Sold out", ar: "نفد" },
+  "wh.state.hidden": { en: "In warehouse", ar: "في المستودع" },
+  "wh.state.draft": { en: "Draft", ar: "مسودة" },
+  "wh.state.archived": { en: "Archived", ar: "مؤرشف" },
+  "wh.inWarehouse": { en: "In the warehouse", ar: "في المستودع" },
+  "wh.updateFailed": { en: "Update failed", ar: "فشل التحديث" },
+  "wh.notStored": {
+    en: "Validated, but not stored: Firebase Admin is not configured here.",
+    ar: "تم التحقق دون تخزين: لم يُهيّأ Firebase Admin هنا.",
+  },
+  "wh.updateError": { en: "The products could not be updated.", ar: "تعذّر تحديث المنتجات." },
+  "wh.searchPlaceholder": { en: "Search title or SKU…", ar: "ابحث بالاسم أو الرمز…" },
+  "wh.filterSeason": { en: "Filter by season", ar: "تصفية حسب الموسم" },
+  "wh.filterCategory": { en: "Filter by category", ar: "تصفية حسب القسم" },
+  "wh.filterState": { en: "Filter by state", ar: "تصفية حسب الحالة" },
+  "wh.everySeason": { en: "Every season", ar: "كل المواسم" },
+  "wh.everyCategory": { en: "Every category", ar: "كل الأقسام" },
+  "wh.anyState": { en: "Any state", ar: "أي حالة" },
+  "wh.hidingHint": {
+    en: "Hiding never changes stock, status or past orders.",
+    ar: "الإخفاء لا يغيّر المخزون ولا الحالة ولا الطلبات السابقة.",
+  },
+  "wh.moveToWarehouse": { en: "Move to warehouse", ar: "أرسل إلى المستودع" },
+  "wh.returnToShopfront": { en: "Return to shopfront", ar: "أعد إلى الواجهة" },
+  "wh.movedToWarehouse": { en: "Moved to the warehouse", ar: "نُقل إلى المستودع" },
+  "wh.returnedToShopfront": { en: "Returned to the shopfront", ar: "أُعيد إلى الواجهة" },
+  "wh.tagged": { en: "Tagged", ar: "وُسم" },
+  "wh.showAt": { en: "Show at (Amman)", ar: "يظهر في (توقيت عمّان)" },
+  "wh.hideAt": { en: "Hide at (Amman)", ar: "يُخفى في (توقيت عمّان)" },
+  "wh.scheduled": { en: "Scheduled", ar: "مجدول" },
+  "wh.scheduleCleared": { en: "Schedule cleared", ar: "أُلغيت الجدولة" },
+  "wh.selectAll": { en: "Select everything shown", ar: "حدّد كل المعروض" },
+  "wh.seasons": { en: "Seasons", ar: "المواسم" },
+  "wh.state": { en: "State", ar: "الحالة" },
+  "wh.schedule": { en: "Schedule", ar: "الجدولة" },
+  "wh.overriding": {
+    en: "A manual change is overriding the schedule",
+    ar: "تغيير يدوي يتجاوز الجدولة",
+  },
+
+  "wh.showsAt": { en: "show", ar: "يظهر" },
+  "wh.hidesAt": { en: "hide", ar: "يُخفى" },
+
+  /* ---- categories ---- */
+  "cat.title": { en: "Categories", ar: "الأقسام" },
+  "cat.subtitle": {
+    en: "The shop's departments and their subcategories, in the order they appear.",
+    ar: "أقسام المتجر وفروعها، بالترتيب الذي تظهر به.",
+  },
+  "cat.nameRequired": {
+    en: "A name is required in both English and Arabic.",
+    ar: "الاسم مطلوب بالإنجليزية والعربية معاً.",
+  },
+  "cat.saveFailed": { en: "Save failed", ar: "فشل الحفظ" },
+  "cat.notStored": {
+    en: "Validated, but not stored: Firebase Admin is not configured here.",
+    ar: "تم التحقق دون تخزين: لم يُهيّأ Firebase Admin هنا.",
+  },
+  "cat.saveError": { en: "The category could not be saved.", ar: "تعذّر حفظ القسم." },
+  "cat.updateFailed": { en: "Update failed", ar: "فشل التحديث" },
+  "cat.updateError": { en: "The categories could not be updated.", ar: "تعذّر تحديث الأقسام." },
+  "cat.altPrompt": {
+    en: "Describe this image for screen readers",
+    ar: "صف هذه الصورة لقارئات الشاشة",
+  },
+  "cat.altRequired": {
+    en: "Every image needs alt text. Nothing was uploaded.",
+    ar: "كل صورة تحتاج نصاً بديلاً. لم يُرفع شيء.",
+  },
+  "cat.uploadError": { en: "That image could not be uploaded.", ar: "تعذّر رفع هذه الصورة." },
+  "cat.tree": { en: "The tree", ar: "الشجرة" },
+  "cat.treeHint": {
+    en: "Nudge to reorder. Hidden categories keep their URLs.",
+    ar: "حرّك لإعادة الترتيب. الأقسام المخفية تحتفظ بروابطها.",
+  },
+  "cat.edit": { en: "Edit category", ar: "تعديل القسم" },
+  "cat.new": { en: "New category", ar: "قسم جديد" },
+  "cat.nothingSelected": { en: "Nothing selected", ar: "لم يُحدَّد شيء" },
+  "cat.movingHint": {
+    en: "Moving a category re-files every product beneath it.",
+    ar: "نقل القسم يعيد تصنيف كل منتج تحته.",
+  },
+  "cat.pickHint": {
+    en: "Pick a category from the tree, or create one.",
+    ar: "اختر قسماً من الشجرة، أو أنشئ واحداً.",
+  },
+  "cat.nameEn": { en: "Name (English)", ar: "الاسم (إنجليزي)" },
+  "cat.nameAr": { en: "Name (Arabic)", ar: "الاسم (عربي)" },
+  "cat.descEn": { en: "Description (English)", ar: "الوصف (إنجليزي)" },
+  "cat.descAr": { en: "Description (Arabic)", ar: "الوصف (عربي)" },
+  "cat.slug": { en: "Slug", ar: "المعرّف" },
+  "cat.slugHint": {
+    en: "The URL key. Changing it on a live category breaks existing links.",
+    ar: "مفتاح الرابط. تغييره على قسم منشور يكسر الروابط القائمة.",
+  },
+  "cat.upload": { en: "Upload", ar: "رفع" },
+  "cat.showInNav": { en: "Show in the navigation menu", ar: "أظهره في قائمة التنقل" },
+  "cat.feature": { en: "Feature on the categories page", ar: "أبرزه في صفحة الأقسام" },
+  "cat.hiddenLabel": { en: "Hidden", ar: "مخفي" },
+  "cat.hiddenHint": {
+    en: "Keeps its products and its URL, but leaves the menu and the grid.",
+    ar: "يحتفظ بمنتجاته ورابطه، لكنه يغادر القائمة والشبكة.",
+  },
+  "cat.saveChanges": { en: "Save changes", ar: "حفظ التغييرات" },
+  "cat.create": { en: "Create", ar: "إنشاء" },
+  "cat.addChild": { en: "Add a subcategory", ar: "أضف قسماً فرعياً" },
+  "cat.moveUp": { en: "Move up", ar: "حرّك لأعلى" },
+  "cat.moveDown": { en: "Move down", ar: "حرّك لأسفل" },
+  "cat.showInMenu": { en: "Show in menu", ar: "أظهر في القائمة" },
+  "cat.hide": { en: "Hide", ar: "إخفاء" },
+  "cat.sitsUnder": { en: "Sits under", ar: "يندرج تحت" },
+  "cat.tileImage": { en: "Tile image", ar: "صورة البطاقة" },
+  "cat.topLevel": { en: "Top level", ar: "المستوى الأعلى" },
+  "cat.pieces": { en: "pieces", ar: "قطعة" },
+  "cat.notInMenu": { en: "not in menu", ar: "ليس في القائمة" },
+
+  /* ---- gift ---- */
+  "gift.title": { en: "Gift game", ar: "لعبة الهدايا" },
+  "gift.subtitle": {
+    en: "A wheel that issues real coupons. The server decides every spin.",
+    ar: "عجلة تصدر كوبونات حقيقية. الخادم هو من يقرّر كل دورة.",
+  },
+  "gift.spins": { en: "Spins", ar: "الدورات" },
+  "gift.couponsIssued": { en: "Coupons issued", ar: "الكوبونات الصادرة" },
+  "gift.winRate": { en: "Win rate", ar: "نسبة الفوز" },
+  "gift.campaigns": { en: "Campaigns", ar: "الحملات" },
+  "gift.saveFailed": { en: "Save failed", ar: "فشل الحفظ" },
+  "gift.notStored": {
+    en: "Validated, but not stored: Firebase Admin is not configured here.",
+    ar: "تم التحقق دون تخزين: لم يُهيّأ Firebase Admin هنا.",
+  },
+  "gift.saveError": { en: "The campaign could not be saved.", ar: "تعذّر حفظ الحملة." },
+  "gift.prizes": { en: "Prizes and odds", ar: "الجوائز والاحتمالات" },
+  "gift.prizesHint": {
+    en: "Weights are relative; the share is shown live.",
+    ar: "الأوزان نسبية، والحصة تُحسب مباشرة.",
+  },
+  "gift.percentOff": { en: "% off", ar: "خصم ٪" },
+  "gift.jodOff": { en: "JOD off", ar: "خصم بالدينار" },
+  "gift.freeDelivery": { en: "Free delivery", ar: "توصيل مجاني" },
+  "gift.noPrize": { en: "No prize", ar: "بلا جائزة" },
+  "gift.campaign": { en: "Campaign", ar: "الحملة" },
+  "gift.campaignHint": { en: "One campaign runs at a time.", ar: "حملة واحدة تعمل في كل وقت." },
+  "gift.nameEn": { en: "Name (EN)", ar: "الاسم (إنجليزي)" },
+  "gift.nameAr": { en: "Name (AR)", ar: "الاسم (عربي)" },
+  "gift.termsEn": { en: "Terms (EN)", ar: "الشروط (إنجليزي)" },
+  "gift.termsAr": { en: "Terms (AR)", ar: "الشروط (عربي)" },
+  "gift.paused": { en: "Paused", ar: "موقوفة" },
+  "gift.archived": { en: "Archived", ar: "مؤرشفة" },
+  "gift.saveCampaign": { en: "Save campaign", ar: "حفظ الحملة" },
+  "gift.createCampaign": { en: "Create campaign", ar: "إنشاء حملة" },
+  "gift.allCampaigns": { en: "All campaigns", ar: "كل الحملات" },
+  "gift.labelEn": { en: "Label (EN)", ar: "التسمية (إنجليزي)" },
+  "gift.labelAr": { en: "Label (AR)", ar: "التسمية (عربي)" },
+  "gift.reward": { en: "Reward", ar: "الجائزة" },
+  "gift.value": { en: "Value", ar: "القيمة" },
+  "gift.weight": { en: "Weight", ar: "الوزن" },
+  "gift.starts": { en: "Starts (Amman)", ar: "تبدأ (توقيت عمّان)" },
+  "gift.ends": { en: "Ends (Amman)", ar: "تنتهي (توقيت عمّان)" },
+  "gift.cooldown": { en: "Hours between spins", ar: "ساعات بين الدورات" },
+  "gift.maxAttempts": { en: "Total spins each", ar: "إجمالي الدورات لكل شخص" },
+  "gift.statusLabel": { en: "Status", ar: "الحالة" },
+  "gift.draftOption": { en: "Draft — not running", ar: "مسودة — لا تعمل" },
+  "gift.activeOption": { en: "Live — customers can play", ar: "تعمل — يستطيع العملاء اللعب" },
+
+  /* ---- offers ---- */
+  "off.title": { en: "Offers & campaigns", ar: "العروض والحملات" },
+  "off.subtitle": {
+    en: "The discount and the shopfront that sells it, managed together.",
+    ar: "الخصم والواجهة التي تبيعه، يُداران معاً.",
+  },
+  "off.code": { en: "Code", ar: "الرمز" },
+  "off.discount": { en: "Discount", ar: "الخصم" },
+  "off.minimum": { en: "Minimum", ar: "الحد الأدنى" },
+  "off.redeemed": { en: "Redeemed", ar: "استُخدم" },
+  "off.window": { en: "Window", ar: "الفترة" },
+  "off.copyCode": { en: "Copy code", ar: "انسخ الرمز" },
+  "off.duplicate": { en: "Duplicate", ar: "نسخة" },
+  "off.pause": { en: "Pause", ar: "إيقاف" },
+  "off.activate": { en: "Activate", ar: "تفعيل" },
+  "off.restore": { en: "Restore", ar: "استعادة" },
+  "off.archive": { en: "Archive", ar: "أرشفة" },
+  "off.type": { en: "Type", ar: "النوع" },
+  "off.value": { en: "Value", ar: "القيمة" },
+  "off.limit": { en: "Limit", ar: "الحد" },
+  "off.starts": { en: "Starts", ar: "تبدأ" },
+  "off.ends": { en: "Ends", ar: "تنتهي" },
+  "off.activeCol": { en: "Active", ar: "فعّال" },
+  "off.yes": { en: "yes", ar: "نعم" },
+  "off.no": { en: "no", ar: "لا" },
+  "off.liveOffers": { en: "Live offers", ar: "عروض فعّالة" },
+  "off.redemptions": { en: "Total redemptions", ar: "إجمالي الاستخدامات" },
+  "off.campaigns": { en: "Campaigns", ar: "الحملات" },
+  "off.liveCampaigns": { en: "Live campaigns", ar: "حملات فعّالة" },
+  "off.searchPlaceholder": { en: "Search code or title…", ar: "ابحث بالرمز أو الاسم…" },
+  "off.searchLabel": { en: "Search coupons", ar: "ابحث في الكوبونات" },
+  "off.filterStatus": { en: "Filter by status", ar: "تصفية حسب الحالة" },
+  "off.allExceptArchived": { en: "All except archived", ar: "الكل عدا المؤرشف" },
+  "off.active": { en: "Active", ar: "فعّال" },
+  "off.paused": { en: "Paused", ar: "موقوف" },
+  "off.draft": { en: "Draft", ar: "مسودة" },
+  "off.archived": { en: "Archived", ar: "مؤرشف" },
+  "off.noMatch": { en: "No coupons match this filter.", ar: "لا كوبونات تطابق هذه التصفية." },
+  "off.empty": {
+    en: "No discount codes yet. Create one to get started.",
+    ar: "لا رموز خصم بعد. أنشئ واحداً للبدء.",
+  },
+  "off.heroHint": {
+    en: "The hero shows the highest-priority live banner. With none live, the homepage falls back to a plain heading — not to old copy.",
+    ar: "تعرض الواجهة اللافتة الفعّالة الأعلى أولوية. وإن لم تكن هناك لافتة فعّالة، تعود الصفحة الرئيسية إلى عنوان بسيط — لا إلى نص قديم.",
+  },
+  "off.newBanner": { en: "New banner", ar: "لافتة جديدة" },
+  "off.slot": { en: "Slot", ar: "الموضع" },
+  "off.tone": { en: "Tone", ar: "النغمة" },
+  "off.priority": { en: "Priority", ar: "الأولوية" },
+  "off.newOffer": { en: "New offer", ar: "عرض جديد" },
+  "off.newCampaign": { en: "New campaign", ar: "حملة جديدة" },
+
+  /* ---- coupon editor ---- */
+  "oe.statusDraft": { en: "Draft — not usable yet", ar: "مسودة — غير قابل للاستخدام بعد" },
+  "oe.statusActive": { en: "Active — customers can use it", ar: "فعّال — يستطيع العملاء استخدامه" },
+  "oe.statusPaused": { en: "Paused — kept, but refused", ar: "موقوف — محفوظ لكنه يُرفض" },
+  "oe.statusArchived": { en: "Archived — closed for good", ar: "مؤرشف — مغلق نهائياً" },
+  "oe.newCoupon": { en: "New coupon", ar: "كوبون جديد" },
+  "oe.edit": { en: "Edit", ar: "تعديل" },
+  "oe.saveFailed": { en: "Save failed", ar: "فشل الحفظ" },
+  "oe.notStored": {
+    en: "Validated, but not stored: Firebase Admin is not configured in this environment.",
+    ar: "تم التحقق دون تخزين: لم يُهيّأ Firebase Admin في هذه البيئة.",
+  },
+  "oe.saveError": { en: "The coupon could not be saved.", ar: "تعذّر حفظ الكوبون." },
+  "oe.codeRequired": { en: "A code is required.", ar: "الرمز مطلوب." },
+  "oe.titleRequired": {
+    en: "A title is required in both English and Arabic.",
+    ar: "الاسم مطلوب بالإنجليزية والعربية معاً.",
+  },
+  "oe.codeLabel": { en: "Code", ar: "الرمز" },
+  "oe.codeHint": {
+    en: "Upper-case, no spaces. This is what customers type.",
+    ar: "أحرف كبيرة بلا مسافات. هذا ما يكتبه العملاء.",
+  },
+  "oe.reward": { en: "Reward", ar: "المكافأة" },
+  "oe.percentageOff": { en: "Percentage off", ar: "خصم بالنسبة" },
+  "oe.fixedOff": { en: "Fixed amount off", ar: "خصم بمبلغ ثابت" },
+  "oe.freeDelivery": { en: "Free delivery", ar: "توصيل مجاني" },
+  "oe.percentOff": { en: "Percent off", ar: "نسبة الخصم" },
+  "oe.amountOff": { en: "Amount off (JOD)", ar: "مبلغ الخصم (دينار)" },
+  "oe.cap": { en: "Cap (JOD)", ar: "الحد الأقصى (دينار)" },
+  "oe.capHint": {
+    en: "Blank means uncapped — rarely what you want.",
+    ar: "الفراغ يعني بلا سقف — نادراً ما يكون هذا المقصود.",
+  },
+  "oe.titleEn": { en: "Title (English)", ar: "الاسم (إنجليزي)" },
+  "oe.startsLabel": { en: "Starts", ar: "تبدأ" },
+  "oe.endsLabel": { en: "Ends", ar: "تنتهي" },
+  "oe.ammanTime": { en: "Amman time", ar: "توقيت عمّان" },
+  "oe.minSpend": { en: "Min spend", ar: "أقل إنفاق" },
+  "oe.totalLimit": { en: "Total limit", ar: "الحد الإجمالي" },
+  "oe.perCustomer": { en: "Per customer", ar: "لكل عميل" },
+  "oe.appliesCategories": { en: "Applies to categories", ar: "يشمل الأقسام" },
+  "oe.appliesHint": { en: "Empty means the whole catalogue.", ar: "الفراغ يعني الكتالوج كله." },
+  "oe.excludedCategories": { en: "Excluded categories", ar: "أقسام مستثناة" },
+  "oe.excludedHint": { en: "Wins over the includes above.", ar: "يتقدّم على المشمول أعلاه." },
+  "oe.excludedProducts": { en: "Excluded products", ar: "منتجات مستثناة" },
+  "oe.restrictUid": { en: "Restrict to one account (uid)", ar: "اقصره على حساب واحد (uid)" },
+  "oe.restrictHint": {
+    en: "For a personal gift or apology code. Leave blank for everyone.",
+    ar: "لهدية شخصية أو رمز اعتذار. اتركه فارغاً ليشمل الجميع.",
+  },
+  "oe.saveChanges": { en: "Save changes", ar: "حفظ التغييرات" },
+  "oe.createCoupon": { en: "Create coupon", ar: "إنشاء كوبون" },
+  "oe.filter": { en: "Filter…", ar: "تصفية…" },
+  "oe.selected": { en: "selected", ar: "مختار" },
+  "oe.nothingMatches": { en: "Nothing matches.", ar: "لا تطابق." },
+  "oe.sumOff": { en: "off", ar: "خصم" },
+  "oe.sumUpTo": { en: "up to", ar: "حتى" },
+  "oe.sumEverything": { en: "on everything", ar: "على كل شيء" },
+  "oe.sumOnGroup": { en: "on 1 selected group", ar: "على مجموعة واحدة مختارة" },
+  "oe.sumOnGroups": { en: "selected groups", ar: "مجموعات مختارة" },
+  "oe.sumExcluding": { en: "excluding", ar: "باستثناء" },
+  "oe.sumOver": { en: "over", ar: "فوق" },
+  "oe.sumFirstOrder": { en: "first order only", ar: "أول طلب فقط" },
+  "oe.sumOneAccount": { en: "one account only", ar: "حساب واحد فقط" },
+  "oe.sumPerCustomer": { en: "per customer", ar: "لكل عميل" },
+  "oe.sumInTotal": { en: "in total", ar: "إجمالاً" },
+  "oe.sumStacks": { en: "stacks with sales", ar: "يُجمع مع التخفيضات" },
+  "oe.sumNoStack": { en: "does not stack with sales", ar: "لا يُجمع مع التخفيضات" },
+
+  /* ---- banner editor ---- */
+  "be.pos.start-top": { en: "Left, top", ar: "يسار، أعلى" },
+  "be.pos.start-middle": { en: "Left, middle", ar: "يسار، وسط" },
+  "be.pos.start-bottom": { en: "Left, bottom", ar: "يسار، أسفل" },
+  "be.pos.center-top": { en: "Centre, top", ar: "وسط، أعلى" },
+  "be.pos.center-middle": { en: "Centre, middle", ar: "وسط، منتصف" },
+  "be.pos.center-bottom": { en: "Centre, bottom", ar: "وسط، أسفل" },
+  "be.pos.end-top": { en: "Right, top", ar: "يمين، أعلى" },
+  "be.pos.end-middle": { en: "Right, middle", ar: "يمين، وسط" },
+  "be.pos.end-bottom": { en: "Right, bottom", ar: "يمين، أسفل" },
+  "be.statusDraft": { en: "Draft — not on the site", ar: "مسودة — ليست على الموقع" },
+  "be.statusActive": { en: "Live — on the site now", ar: "معروضة — على الموقع الآن" },
+  "be.statusPaused": { en: "Paused — kept, not shown", ar: "موقوفة — محفوظة ولا تُعرض" },
+  "be.statusArchived": { en: "Archived — closed for good", ar: "مؤرشفة — مغلقة نهائياً" },
+  "be.savedAs": { en: "Saved as", ar: "محفوظة كـ" },
+  "be.notOnSite": { en: "Not on the site.", ar: "ليست على الموقع." },
+  "be.scheduledLive": { en: "Scheduled. Goes live", ar: "مجدولة. تبدأ" },
+  "be.ammanTime": { en: "Amman time.", ar: "بتوقيت عمّان." },
+  "be.windowClosed": {
+    en: "This window has already closed — it will not show.",
+    ar: "أُغلقت هذه الفترة — لن تُعرض.",
+  },
+  "be.liveUntil": { en: "Live now, until", ar: "معروضة الآن، حتى" },
+  "be.liveNoEnd": { en: "Live now, with no end date.", ar: "معروضة الآن، بلا تاريخ انتهاء." },
+  "be.altPrompt": {
+    en: "Describe this image for screen readers",
+    ar: "صف هذه الصورة لقارئات الشاشة",
+  },
+  "be.altRequired": {
+    en: "Every image needs alt text. Nothing was uploaded.",
+    ar: "كل صورة تحتاج نصاً بديلاً. لم يُرفع شيء.",
+  },
+  "be.uploadError": { en: "That image could not be uploaded.", ar: "تعذّر رفع هذه الصورة." },
+  "be.titleRequired": {
+    en: "A title is required in both English and Arabic.",
+    ar: "الاسم مطلوب بالإنجليزية والعربية معاً.",
+  },
+  "be.saveFailed": { en: "Save failed", ar: "فشل الحفظ" },
+  "be.notStored": {
+    en: "Validated, but not stored: Firebase Admin is not configured here.",
+    ar: "تم التحقق دون تخزين: لم يُهيّأ Firebase Admin هنا.",
+  },
+  "be.saveError": { en: "The banner could not be saved.", ar: "تعذّر حفظ اللافتة." },
+  "be.editBanner": { en: "Edit banner", ar: "تعديل اللافتة" },
+  "be.newBanner": { en: "New banner", ar: "لافتة جديدة" },
+  "be.yourHeadline": { en: "Your headline", ar: "عنوانك" },
+  "be.noPhoneImage": {
+    en: "No phone image — the desktop crop is being letterboxed.",
+    ar: "لا صورة للهاتف — يُعرض قصّ سطح المكتب بأشرطة.",
+  },
+  "be.placement": { en: "Placement", ar: "الموضع" },
+  "be.slotHero": { en: "Hero — the first screen", ar: "الواجهة — الشاشة الأولى" },
+  "be.slotPromo": { en: "Promo rail", ar: "شريط العروض" },
+  "be.slotSpotlight": { en: "Spotlight", ar: "الإبراز" },
+  "be.slotCategory": { en: "Category strip", ar: "شريط الأقسام" },
+  "be.slotAnnouncement": { en: "Announcement bar", ar: "شريط الإعلان" },
+  "be.desktopImage": { en: "Desktop image", ar: "صورة سطح المكتب" },
+  "be.desktopHint": { en: "Wide crop, 21:9 or thereabouts.", ar: "قصّ عريض، بنسبة ٢١:٩ تقريباً." },
+  "be.phoneImage": { en: "Phone image", ar: "صورة الهاتف" },
+  "be.phoneHint": {
+    en: "Portrait. Without one, the desktop crop is letterboxed.",
+    ar: "طولية. بدونها يُعرض قصّ سطح المكتب بأشرطة.",
+  },
+  "be.eyebrow": { en: "Eyebrow", ar: "السطر العلوي" },
+  "be.headline": { en: "Headline", ar: "العنوان" },
+  "be.body": { en: "Body", ar: "النص" },
+  "be.buttonLabel": { en: "Button label", ar: "نص الزر" },
+  "be.buttonLink": { en: "Button link", ar: "رابط الزر" },
+  "be.buttonLinkHint": {
+    en: "An internal path, beginning with /.",
+    ar: "مسار داخلي يبدأ بـ /.",
+  },
+  "be.textPosition": { en: "Text position", ar: "موضع النص" },
+  "be.textColour": { en: "Text colour", ar: "لون النص" },
+  "be.light": { en: "Light — for a dark photo", ar: "فاتح — لصورة داكنة" },
+  "be.dark": { en: "Dark — for a light photo", ar: "داكن — لصورة فاتحة" },
+  "be.starts": { en: "Starts", ar: "تبدأ" },
+  "be.ends": { en: "Ends", ar: "تنتهي" },
+  "be.endsHint": { en: "Blank means no end", ar: "الفراغ يعني بلا نهاية" },
+  "be.priority": { en: "Priority", ar: "الأولوية" },
+  "be.priorityHint": { en: "Higher shows first.", ar: "الأعلى يظهر أولاً." },
+
+  /* ---- product editor ---- */
+  "pe.newProduct": { en: "New product", ar: "منتج جديد" },
+  "pe.untitled": { en: "Untitled", ar: "بلا اسم" },
+  "pe.bothLanguages": {
+    en: "Both languages are required before publishing.",
+    ar: "اللغتان مطلوبتان قبل النشر.",
+  },
+  "pe.catalogue": { en: "Catalogue", ar: "الكتالوج" },
+  "pe.viewLive": { en: "View live", ar: "عرض على الموقع" },
+  "pe.couldNotSave": { en: "Could not save.", ar: "تعذّر الحفظ." },
+  "pe.designAltRequired": {
+    en: "A design thumbnail needs alt text. Nothing was uploaded.",
+    ar: "مصغّرة التصميم تحتاج نصاً بديلاً. لم يُرفع شيء.",
+  },
+  "pe.imageAltRequired": {
+    en: "Every image needs alt text. Nothing was uploaded.",
+    ar: "كل صورة تحتاج نصاً بديلاً. لم يُرفع شيء.",
+  },
+  "pe.names": { en: "Names", ar: "الأسماء" },
+  "pe.namesHint": {
+    en: "English and Arabic, side by side on purpose.",
+    ar: "الإنجليزية والعربية جنباً إلى جنب عن قصد.",
+  },
+  "pe.titleEn": { en: "Title (English)", ar: "الاسم (إنجليزي)" },
+  "pe.titleAr": { en: "Title (Arabic)", ar: "الاسم (عربي)" },
+  "pe.subtitleEn": { en: "Subtitle (English)", ar: "العنوان الفرعي (إنجليزي)" },
+  "pe.subtitleAr": { en: "Subtitle (Arabic)", ar: "العنوان الفرعي (عربي)" },
+  "pe.descEn": { en: "Description (English)", ar: "الوصف (إنجليزي)" },
+  "pe.descAr": { en: "Description (Arabic)", ar: "الوصف (عربي)" },
+  "pe.imagery": { en: "Imagery", ar: "الصور" },
+  "pe.add": { en: "Add", ar: "أضف" },
+  "pe.designs": { en: "Designs", ar: "التصاميم" },
+  "pe.moveUp": { en: "Move up", ar: "حرّك لأعلى" },
+  "pe.moveDown": { en: "Move down", ar: "حرّك لأسفل" },
+  "pe.retireHint": {
+    en: "Takes it out of the picker; past orders keep the name",
+    ar: "يخرجه من الاختيار؛ الطلبات السابقة تحتفظ بالاسم",
+  },
+  "pe.variants": { en: "Variants", ar: "الخيارات" },
+  "pe.variantsHint": {
+    en: "Stock is held per variant, not on the product.",
+    ar: "المخزون محفوظ لكل خيار، لا على المنتج ككل.",
+  },
+  "pe.designBeingEdited": { en: "Design being edited", ar: "التصميم قيد التعديل" },
+  "pe.colour": { en: "Colour", ar: "اللون" },
+  "pe.totalAcross": { en: "Total across all variants:", ar: "الإجمالي عبر كل الخيارات:" },
+  "pe.savedWithProduct": {
+    en: "Saved with the product; the checkout decrements the variant, not the total.",
+    ar: "يُحفظ مع المنتج؛ والدفع يخصم من الخيار لا من الإجمالي.",
+  },
+  "pe.pricing": { en: "Pricing", ar: "التسعير" },
+  "pe.price": { en: "Price", ar: "السعر" },
+  "pe.compareAt": { en: "Compare at (optional)", ar: "السعر قبل الخصم (اختياري)" },
+  "pe.compareAtHint": {
+    en: "Shown struck through. Must be higher than the price to display.",
+    ar: "يُعرض مشطوباً. يجب أن يكون أعلى من السعر ليظهر.",
+  },
+  "pe.organisation": { en: "Organisation", ar: "التنظيم" },
+  "pe.slug": { en: "Slug", ar: "المعرّف" },
+  "pe.statusDraft": { en: "Draft — hidden from the store", ar: "مسودة — مخفي عن المتجر" },
+  "pe.statusActive": { en: "Active — on sale", ar: "فعّال — معروض للبيع" },
+  "pe.statusArchived": { en: "Archived", ar: "مؤرشف" },
+  "pe.totalStock": { en: "Total stock", ar: "إجمالي المخزون" },
+  "pe.tags": { en: "Tags", ar: "الوسوم" },
+  "pe.tagsHint": {
+    en: "Comma separated. Used by search and related products.",
+    ar: "مفصولة بفواصل. يستخدمها البحث والمنتجات ذات الصلة.",
+  },
+  "pe.commerce": { en: "Commerce", ar: "التجارة" },
+  "pe.typeSimple": { en: "Simple — one item, no options", ar: "بسيط — قطعة واحدة بلا خيارات" },
+  "pe.typeVariable": {
+    en: "Variable — colour and size variants",
+    ar: "متعدد — خيارات لون ومقاس",
+  },
+  "pe.sku": { en: "SKU", ar: "رمز المنتج" },
+  "pe.gtin": { en: "GTIN", ar: "الباركود GTIN" },
+  "pe.gtinHint": {
+    en: "GTIN-8, -12, -13 or -14. The check digit is verified.",
+    ar: "GTIN بطول ٨ أو ١٢ أو ١٣ أو ١٤. يُتحقق من رقم التدقيق.",
+  },
+  "pe.standard": { en: "Standard", ar: "قياسي" },
+  "pe.maxPerOrder": { en: "Max per order", ar: "أقصى كمية للطلب" },
+  "pe.upsells": { en: "Upsells", ar: "منتجات أعلى" },
+  "pe.upsellsHint": {
+    en: "Product ids, comma separated. Shown on this product's page as the upgrade — keep them dearer than this one.",
+    ar: "معرّفات منتجات مفصولة بفواصل. تُعرض في صفحة هذا المنتج كترقية — اجعلها أغلى منه.",
+  },
+  "pe.crossSells": { en: "Cross-sells", ar: "منتجات مكمّلة" },
+  "pe.crossSellsHint": {
+    en: "Product ids, comma separated. Shown in the bag once this product is in it.",
+    ar: "معرّفات منتجات مفصولة بفواصل. تُعرض في الحقيبة متى كان هذا المنتج فيها.",
+  },
+
+  /* ---- the last of it ---- */
+  "common.remove": { en: "Remove", ar: "إزالة" },
+  "common.preview": { en: "Preview", ar: "معاينة" },
+  "common.desktop": { en: "Desktop", ar: "سطح المكتب" },
+  "common.phone": { en: "Phone", ar: "الهاتف" },
+  "common.noImage": { en: "No image yet", ar: "لا صورة بعد" },
+  "common.category": { en: "Category", ar: "القسم" },
+  "beh.nothingMissing": { en: "Nothing yet — or nothing missing.", ar: "لا شيء بعد — أو لا شيء ناقص." },
+  "beh.notEnough": { en: "Not enough data yet.", ar: "لا بيانات كافية بعد." },
+  "beh.noRefusals": { en: "No refusals in this window.", ar: "لا رفض في هذه الفترة." },
+  "cat.newDepartment": { en: "New department", ar: "قسم رئيسي جديد" },
+  "cat.empty": {
+    en: "No categories yet. Create a department to begin.",
+    ar: "لا أقسام بعد. أنشئ قسماً رئيسياً للبدء.",
+  },
+  "cat.selectToEdit": { en: "Select a category to edit it.", ar: "اختر قسماً لتعديله." },
+  "customers.export": { en: "net sale — customers", ar: "نت سيل — العملاء" },
+  "orders.export": { en: "net sale — orders", ar: "نت سيل — الطلبات" },
+  "dash.cancelledRefunded": { en: "Cancelled / refunded", ar: "ملغاة / مُسترجعة" },
+  "gift.limit": { en: "Limit", ar: "الحد" },
+  "gift.pausesOthers": {
+    en: "Making this live pauses any other running campaign.",
+    ar: "تفعيل هذه يوقف أي حملة أخرى تعمل.",
+  },
+  "inv.savePdf": { en: "Save as PDF", ar: "احفظ كـ PDF" },
+  "oe.firstOrderOnly": { en: "First order only", ar: "أول طلب فقط" },
+  "oe.firstOrderHint": {
+    en: "Refused once the account has a completed order.",
+    ar: "يُرفض متى أتمّ الحساب طلباً واحداً.",
+  },
+  "oe.stackable": { en: "May combine with sale prices", ar: "يُجمع مع أسعار التخفيض" },
+  "oe.stackableHint": {
+    en: "Off by default. Stacking a code on a sale is how 20% and 30% become 50%.",
+    ar: "معطّل افتراضياً. جمع رمز على تخفيض هو ما يحوّل ٢٠٪ و٣٠٪ إلى ٥٠٪.",
+  },
+  "oe.inPlainWords": { en: "In plain words", ar: "بعبارة واضحة" },
+  "off.raisePriority": { en: "Raise priority", ar: "ارفع الأولوية" },
+  "off.lowerPriority": { en: "Lower priority", ar: "اخفض الأولوية" },
+  "off.newCoupon": { en: "New coupon", ar: "كوبون جديد" },
+  "off.makeLive": { en: "Make live", ar: "اجعله فعّالاً" },
+  "order.invoice": { en: "Invoice", ar: "الفاتورة" },
+  "pe.firstImageHint": {
+    en: "The first image is the one used on listing cards. SVG is rejected — it is an executable document.",
+    ar: "الصورة الأولى هي المستخدمة في بطاقات العرض. صيغة SVG مرفوضة — فهي مستند قابل للتنفيذ.",
+  },
+  "pe.designsHint": {
+    en: "Embroideries or prints, chosen separately from colour.",
+    ar: "تطريزات أو طباعات، تُختار بمعزل عن اللون.",
+  },
+  "pe.main": { en: "Main", ar: "رئيسية" },
+  "pe.restore": { en: "Restore", ar: "استعادة" },
+  "pe.withdraw": { en: "Withdraw", ar: "سحب" },
+  "pe.productType": { en: "Product type", ar: "نوع المنتج" },
+  "pe.shippingClass": { en: "Shipping class", ar: "فئة الشحن" },
+  "pe.beforePublishing": { en: "Before publishing", ar: "قبل النشر" },
+  "reviews.verified": { en: "Verified purchase", ar: "شراء موثّق" },
+  "reviews.postReply": { en: "Post reply", ar: "انشر الرد" },
+
+  "inv.printHint": {
+    en: "opens your browser's print dialogue — choose",
+    ar: "يفتح نافذة الطباعة في متصفحك — اختر",
+  },
+  "off.edit": { en: "Edit", ar: "تعديل" },
+  "reviews.publish": { en: "Publish", ar: "نشر" },
+  "reviews.hideAction": { en: "Hide", ar: "إخفاء" },
+  "reviews.removeReply": { en: "Remove reply", ar: "حذف الرد" },
+  "set.fastestDays": { en: "Fastest delivery in business days", ar: "أسرع توصيل بأيام العمل" },
+  "set.slowestDays": { en: "Slowest delivery in business days", ar: "أبطأ توصيل بأيام العمل" },
+  "ship.freeAbove": { en: "Free above", ar: "مجاني فوق" },
+  "ship.freeAboveFor": { en: "Free above for", ar: "مجاني فوق، لـ" },
+  "support.inboxZero": { en: "Nothing here. Inbox zero.", ar: "لا شيء هنا. الصندوق فارغ." },
+  "support.resolve": { en: "Resolve", ar: "إنهاء" },
+  "support.sendReply": { en: "Send reply", ar: "إرسال الرد" },
+  "support.selectTicket": {
+    en: "Select a ticket to read the thread.",
+    ar: "اختر محادثة لقراءتها.",
+  },
+  "wh.clear": { en: "Clear", ar: "مسح" },
+  "wh.noMatch": { en: "Nothing matches these filters.", ar: "لا شيء يطابق هذه التصفية." },
+
+  "orders.line": { en: "line", ar: "سطر" },
+  "orders.lines": { en: "lines", ar: "سطور" },
+  "orders.showing": { en: "Showing", ar: "يُعرض" },
+  "orders.ordersWord": { en: "orders", ar: "طلباً" },
+  "order.paidBy": { en: "Paid by", ar: "دُفع بـ" },
 
   /* ---- access ---- */
   "team.title": { en: "Who can get in", ar: "من يملك الدخول" },

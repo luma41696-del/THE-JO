@@ -6,7 +6,9 @@ import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { EASE } from "@/lib/motion";
 import { Sparkline } from "./charts/Charts";
-import type { InvoiceStatus, OrderStatus, TicketPriority, TicketStatus } from "@/types";
+import { useAdminLocale } from "./AdminLocale";
+import { adminText, type AdminKey } from "@/lib/i18n/admin";
+import type { InvoiceStatus, Locale, OrderStatus, TicketPriority, TicketStatus } from "@/types";
 
 /* -------------------------------------------------------------------------- */
 /*  Surfaces                                                                  */
@@ -168,19 +170,32 @@ const ORDER_TONES: Record<OrderStatus, string> = {
   refunded: "bg-sand text-ink-muted",
 };
 
-const ORDER_LABELS: Record<OrderStatus, string> = {
-  pending: "Awaiting payment",
-  paid: "Paid",
-  processing: "Processing",
-  packed: "Packed",
-  shipped: "Shipped",
-  "out-for-delivery": "Out for delivery",
-  delivered: "Delivered",
-  cancelled: "Cancelled",
-  refunded: "Refunded",
+/*
+ * Statuses read from the dictionary rather than a literal map.
+ *
+ * These pills are the most-rendered text in the whole tool — every board shows
+ * them — so leaving them in English was the single biggest thing standing
+ * between an Arabic operator and an Arabic admin.
+ */
+const ORDER_LABEL_KEYS: Record<OrderStatus, AdminKey> = {
+  pending: "status.order.pending",
+  paid: "status.order.paid",
+  processing: "status.order.processing",
+  packed: "status.order.packed",
+  shipped: "status.order.shipped",
+  "out-for-delivery": "status.order.out-for-delivery",
+  delivered: "status.order.delivered",
+  cancelled: "status.order.cancelled",
+  refunded: "status.order.refunded",
 };
 
+/** The English labels, for exports and anything outside a provider. */
+export function orderLabel(status: OrderStatus, locale: Locale = "en"): string {
+  return adminText(ORDER_LABEL_KEYS[status], locale);
+}
+
 export function OrderStatusPill({ status, className }: { status: OrderStatus; className?: string }) {
+  const { t } = useAdminLocale();
   return (
     <span
       className={cn(
@@ -189,12 +204,10 @@ export function OrderStatusPill({ status, className }: { status: OrderStatus; cl
         className,
       )}
     >
-      {ORDER_LABELS[status]}
+      {t(ORDER_LABEL_KEYS[status])}
     </span>
   );
 }
-
-export { ORDER_LABELS };
 
 const TICKET_TONES: Record<TicketStatus, string> = {
   open: "bg-alert/12 text-alert",
@@ -204,14 +217,15 @@ const TICKET_TONES: Record<TicketStatus, string> = {
 };
 
 export function TicketStatusPill({ status }: { status: TicketStatus }) {
+  const { t } = useAdminLocale();
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-pill px-2.5 py-1 text-[0.6875rem] font-medium capitalize",
+        "inline-flex items-center rounded-pill px-2.5 py-1 text-[0.6875rem] font-medium",
         TICKET_TONES[status],
       )}
     >
-      {status}
+      {t(`status.ticket.${status}` as AdminKey)}
     </span>
   );
 }
@@ -224,10 +238,11 @@ const PRIORITY_TONES: Record<TicketPriority, string> = {
 };
 
 export function PriorityFlag({ priority }: { priority: TicketPriority }) {
+  const { t } = useAdminLocale();
   return (
-    <span className={cn("inline-flex items-center gap-1 text-[0.75rem] capitalize", PRIORITY_TONES[priority])}>
+    <span className={cn("inline-flex items-center gap-1 text-[0.75rem]", PRIORITY_TONES[priority])}>
       {(priority === "urgent" || priority === "high") && <span aria-hidden="true">▲</span>}
-      {priority}
+      {t(`priority.${priority}` as AdminKey)}
     </span>
   );
 }
@@ -240,14 +255,15 @@ const INVOICE_TONES: Record<InvoiceStatus, string> = {
 };
 
 export function InvoiceStatusPill({ status }: { status: InvoiceStatus }) {
+  const { t } = useAdminLocale();
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-pill px-2.5 py-1 text-[0.6875rem] font-medium capitalize",
+        "inline-flex items-center rounded-pill px-2.5 py-1 text-[0.6875rem] font-medium",
         INVOICE_TONES[status],
       )}
     >
-      {status}
+      {t(`status.invoice.${status}` as AdminKey)}
     </span>
   );
 }
@@ -279,7 +295,7 @@ export function DataTable<T>({
   columns,
   rowKey,
   onRowClick,
-  empty = "Nothing here yet.",
+  empty,
   initialSort,
 }: {
   rows: T[];
@@ -289,6 +305,7 @@ export function DataTable<T>({
   empty?: ReactNode;
   initialSort?: { key: string; dir: "asc" | "desc" };
 }) {
+  const { t } = useAdminLocale();
   const [sort, setSort] = useState(initialSort ?? null);
 
   const sorted = useMemo(() => {
@@ -317,7 +334,7 @@ export function DataTable<T>({
   if (rows.length === 0) {
     return (
       <div className="border-line text-smoke rounded-lg border border-dashed py-16 text-center text-[0.9375rem]">
-        {empty}
+        {empty ?? t("common.empty")}
       </div>
     );
   }

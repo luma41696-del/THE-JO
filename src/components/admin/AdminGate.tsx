@@ -6,6 +6,7 @@ import { Link } from "@/components/ui/Link";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { BrandWave } from "@/components/brand/BrandWave";
+import { useAdminLocale } from "./AdminLocale";
 
 /**
  * Admin access gate.
@@ -50,6 +51,7 @@ const DEV_BYPASS =
   process.env.NEXT_PUBLIC_ADMIN_DEV_BYPASS === "true";
 
 export function AdminGate({ children }: { children: ReactNode }) {
+  const { t } = useAdminLocale();
   const { user, status } = useAuth();
   const [access, setAccess] = useState<Access>("checking");
   const [role, setRole] = useState<string | null>(null);
@@ -97,7 +99,7 @@ export function AdminGate({ children }: { children: ReactNode }) {
         <div className="h-20 w-20 opacity-60">
           <BrandWave rings={3} color="var(--color-brand)" speed={5} />
         </div>
-        <span className="sr-only">Checking access</span>
+        <span className="sr-only">{t("gate.checking")}</span>
       </div>
     );
   }
@@ -105,12 +107,12 @@ export function AdminGate({ children }: { children: ReactNode }) {
   if (access === "anonymous") {
     return (
       <Shell
-        title="Sign in to continue"
-        body="The admin is only reachable by a signed-in account with a staff or admin role."
+        title={t("gate.signInTitle")}
+        body={t("gate.signInBody")}
         action={
           <Link href="/login?next=/admin">
             <Button variant="brand" size="lg" magnetic>
-              Sign in
+              {t("gate.signIn")}
             </Button>
           </Link>
         }
@@ -121,26 +123,25 @@ export function AdminGate({ children }: { children: ReactNode }) {
   if (access === "denied") {
     return (
       <Shell
-        title="This account does not have admin access"
+        title={t("gate.deniedTitle")}
         body={
           <>
-            Signed in as <strong className="text-ink">{user?.email}</strong> with the role{" "}
+            {t("gate.signedInAs")} <strong className="text-ink">{user?.email}</strong>{" "}
+            {t("gate.withRole")}{" "}
             <code className="bg-paper-sunken rounded-xs px-1.5 py-0.5 text-[0.8125rem]">
               {role ?? "customer"}
             </code>
-            . An existing admin can grant it from{" "}
-            <strong className="text-ink">Access</strong> in the admin. If nobody has
-            admin yet, it is granted from a trusted machine:
+            . {t("gate.grantFrom")}
             <code className="bg-ink mt-4 block rounded-md px-4 py-3 text-start text-[0.8125rem] text-white">
               npm run grant-admin -- {user?.email}
             </code>
-            Either way, sign out and back in so the new token carries the claim.
+            {t("gate.thenSignOut")}
           </>
         }
         action={
           <Link href="/">
             <Button variant="secondary" size="lg">
-              Back to the store
+              {t("gate.backToStore")}
             </Button>
           </Link>
         }
@@ -155,8 +156,7 @@ export function AdminGate({ children }: { children: ReactNode }) {
           role="status"
           className="bg-alert sticky top-0 z-[200] px-4 py-1.5 text-center text-[0.6875rem] font-medium text-white"
         >
-          Development preview — access checks are bypassed. Writes still require a
-          verified admin token and will be refused.
+          {t("gate.devBypass")}
         </p>
       )}
       {children}

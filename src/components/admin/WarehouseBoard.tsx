@@ -15,6 +15,8 @@ import {
   type StorefrontState,
 } from "@/lib/visibility";
 import { AdminPageHeader } from "./AdminShell";
+import { useAdminLocale } from "./AdminLocale";
+import type { AdminKey } from "@/lib/i18n/admin";
 import { Panel, StatTile } from "./AdminUI";
 import { Button } from "@/components/ui/Button";
 import type { Category, Product, Season } from "@/types";
@@ -59,20 +61,20 @@ function fromLocalInput(value: string): number | null {
   return guess - drift;
 }
 
-const SEASON_LABELS: Record<Season, string> = {
-  winter: "Winter",
-  spring: "Spring",
-  summer: "Summer",
-  autumn: "Autumn",
-  "all-season": "All season",
+const SEASON_KEYS: Record<Season, AdminKey> = {
+  winter: "wh.season.winter",
+  spring: "wh.season.spring",
+  summer: "wh.season.summer",
+  autumn: "wh.season.autumn",
+  "all-season": "wh.season.all-season",
 };
 
-const STATE_STYLES: Record<StorefrontState, { label: string; tone: string }> = {
-  live: { label: "Live", tone: "bg-mint/12 text-mint" },
-  "out-of-stock": { label: "Sold out", tone: "bg-alert/10 text-alert" },
-  hidden: { label: "In warehouse", tone: "bg-brand-mist text-brand-deep" },
-  draft: { label: "Draft", tone: "bg-paper-sunken text-smoke" },
-  archived: { label: "Archived", tone: "bg-paper-sunken text-mist" },
+const STATE_STYLES: Record<StorefrontState, { label: AdminKey; tone: string }> = {
+  live: { label: "wh.state.live", tone: "bg-mint/12 text-mint" },
+  "out-of-stock": { label: "wh.state.out-of-stock", tone: "bg-alert/10 text-alert" },
+  hidden: { label: "wh.state.hidden", tone: "bg-brand-mist text-brand-deep" },
+  draft: { label: "wh.state.draft", tone: "bg-paper-sunken text-smoke" },
+  archived: { label: "wh.state.archived", tone: "bg-paper-sunken text-mist" },
 };
 
 export function WarehouseBoard({
@@ -84,6 +86,7 @@ export function WarehouseBoard({
   categories: Category[];
   now: number;
 }) {
+  const { t, locale } = useAdminLocale();
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
@@ -156,16 +159,16 @@ export function WarehouseBoard({
         persisted?: boolean;
         count?: number;
       };
-      if (!response.ok || !data.ok) throw new Error(data.error ?? "Update failed");
+      if (!response.ok || !data.ok) throw new Error(data.error ?? t("wh.updateFailed"));
       if (data.persisted === false) {
-        setError("Validated, but not stored: Firebase Admin is not configured here.");
+        setError(t("wh.notStored"));
         return;
       }
       setNotice(`${describe} — ${data.count ?? selected.size} products. The storefront is updated.`);
       setSelected(new Set());
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "The products could not be updated.");
+      setError(err instanceof Error ? err.message : t("wh.updateError"));
     } finally {
       setBusy(false);
     }
@@ -174,15 +177,15 @@ export function WarehouseBoard({
   return (
     <>
       <AdminPageHeader
-        title="Seasonal warehouse"
-        description="Move stock off the shopfront and back, without changing what it is."
+        title={t("wh.title")}
+        description={t("wh.subtitle")}
       />
 
       <div className="mb-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatTile label="Live" value={counts.live.toString()} emphasis={counts.live > 0} />
-        <StatTile label="In the warehouse" value={counts.hidden.toString()} />
-        <StatTile label="Sold out" value={counts["out-of-stock"].toString()} />
-        <StatTile label="Draft" value={counts.draft.toString()} />
+        <StatTile label={t("wh.state.live")} value={counts.live.toString()} emphasis={counts.live > 0} />
+        <StatTile label={t("wh.inWarehouse")} value={counts.hidden.toString()} />
+        <StatTile label={t("wh.state.out-of-stock")} value={counts["out-of-stock"].toString()} />
+        <StatTile label={t("wh.state.draft")} value={counts.draft.toString()} />
       </div>
 
       {/* ---- Filters ------------------------------------------------- */}
@@ -190,47 +193,47 @@ export function WarehouseBoard({
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search title or SKU…"
-          aria-label="Search products"
+          placeholder={t("wh.searchPlaceholder")}
+          aria-label={t("products.searchLabel")}
           className="border-line focus:border-brand bg-paper text-ink min-w-0 flex-1 rounded-md border px-3 py-2 text-[0.8125rem] outline-none sm:max-w-xs"
         />
         <select
           value={seasonFilter}
           onChange={(e) => setSeasonFilter(e.target.value as Season | "all")}
-          aria-label="Filter by season"
+          aria-label={t("wh.filterSeason")}
           className={filterClass}
         >
-          <option value="all">Every season</option>
+          <option value="all">{t("wh.everySeason")}</option>
           {SEASONS.map((s) => (
             <option key={s} value={s}>
-              {SEASON_LABELS[s]}
+              {t(SEASON_KEYS[s])}
             </option>
           ))}
         </select>
         <select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
-          aria-label="Filter by category"
+          aria-label={t("wh.filterCategory")}
           className={filterClass}
         >
-          <option value="all">Every category</option>
+          <option value="all">{t("wh.everyCategory")}</option>
           {categories.map((c) => (
             <option key={c.id} value={c.id}>
               {"— ".repeat(c.depth)}
-              {c.name.en}
+              {locale === "ar" ? c.name.ar : c.name.en}
             </option>
           ))}
         </select>
         <select
           value={stateFilter}
           onChange={(e) => setStateFilter(e.target.value as StorefrontState | "all")}
-          aria-label="Filter by state"
+          aria-label={t("wh.filterState")}
           className={filterClass}
         >
-          <option value="all">Any state</option>
+          <option value="all">{t("wh.anyState")}</option>
           {(Object.keys(STATE_STYLES) as StorefrontState[]).map((s) => (
             <option key={s} value={s}>
-              {STATE_STYLES[s].label}
+              {t(STATE_STYLES[s].label)}
             </option>
           ))}
         </select>
@@ -251,24 +254,24 @@ export function WarehouseBoard({
       {selected.size > 0 && (
         <Panel
           title={`${selected.size} selected`}
-          description="Hiding never changes stock, status or past orders."
+          description={t("wh.hidingHint")}
         >
           <div className="flex flex-wrap items-end gap-3">
             <Button
               variant="secondary"
               size="sm"
               loading={busy}
-              onClick={() => apply({ visibility: "hidden" }, "Moved to the warehouse")}
+              onClick={() => apply({ visibility: "hidden" }, t("wh.movedToWarehouse"))}
             >
-              Move to warehouse
+              {t("wh.moveToWarehouse")}
             </Button>
             <Button
               variant="brand"
               size="sm"
               loading={busy}
-              onClick={() => apply({ visibility: "visible" }, "Returned to the shopfront")}
+              onClick={() => apply({ visibility: "visible" }, t("wh.returnedToShopfront"))}
             >
-              Return to shopfront
+              {t("wh.returnToShopfront")}
             </Button>
 
             <span className="border-line mx-1 h-8 border-s" />
@@ -278,18 +281,18 @@ export function WarehouseBoard({
                 key={season}
                 type="button"
                 disabled={busy}
-                onClick={() => apply({ seasons: [season] }, `Tagged ${SEASON_LABELS[season]}`)}
+                onClick={() => apply({ seasons: [season] }, `${t("wh.tagged")} ${t(SEASON_KEYS[season])}`)}
                 className="border-line text-ink-muted hover:border-ink hover:text-ink rounded-pill cursor-pointer border px-3 py-1.5 text-[0.75rem] transition-colors disabled:opacity-40"
                 data-cursor="hover"
               >
-                {SEASON_LABELS[season]}
+                {t(SEASON_KEYS[season])}
               </button>
             ))}
           </div>
 
           <div className="border-line mt-4 grid gap-3 border-t pt-4 sm:grid-cols-[1fr_1fr_auto]">
             <label className="block">
-              <span className="text-ink-muted mb-1.5 block text-[0.75rem]">Show at (Amman)</span>
+              <span className="text-ink-muted mb-1.5 block text-[0.75rem]">{t("wh.showAt")}</span>
               <input
                 type="datetime-local"
                 value={showAt}
@@ -298,7 +301,7 @@ export function WarehouseBoard({
               />
             </label>
             <label className="block">
-              <span className="text-ink-muted mb-1.5 block text-[0.75rem]">Hide at (Amman)</span>
+              <span className="text-ink-muted mb-1.5 block text-[0.75rem]">{t("wh.hideAt")}</span>
               <input
                 type="datetime-local"
                 value={hideAt}
@@ -318,19 +321,19 @@ export function WarehouseBoard({
                       hideAt: fromLocalInput(hideAt),
                       override: false,
                     },
-                    "Scheduled",
+                    t("wh.scheduled"),
                   )
                 }
               >
-                Schedule
+                {t("wh.schedule")}
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
                 loading={busy}
-                onClick={() => apply({ clearSchedule: true }, "Schedule cleared")}
+                onClick={() => apply({ clearSchedule: true }, t("wh.scheduleCleared"))}
               >
-                Clear
+                {t("wh.clear")}
               </Button>
             </div>
           </div>
@@ -354,25 +357,25 @@ export function WarehouseBoard({
                   <input
                     type="checkbox"
                     checked={allShown}
-                    aria-label="Select everything shown"
+                    aria-label={t("wh.selectAll")}
                     onChange={() =>
                       setSelected(allShown ? new Set() : new Set(rows.map((r) => r.id)))
                     }
                     className="accent-brand"
                   />
                 </th>
-                <th className="p-3 text-start font-medium">Product</th>
-                <th className="p-3 text-start font-medium">Seasons</th>
-                <th className="p-3 text-start font-medium">State</th>
-                <th className="p-3 text-end font-medium">Stock</th>
-                <th className="p-3 text-start font-medium">Schedule</th>
+                <th className="p-3 text-start font-medium">{t("col.product")}</th>
+                <th className="p-3 text-start font-medium">{t("wh.seasons")}</th>
+                <th className="p-3 text-start font-medium">{t("wh.state")}</th>
+                <th className="p-3 text-end font-medium">{t("col.stock")}</th>
+                <th className="p-3 text-start font-medium">{t("wh.schedule")}</th>
               </tr>
             </thead>
             <tbody className="divide-line divide-y">
               {rows.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="text-mist p-8 text-center">
-                    Nothing matches these filters.
+                    {t("wh.noMatch")}
                   </td>
                 </tr>
               ) : (
@@ -383,8 +386,12 @@ export function WarehouseBoard({
                   const scheduled =
                     schedule?.showAt || schedule?.hideAt
                       ? [
-                          schedule.showAt ? `show ${toLocalInput(schedule.showAt)}` : null,
-                          schedule.hideAt ? `hide ${toLocalInput(schedule.hideAt)}` : null,
+                          schedule.showAt
+                            ? `${t("wh.showsAt")} ${toLocalInput(schedule.showAt)}`
+                            : null,
+                          schedule.hideAt
+                            ? `${t("wh.hidesAt")} ${toLocalInput(schedule.hideAt)}`
+                            : null,
                         ]
                           .filter(Boolean)
                           .join(" · ")
@@ -416,7 +423,7 @@ export function WarehouseBoard({
                           )}
                           <span className="min-w-0">
                             <span className="text-ink block truncate font-medium">
-                              {pick(product.title, "en")}
+                              {pick(product.title, locale)}
                             </span>
                             <span className="text-mist block font-mono text-[0.6875rem]">
                               {product.sku}
@@ -427,7 +434,7 @@ export function WarehouseBoard({
                       <td className="p-3">
                         <span className="text-ink-muted text-[0.75rem]">
                           {seasonsOf(product)
-                            .map((s) => SEASON_LABELS[s])
+                            .map((s) => t(SEASON_KEYS[s]))
                             .join(", ")}
                         </span>
                       </td>
@@ -443,7 +450,7 @@ export function WarehouseBoard({
                         {product.visibilityOverride && (
                           <span
                             className="text-mist ms-1.5 text-[0.625rem]"
-                            title="A manual change is overriding the schedule"
+                            title={t("wh.overriding")}
                           >
                             manual
                           </span>

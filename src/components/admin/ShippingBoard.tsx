@@ -223,7 +223,7 @@ export function ShippingBoard({
 
                 <label className="text-center">
                   <span className="text-mist block text-[0.6875rem] tracking-[0.1em] uppercase">
-                    Free above
+                    {t("ship.freeAbove")}
                   </span>
                   <Num
                     value={zone.freeAbove ?? ""}

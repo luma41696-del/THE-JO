@@ -9,6 +9,7 @@ import { transition } from "@/lib/motion";
 import { formatDate } from "@/lib/format";
 import { getIdToken } from "@/lib/firebase/auth";
 import { AdminPageHeader } from "./AdminShell";
+import { useAdminLocale } from "./AdminLocale";
 import { FilterChips, Panel, PriorityFlag, StatTile, TicketStatusPill } from "./AdminUI";
 import { Button } from "@/components/ui/Button";
 import type { SupportTicket, TicketStatus } from "@/types";
@@ -31,6 +32,7 @@ type Filter = "needs-reply" | "all" | TicketStatus;
 const POLL_MS = 15_000;
 
 export function SupportBoard({ tickets: initial }: { tickets: SupportTicket[] }) {
+  const { t } = useAdminLocale();
   const [tickets, setTickets] = useState(initial);
   const [filter, setFilter] = useState<Filter>("needs-reply");
   const [selectedId, setSelectedId] = useState<string | null>(initial[0]?.id ?? null);
@@ -144,14 +146,14 @@ export function SupportBoard({ tickets: initial }: { tickets: SupportTicket[] })
         delivered?: boolean;
         deliveryNote?: string;
       };
-      if (!response.ok || !data.ok) throw new Error(data.error ?? "The reply was not saved.");
+      if (!response.ok || !data.ok) throw new Error(data.error ?? t("support.replyNotSaved"));
 
       if (data.persisted === false) {
         // Roll back rather than leave a reply on screen that is not stored.
         setTickets(snapshot);
         setReply(body);
         setSendError(
-          "Not saved: Firebase Admin is not configured in this environment.",
+          t("support.replyNotSavedAdmin"),
         );
       } else if (data.delivered === false && data.deliveryNote) {
         // Stored, but not emailed. Staff must know the customer has not been
@@ -162,7 +164,7 @@ export function SupportBoard({ tickets: initial }: { tickets: SupportTicket[] })
       setTickets(snapshot);
       setReply(body);
       setSendError(
-        error instanceof Error ? error.message : "The reply could not be saved.",
+        error instanceof Error ? error.message : t("support.replyError"),
       );
     } finally {
       setSending(false);
@@ -198,12 +200,12 @@ export function SupportBoard({ tickets: initial }: { tickets: SupportTicket[] })
       });
 
       const data = (await response.json()) as { ok?: boolean; error?: string; persisted?: boolean };
-      if (!response.ok || !data.ok) throw new Error(data.error ?? "The status was not saved.");
-      if (data.persisted === false) throw new Error("Not saved: Firebase Admin is not configured.");
+      if (!response.ok || !data.ok) throw new Error(data.error ?? t("support.statusNotSaved"));
+      if (data.persisted === false) throw new Error(t("support.statusNotSavedAdmin"));
     } catch (error) {
       setTickets(snapshot);
       setSendError(
-        error instanceof Error ? error.message : "The status could not be saved.",
+        error instanceof Error ? error.message : t("support.statusError"),
       );
     }
   }
@@ -246,33 +248,33 @@ export function SupportBoard({ tickets: initial }: { tickets: SupportTicket[] })
   }, []);
 
   const FILTERS: { value: Filter; label: string }[] = [
-    { value: "needs-reply", label: "Needs reply" },
-    { value: "all", label: "All" },
-    { value: "open", label: "Open" },
-    { value: "pending", label: "Waiting" },
-    { value: "resolved", label: "Resolved" },
-    { value: "closed", label: "Closed" },
+    { value: "needs-reply", label: t("support.needsReply") },
+    { value: "all", label: t("common.all") },
+    { value: "open", label: t("status.ticket.open") },
+    { value: "pending", label: t("status.ticket.pending") },
+    { value: "resolved", label: t("status.ticket.resolved") },
+    { value: "closed", label: t("status.ticket.closed") },
   ];
 
   return (
     <>
       <AdminPageHeader
-        title="Support"
-        description="Answered in runs — the thread opens beside the list, not instead of it."
+        title={t("support.title")}
+        description={t("support.subtitle")}
       />
 
       <div className="mb-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatTile label="Open" value={stats.open.toString()} emphasis={stats.open > 0} />
-        <StatTile label="Awaiting customer" value={stats.awaiting.toString()} />
+        <StatTile label={t("status.ticket.open")} value={stats.open.toString()} emphasis={stats.open > 0} />
+        <StatTile label={t("support.awaitingCustomer")} value={stats.awaiting.toString()} />
         <StatTile
-          label="Median first reply"
+          label={t("support.medianFirstReply")}
           value={
             stats.medianMinutes >= 60
               ? `${(stats.medianMinutes / 60).toFixed(1)}h`
               : `${stats.medianMinutes}m`
           }
         />
-        <StatTile label="Resolved" value={`${Math.round(stats.resolvedShare * 100)}%`} />
+        <StatTile label={t("status.ticket.resolved")} value={`${Math.round(stats.resolvedShare * 100)}%`} />
       </div>
 
       <div className="mb-4">
@@ -284,7 +286,7 @@ export function SupportBoard({ tickets: initial }: { tickets: SupportTicket[] })
         <Panel padded={false} className="max-h-[38rem] overflow-y-auto">
           {rows.length === 0 ? (
             <p className="text-smoke p-8 text-center text-[0.875rem]">
-              Nothing here. Inbox zero.
+              {t("support.inboxZero")}
             </p>
           ) : (
             <ul className="divide-line divide-y">
@@ -351,7 +353,7 @@ export function SupportBoard({ tickets: initial }: { tickets: SupportTicket[] })
                 <TicketStatusPill status={selected.status} />
                 {selected.status !== "resolved" && (
                   <Button variant="ghost" size="sm" onClick={() => setStatus("resolved")}>
-                    Resolve
+                    {t("support.resolve")}
                   </Button>
                 )}
               </div>
@@ -397,7 +399,7 @@ export function SupportBoard({ tickets: initial }: { tickets: SupportTicket[] })
                   value={reply}
                   onChange={(event) => setReply(event.target.value)}
                   rows={3}
-                  placeholder="Write a reply…"
+                  placeholder={t("support.replyPlaceholder")}
                   className="border-line focus:border-brand bg-paper text-ink placeholder:text-mist w-full resize-y rounded-md border px-3 py-2.5 text-[0.875rem] outline-none transition-colors"
                 />
               </label>
@@ -415,7 +417,7 @@ export function SupportBoard({ tickets: initial }: { tickets: SupportTicket[] })
                   disabled={!reply.trim()}
                   onClick={send}
                 >
-                  Send reply
+                  {t("support.sendReply")}
                 </Button>
               </div>
 
@@ -435,7 +437,7 @@ export function SupportBoard({ tickets: initial }: { tickets: SupportTicket[] })
         ) : (
           <Panel>
             <p className="text-smoke py-16 text-center text-[0.875rem]">
-              Select a ticket to read the thread.
+              {t("support.selectTicket")}
             </p>
           </Panel>
         )}

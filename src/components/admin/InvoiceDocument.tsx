@@ -6,6 +6,7 @@ import { Link } from "@/components/ui/Link";
 import { cn } from "@/lib/utils";
 import { formatDate, formatPrice, t as pick } from "@/lib/format";
 import { taxLabel } from "@/lib/pricing";
+import { useAdminLocale } from "./AdminLocale";
 import { printToPdf } from "@/lib/admin/export";
 import { NetSaleMark } from "@/components/brand/NetSaleMark";
 import { Button } from "@/components/ui/Button";
@@ -47,6 +48,7 @@ export function InvoiceDocument({
    */
   settings: StoreSettings;
 }) {
+  const { t } = useAdminLocale();
   const [locale, setLocale] = useState<Locale>("en");
   const rtl = locale === "ar";
 
@@ -105,7 +107,7 @@ export function InvoiceDocument({
                 ))}
               </div>
               <Button variant="brand" size="sm" onClick={printToPdf}>
-                Save as PDF
+                {t("inv.savePdf")}
               </Button>
             </>
           }

@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { formatPrice, t as pick } from "@/lib/format";
 import { discountPercent } from "@/lib/utils";
 import { AdminPageHeader } from "./AdminShell";
+import { useAdminLocale } from "./AdminLocale";
 import { DataTable, FilterChips, type Column } from "./AdminUI";
 import { ExportMenu } from "./ExportMenu";
 import { Button } from "@/components/ui/Button";
@@ -32,6 +33,7 @@ export function ProductsBoard({
   products: Product[];
   categories: Category[];
 }) {
+  const { t, locale } = useAdminLocale();
   const router = useLocalizedRouter();
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
@@ -71,7 +73,7 @@ export function ProductsBoard({
   const columns: Column<Product>[] = [
     {
       key: "product",
-      header: "Product",
+      header: t("col.product"),
       cell: (product) => (
         <span className="flex items-center gap-3">
           {product.images[0] && (
@@ -90,7 +92,7 @@ export function ProductsBoard({
               href={`/admin/products/${product.id}`}
               className="text-ink block truncate font-medium"
             >
-              {pick(product.title, "en")}
+              {pick(product.title, locale)}
             </Link>
             <span className="text-mist block truncate text-[0.6875rem]" dir="rtl" lang="ar">
               {pick(product.title, "ar")}
@@ -98,17 +100,17 @@ export function ProductsBoard({
           </span>
         </span>
       ),
-      sortValue: (product) => pick(product.title, "en"),
+      sortValue: (product) => pick(product.title, locale),
     },
     {
       key: "category",
-      header: "Category",
+      header: t("col.category"),
       cell: (product) => <span className="text-ink-muted capitalize">{product.categoryId}</span>,
       sortValue: (product) => product.categoryId,
     },
     {
       key: "price",
-      header: "Price",
+      header: t("col.price"),
       align: "end",
       cell: (product) => {
         const off = discountPercent(product.price, product.compareAtPrice);
@@ -125,7 +127,7 @@ export function ProductsBoard({
     },
     {
       key: "stock",
-      header: "Stock",
+      header: t("col.stock"),
       align: "end",
       cell: (product) => (
         <span
@@ -148,7 +150,7 @@ export function ProductsBoard({
     },
     {
       key: "variants",
-      header: "Variants",
+      header: t("col.variants"),
       align: "end",
       cell: (product) => (
         <span className="text-smoke tabular-nums">
@@ -159,7 +161,7 @@ export function ProductsBoard({
     },
     {
       key: "status",
-      header: "Status",
+      header: t("col.status"),
       cell: (product) => (
         <span
           className={cn(
@@ -175,44 +177,44 @@ export function ProductsBoard({
   ];
 
   const filters = [
-    { value: "all", label: "All" },
-    { value: "low-stock", label: "Low stock" },
-    { value: "on-sale", label: "On sale" },
-    { value: "draft", label: "Draft" },
-    ...categories.map((c) => ({ value: c.id, label: pick(c.name, "en") })),
+    { value: "all", label: t("common.all") },
+    { value: "low-stock", label: t("products.lowStock") },
+    { value: "on-sale", label: t("products.onSale") },
+    { value: "draft", label: t("products.draft") },
+    ...categories.map((c) => ({ value: c.id, label: pick(c.name, locale) })),
   ];
 
   return (
     <>
       <AdminPageHeader
-        title="Products"
-        description="The catalogue, lowest stock first."
+        title={t("products.title")}
+        description={t("products.subtitle")}
         actions={
           <>
             <ExportMenu
               rows={rows}
               columns={[
-                { header: "Title (EN)", value: (p) => pick(p.title, "en"), width: 30 },
-                { header: "Title (AR)", value: (p) => pick(p.title, "ar"), width: 30 },
-                { header: "Slug", value: (p) => p.slug, width: 26 },
-                { header: "Category", value: (p) => p.categoryId },
-                { header: "Price", value: (p) => p.price, format: "currency" },
-                { header: "Compare at", value: (p) => p.compareAtPrice ?? "", format: "currency" },
-                { header: "Stock", value: (p) => p.totalStock, format: "number" },
-                { header: "Colours", value: (p) => p.colors.map((c) => pick(c.name, "en")).join(", "), width: 28 },
-                { header: "Sizes", value: (p) => p.sizes.map((s) => s.label).join(", ") },
-                { header: "Status", value: (p) => p.status },
+                { header: t("col.titleEn"), value: (p) => pick(p.title, "en"), width: 30 },
+                { header: t("col.titleAr"), value: (p) => pick(p.title, "ar"), width: 30 },
+                { header: t("col.slug"), value: (p) => p.slug, width: 26 },
+                { header: t("col.category"), value: (p) => p.categoryId },
+                { header: t("col.price"), value: (p) => p.price, format: "currency" },
+                { header: t("col.compareAt"), value: (p) => p.compareAtPrice ?? "", format: "currency" },
+                { header: t("col.stock"), value: (p) => p.totalStock, format: "number" },
+                { header: t("col.colours"), value: (p) => p.colors.map((c) => pick(c.name, locale)).join(", "), width: 28 },
+                { header: t("col.sizes"), value: (p) => p.sizes.map((s) => s.label).join(", ") },
+                { header: t("col.status"), value: (p) => p.status },
                 // Exported from the seeded field, which is demo data. Left in
                 // the export for continuity, but the storefront no longer shows
                 // it — the product page reads published reviews instead.
                 { header: "Seeded rating", value: (p) => p.rating?.average ?? "" },
               ]}
               filename="net-sale-catalogue"
-              title="net sale — catalogue"
+              title={t("products.title")}
             />
             <Link href="/admin/products/new">
               <Button variant="brand" size="sm">
-                New product
+                {t("products.new")}
               </Button>
             </Link>
           </>
@@ -223,11 +225,11 @@ export function ProductsBoard({
         <FilterChips options={filters} value={filter} onChange={setFilter} counts={counts} />
 
         <label className="relative">
-          <span className="sr-only">Search products</span>
+          <span className="sr-only">{t("products.searchLabel")}</span>
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Title, slug, tag…"
+            placeholder={t("products.searchPlaceholder")}
             className="border-line focus:border-brand bg-paper-raised text-ink placeholder:text-mist w-56 rounded-pill border py-2 ps-4 pe-4 text-[0.8125rem] outline-none transition-colors"
           />
         </label>
@@ -239,7 +241,7 @@ export function ProductsBoard({
         rowKey={(product) => product.id}
         onRowClick={(product) => router.push(`/admin/products/${product.id}`)}
         initialSort={{ key: "stock", dir: "asc" }}
-        empty={search ? `Nothing matches "${search}".` : "No products in this view."}
+        empty={search ? t("common.noMatch") : t("products.empty")}
       />
     </>
   );

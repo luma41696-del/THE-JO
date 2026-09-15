@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/format";
 import { getIdToken } from "@/lib/firebase/auth";
 import { AdminPageHeader } from "./AdminShell";
+import { useAdminLocale } from "./AdminLocale";
 import { Panel, StatTile } from "./AdminUI";
 import { Button } from "@/components/ui/Button";
 import type { GiftCampaign, GiftPlay, GiftPrize } from "@/types";
@@ -101,6 +102,7 @@ export function GiftBoard({
   campaigns: GiftCampaign[];
   plays: GiftPlay[];
 }) {
+  const { t } = useAdminLocale();
   const router = useRouter();
   const active = campaigns.find((c) => c.status === "active") ?? null;
   const [editing, setEditing] = useState<GiftCampaign | null>(active);
@@ -167,14 +169,14 @@ export function GiftBoard({
         }),
       });
       const data = (await response.json()) as { ok?: boolean; error?: string; persisted?: boolean };
-      if (!response.ok || !data.ok) throw new Error(data.error ?? "Save failed");
+      if (!response.ok || !data.ok) throw new Error(data.error ?? t("gift.saveFailed"));
       if (data.persisted === false) {
-        setError("Validated, but not stored: Firebase Admin is not configured here.");
+        setError(t("gift.notStored"));
         return;
       }
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "The campaign could not be saved.");
+      setError(err instanceof Error ? err.message : t("gift.saveError"));
     } finally {
       setSaving(false);
     }
@@ -183,18 +185,18 @@ export function GiftBoard({
   return (
     <>
       <AdminPageHeader
-        title="Gift game"
-        description="A wheel that issues real coupons. The server decides every spin."
+        title={t("gift.title")}
+        description={t("gift.subtitle")}
       />
 
       <div className="mb-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatTile label="Spins" value={report.total.toLocaleString("en-GB")} emphasis={report.total > 0} />
-        <StatTile label="Coupons issued" value={report.withCoupon.toLocaleString("en-GB")} />
+        <StatTile label={t("gift.spins")} value={report.total.toLocaleString("en-GB")} emphasis={report.total > 0} />
+        <StatTile label={t("gift.couponsIssued")} value={report.withCoupon.toLocaleString("en-GB")} />
         <StatTile
-          label="Win rate"
+          label={t("gift.winRate")}
           value={report.total > 0 ? `${Math.round((report.withCoupon / report.total) * 100)}%` : "—"}
         />
-        <StatTile label="Campaigns" value={campaigns.length.toString()} />
+        <StatTile label={t("gift.campaigns")} value={campaigns.length.toString()} />
       </div>
 
       {error && (
@@ -204,7 +206,7 @@ export function GiftBoard({
       )}
 
       <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr] [&>*]:min-w-0">
-        <Panel title="Prizes and odds" description="Weights are relative; the share is shown live.">
+        <Panel title={t("gift.prizes")} description={t("gift.prizesHint")}>
           <ul className="space-y-3">
             {prizes.map((prize, index) => {
               const share = totalWeight > 0 ? prize.weight / totalWeight : 0;
@@ -215,7 +217,7 @@ export function GiftBoard({
                 <li key={prize.id} className="border-line rounded-md border p-3">
                   <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto_auto] sm:items-end">
                     <label className="block">
-                      <span className="text-mist mb-1 block text-[0.6875rem]">Label (EN)</span>
+                      <span className="text-mist mb-1 block text-[0.6875rem]">{t("gift.labelEn")}</span>
                       <input
                         value={prize.label.en}
                         onChange={(e) =>
@@ -226,7 +228,7 @@ export function GiftBoard({
                     </label>
 
                     <label className="block">
-                      <span className="text-mist mb-1 block text-[0.6875rem]">Reward</span>
+                      <span className="text-mist mb-1 block text-[0.6875rem]">{t("gift.reward")}</span>
                       <select
                         value={prize.reward}
                         onChange={(e) =>
@@ -234,15 +236,15 @@ export function GiftBoard({
                         }
                         className={input}
                       >
-                        <option value="percentage">% off</option>
-                        <option value="fixed">JOD off</option>
-                        <option value="free-shipping">Free delivery</option>
-                        <option value="none">No prize</option>
+                        <option value="percentage">{t("gift.percentOff")}</option>
+                        <option value="fixed">{t("gift.jodOff")}</option>
+                        <option value="free-shipping">{t("gift.freeDelivery")}</option>
+                        <option value="none">{t("gift.noPrize")}</option>
                       </select>
                     </label>
 
                     <label className="block">
-                      <span className="text-mist mb-1 block text-[0.6875rem]">Value</span>
+                      <span className="text-mist mb-1 block text-[0.6875rem]">{t("gift.value")}</span>
                       <input
                         type="number"
                         min={0}
@@ -254,7 +256,7 @@ export function GiftBoard({
                     </label>
 
                     <label className="block">
-                      <span className="text-mist mb-1 block text-[0.6875rem]">Weight</span>
+                      <span className="text-mist mb-1 block text-[0.6875rem]">{t("gift.weight")}</span>
                       <input
                         type="number"
                         min={0}
@@ -270,7 +272,7 @@ export function GiftBoard({
                       {(share * 100).toFixed(1)}% chance
                     </span>
                     <label className="text-mist flex items-center gap-1.5">
-                      Limit
+                      {t("gift.limit")}
                       <input
                         type="number"
                         min={0}
@@ -303,9 +305,9 @@ export function GiftBoard({
           </p>
         </Panel>
 
-        <Panel title="Campaign" description="One campaign runs at a time.">
+        <Panel title={t("gift.campaign")} description={t("gift.campaignHint")}>
           <div className="grid gap-3">
-            <Field label="Name (EN)" value={name.en} onChange={(v) => setName({ ...name, en: v })} />
+            <Field label={t("gift.nameEn")} value={name.en} onChange={(v) => setName({ ...name, en: v })} />
             <Field
               label="الاسم (عربي)"
               value={name.ar}
@@ -315,7 +317,7 @@ export function GiftBoard({
 
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block">
-                <span className="text-ink-muted mb-1.5 block text-[0.75rem]">Starts (Amman)</span>
+                <span className="text-ink-muted mb-1.5 block text-[0.75rem]">{t("gift.starts")}</span>
                 <input
                   type="datetime-local"
                   value={startsAt}
@@ -324,7 +326,7 @@ export function GiftBoard({
                 />
               </label>
               <label className="block">
-                <span className="text-ink-muted mb-1.5 block text-[0.75rem]">Ends (Amman)</span>
+                <span className="text-ink-muted mb-1.5 block text-[0.75rem]">{t("gift.ends")}</span>
                 <input
                   type="datetime-local"
                   value={endsAt}
@@ -336,7 +338,7 @@ export function GiftBoard({
 
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block">
-                <span className="text-ink-muted mb-1.5 block text-[0.75rem]">Hours between spins</span>
+                <span className="text-ink-muted mb-1.5 block text-[0.75rem]">{t("gift.cooldown")}</span>
                 <input
                   type="number"
                   min={0}
@@ -346,7 +348,7 @@ export function GiftBoard({
                 />
               </label>
               <label className="block">
-                <span className="text-ink-muted mb-1.5 block text-[0.75rem]">Total spins each</span>
+                <span className="text-ink-muted mb-1.5 block text-[0.75rem]">{t("gift.maxAttempts")}</span>
                 <input
                   type="number"
                   min={1}
@@ -361,7 +363,7 @@ export function GiftBoard({
             </div>
 
             <Field
-              label="Terms (EN)"
+              label={t("gift.termsEn")}
               value={terms.en}
               onChange={(v) => setTerms({ ...terms, en: v })}
               multiline
@@ -375,25 +377,25 @@ export function GiftBoard({
             />
 
             <label className="block">
-              <span className="text-ink-muted mb-1.5 block text-[0.75rem]">Status</span>
+              <span className="text-ink-muted mb-1.5 block text-[0.75rem]">{t("gift.statusLabel")}</span>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value as GiftCampaign["status"])}
                 className={input}
               >
-                <option value="draft">Draft — not running</option>
-                <option value="active">Live — customers can play</option>
-                <option value="paused">Paused</option>
-                <option value="archived">Archived</option>
+                <option value="draft">{t("gift.draftOption")}</option>
+                <option value="active">{t("gift.activeOption")}</option>
+                <option value="paused">{t("gift.paused")}</option>
+                <option value="archived">{t("gift.archived")}</option>
               </select>
               <span className="text-mist mt-1 block text-[0.6875rem]">
-                Making this live pauses any other running campaign.
+                {t("gift.pausesOthers")}
               </span>
             </label>
 
             <div className="flex justify-end">
               <Button variant="brand" size="sm" loading={saving} onClick={save}>
-                {editing ? "Save campaign" : "Create campaign"}
+                {editing ? t("gift.saveCampaign") : t("gift.createCampaign")}
               </Button>
             </div>
           </div>
@@ -402,7 +404,7 @@ export function GiftBoard({
 
       {campaigns.length > 0 && (
         <div className="mt-4">
-          <Panel title="All campaigns" padded={false}>
+          <Panel title={t("gift.allCampaigns")} padded={false}>
             <ul className="divide-line divide-y">
               {campaigns.map((campaign) => (
                 <li key={campaign.id} className="flex flex-wrap items-center gap-3 p-4">

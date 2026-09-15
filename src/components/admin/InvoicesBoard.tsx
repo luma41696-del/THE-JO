@@ -7,6 +7,8 @@ import { formatDate, formatPrice } from "@/lib/format";
 import { AdminPageHeader } from "./AdminShell";
 import { DataTable, InvoiceStatusPill, StatTile, type Column } from "./AdminUI";
 import { ExportMenu } from "./ExportMenu";
+import { useAdminLocale } from "./AdminLocale";
+import { taxLabel } from "@/lib/pricing";
 import type { Invoice } from "@/types";
 
 /**
@@ -18,6 +20,7 @@ import type { Invoice } from "@/types";
  * tax authority — but its value is subtracted rather than counted.
  */
 export function InvoicesBoard({ invoices }: { invoices: Invoice[] }) {
+  const { t, locale } = useAdminLocale();
   const router = useLocalizedRouter();
   const [search, setSearch] = useState("");
 
@@ -50,7 +53,7 @@ export function InvoicesBoard({ invoices }: { invoices: Invoice[] }) {
   const columns: Column<Invoice>[] = [
     {
       key: "number",
-      header: "Invoice",
+      header: t("invoices.invoice"),
       cell: (invoice) => (
         <Link
           href={`/admin/invoices/${invoice.orderReference}`}
@@ -63,7 +66,7 @@ export function InvoicesBoard({ invoices }: { invoices: Invoice[] }) {
     },
     {
       key: "order",
-      header: "Order",
+      header: t("col.order"),
       cell: (invoice) => (
         <Link href={`/admin/orders/${invoice.orderReference}`} className="text-brand">
           {invoice.orderReference}
@@ -73,7 +76,7 @@ export function InvoicesBoard({ invoices }: { invoices: Invoice[] }) {
     },
     {
       key: "customer",
-      header: "Billed to",
+      header: t("invoices.billedTo"),
       cell: (invoice) => (
         <span>
           <span className="text-ink block">{invoice.billTo.name}</span>
@@ -84,19 +87,19 @@ export function InvoicesBoard({ invoices }: { invoices: Invoice[] }) {
     },
     {
       key: "issued",
-      header: "Issued",
+      header: t("invoices.issued"),
       cell: (invoice) => <span className="text-smoke">{formatDate(invoice.issuedAt)}</span>,
       sortValue: (invoice) => invoice.issuedAt,
     },
     {
       key: "status",
-      header: "Status",
+      header: t("col.status"),
       cell: (invoice) => <InvoiceStatusPill status={invoice.status} />,
       sortValue: (invoice) => invoice.status,
     },
     {
       key: "tax",
-      header: "Tax",
+      header: t("col.tax"),
       align: "end",
       cell: (invoice) => (
         <span className="text-smoke tabular-nums">{formatPrice(invoice.tax, invoice.currency)}</span>
@@ -105,7 +108,7 @@ export function InvoicesBoard({ invoices }: { invoices: Invoice[] }) {
     },
     {
       key: "total",
-      header: "Total",
+      header: t("col.total"),
       align: "end",
       cell: (invoice) => (
         <span className="text-ink font-medium tabular-nums">
@@ -119,46 +122,46 @@ export function InvoicesBoard({ invoices }: { invoices: Invoice[] }) {
   return (
     <>
       <AdminPageHeader
-        title="Invoices"
-        description="Sequential and gapless. A credited invoice is reversed, never removed."
+        title={t("invoices.title")}
+        description={t("invoices.subtitle")}
         actions={
           <ExportMenu
             rows={rows}
             columns={[
-              { header: "Invoice", value: (i) => i.number, width: 18 },
-              { header: "Order", value: (i) => i.orderReference, width: 14 },
-              { header: "Issued", value: (i) => new Date(i.issuedAt), format: "date", width: 18 },
-              { header: "Status", value: (i) => i.status },
-              { header: "Customer", value: (i) => i.billTo.name, width: 24 },
-              { header: "Email", value: (i) => i.billTo.email, width: 28 },
-              { header: "City", value: (i) => i.billTo.city },
-              { header: "Subtotal", value: (i) => i.subtotal, format: "currency" },
-              { header: "Discount", value: (i) => i.discount, format: "currency" },
-              { header: "Shipping", value: (i) => i.shipping, format: "currency" },
-              { header: "Tax (16%)", value: (i) => i.tax, format: "currency" },
-              { header: "Total", value: (i) => i.total, format: "currency" },
-              { header: "Payment", value: (i) => i.paymentMethod },
+              { header: t("invoices.invoice"), value: (i) => i.number, width: 18 },
+              { header: t("col.order"), value: (i) => i.orderReference, width: 14 },
+              { header: t("invoices.issued"), value: (i) => new Date(i.issuedAt), format: "date", width: 18 },
+              { header: t("col.status"), value: (i) => i.status },
+              { header: t("col.customer"), value: (i) => i.billTo.name, width: 24 },
+              { header: t("col.email"), value: (i) => i.billTo.email, width: 28 },
+              { header: t("col.city"), value: (i) => i.billTo.city },
+              { header: t("col.subtotal"), value: (i) => i.subtotal, format: "currency" },
+              { header: t("order.discount"), value: (i) => i.discount, format: "currency" },
+              { header: t("col.shipping"), value: (i) => i.shipping, format: "currency" },
+              { header: taxLabel(locale), value: (i) => i.tax, format: "currency" },
+              { header: t("col.total"), value: (i) => i.total, format: "currency" },
+              { header: t("col.payment"), value: (i) => i.paymentMethod },
             ]}
             filename="net-sale-invoices"
-            title="net sale — invoice ledger"
+            title={t("invoices.ledger")}
           />
         }
       />
 
       <div className="mb-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatTile label="Invoices" value={stats.count.toLocaleString("en-GB")} />
-        <StatTile label="Net billed" value={formatPrice(stats.net, "JOD")} emphasis />
-        <StatTile label="Tax collected" value={formatPrice(stats.tax, "JOD")} />
-        <StatTile label="Credited" value={formatPrice(stats.credited, "JOD")} />
+        <StatTile label={t("invoices.count")} value={stats.count.toLocaleString("en-GB")} />
+        <StatTile label={t("invoices.netBilled")} value={formatPrice(stats.net, "JOD")} emphasis />
+        <StatTile label={t("invoices.taxCollected")} value={formatPrice(stats.tax, "JOD")} />
+        <StatTile label={t("invoices.credited")} value={formatPrice(stats.credited, "JOD")} />
       </div>
 
       <div className="mb-4 flex justify-end">
         <label className="relative">
-          <span className="sr-only">Search invoices</span>
+          <span className="sr-only">{t("invoices.searchLabel")}</span>
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Invoice number, order, customer…"
+            placeholder={t("invoices.searchPlaceholder")}
             className="border-line focus:border-brand bg-paper-raised text-ink placeholder:text-mist w-72 rounded-pill border px-4 py-2 text-[0.8125rem] outline-none transition-colors"
           />
         </label>
@@ -170,7 +173,7 @@ export function InvoicesBoard({ invoices }: { invoices: Invoice[] }) {
         rowKey={(invoice) => invoice.id}
         onRowClick={(invoice) => router.push(`/admin/invoices/${invoice.orderReference}`)}
         initialSort={{ key: "issued", dir: "desc" }}
-        empty={search ? `Nothing matches "${search}".` : "No invoices yet."}
+        empty={search ? t("common.noMatch") : t("invoices.empty")}
       />
     </>
   );

@@ -396,6 +396,42 @@
   [data-admin-surface] :is(.grid, .flex) > * {
     min-width: 0;
   }
+
+  /* -------------------------------------------------------------------------
+     The admin's typeface
+
+     One family for the whole tool, in both scripts. Every font token is
+     redirected rather than the body's `font-family` being overridden, because
+     components reach for `font-display`, `font-ui` and `font-sans` by name —
+     setting the body alone would leave headings in the storefront's display
+     face and the admin in two typefaces at once.
+
+     `--font-arabic` points at Cairo too, which is the actual repair: the
+     `[dir="rtl"] body` swap further up cannot match in the admin, where the
+     direction is set on a div *inside* the body. With one family covering both
+     scripts there is nothing left to swap.
+
+     Scoped to `[data-admin-root]` so the storefront's identity is untouched.
+     ------------------------------------------------------------------------- */
+  [data-admin-root] {
+    --font-display: var(--font-cairo), "Segoe UI", Tahoma, sans-serif;
+    --font-ui: var(--font-cairo), "Segoe UI", Tahoma, sans-serif;
+    --font-sans: var(--font-cairo), "Segoe UI", Tahoma, sans-serif;
+    --font-arabic: var(--font-cairo), "Segoe UI", Tahoma, sans-serif;
+  }
+
+  /* Cairo's Arabic is already generously spaced; the extra leading the
+     storefront adds for Baloo makes an operations table loose and costs rows
+     on screen. */
+  [data-admin-root] [dir="rtl"] {
+    line-height: 1.6;
+  }
+
+  /* The wordmark keeps the brand face. The typeface of the tool changed; the
+     logo lockup did not. */
+  [data-admin-root] .ns-wordmark {
+    font-family: var(--font-quadrillion), var(--font-cairo), sans-serif;
+  }
 }
 
 /* ===========================================================================

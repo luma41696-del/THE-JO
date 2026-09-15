@@ -18,6 +18,7 @@ import {
   type Period,
 } from "@/lib/analytics/report";
 import { AdminPageHeader } from "./AdminShell";
+import { useAdminLocale } from "./AdminLocale";
 import { Panel, StatTile } from "./AdminUI";
 import type { AnalyticsEvent, Product } from "@/types";
 
@@ -46,6 +47,7 @@ export function BehaviourBoard({
   /** False when reading fell back to demo data. */
   live: boolean;
 }) {
+  const { t } = useAdminLocale();
   const [period, setPeriod] = useState<Period>("30d");
   const scoped = useMemo(() => inPeriod(events, period), [events, period]);
 
@@ -73,8 +75,8 @@ export function BehaviourBoard({
   return (
     <>
       <AdminPageHeader
-        title="Shopping behaviour"
-        description="What visitors did, and where the ones who did not buy stopped."
+        title={t("beh.title")}
+        description={t("beh.subtitle")}
       />
 
       {/* Honesty about the data before any number is read. */}
@@ -111,18 +113,18 @@ export function BehaviourBoard({
       </div>
 
       <div className="mb-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatTile label="Sessions" value={sessions.toLocaleString("en-GB")} emphasis={sessions > 0} />
-        <StatTile label="Orders" value={purchases.toLocaleString("en-GB")} />
-        <StatTile label="Conversion" value={`${(rate * 100).toFixed(1)}%`} />
+        <StatTile label={t("beh.sessions")} value={sessions.toLocaleString("en-GB")} emphasis={sessions > 0} />
+        <StatTile label={t("col.orders")} value={purchases.toLocaleString("en-GB")} />
+        <StatTile label={t("beh.conversion")} value={`${(rate * 100).toFixed(1)}%`} />
         <StatTile
-          label="Searches with no results"
+          label={t("beh.noResults")}
           value={zero.reduce((sum, s) => sum + s.count, 0).toLocaleString("en-GB")}
         />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_1fr] [&>*]:min-w-0">
         {/* ---- Funnel ------------------------------------------------- */}
-        <Panel title="Funnel" description="Sessions reaching each step, not events.">
+        <Panel title={t("beh.funnel")} description={t("beh.funnelHint")}>
           <ul className="space-y-3">
             {steps.map((step, index) => {
               const first = steps[0]?.count ?? 0;
@@ -159,12 +161,12 @@ export function BehaviourBoard({
 
         {/* ---- Zero-result searches ----------------------------------- */}
         <Panel
-          title="Searched for, not found"
-          description="Every line is something a customer wanted and the shop did not show."
+          title={t("beh.searchedNotFound")}
+          description={t("beh.searchedNotFoundHint")}
         >
           {zero.length === 0 ? (
             <p className="text-mist py-6 text-center text-[0.875rem]">
-              Nothing yet — or nothing missing.
+              {t("beh.nothingMissing")}
             </p>
           ) : (
             <ul className="divide-line divide-y">
@@ -181,9 +183,9 @@ export function BehaviourBoard({
         </Panel>
 
         {/* ---- Exit points -------------------------------------------- */}
-        <Panel title="Where sessions ended" description="Last page of visits that did not order.">
+        <Panel title={t("beh.exits")} description={t("beh.exitsHint")}>
           {exits.length === 0 ? (
-            <p className="text-mist py-6 text-center text-[0.875rem]">Not enough data yet.</p>
+            <p className="text-mist py-6 text-center text-[0.875rem]">{t("beh.notEnough")}</p>
           ) : (
             <ul className="divide-line divide-y">
               {exits.map((row) => (
@@ -201,9 +203,9 @@ export function BehaviourBoard({
         </Panel>
 
         {/* ---- Most viewed -------------------------------------------- */}
-        <Panel title="Most viewed" description="Unique sessions, not refreshes.">
+        <Panel title={t("beh.mostViewed")} description={t("beh.mostViewedHint")}>
           {viewed.length === 0 ? (
-            <p className="text-mist py-6 text-center text-[0.875rem]">Not enough data yet.</p>
+            <p className="text-mist py-6 text-center text-[0.875rem]">{t("beh.notEnough")}</p>
           ) : (
             <ul className="divide-line divide-y">
               {viewed.map((row) => (
@@ -221,7 +223,7 @@ export function BehaviourBoard({
         </Panel>
 
         {/* ---- Devices and sources ------------------------------------ */}
-        <Panel title="Devices" description="Sessions by screen size.">
+        <Panel title={t("beh.devices")} description={t("beh.devicesHint")}>
           <ul className="space-y-2">
             {(["mobile", "tablet", "desktop"] as const).map((key) => {
               const total = devices.mobile + devices.tablet + devices.desktop;
@@ -246,9 +248,9 @@ export function BehaviourBoard({
           </ul>
         </Panel>
 
-        <Panel title="Where they came from" description="Sessions by source.">
+        <Panel title={t("beh.sources")} description={t("beh.sourcesHint")}>
           {sources.length === 0 ? (
-            <p className="text-mist py-6 text-center text-[0.875rem]">Not enough data yet.</p>
+            <p className="text-mist py-6 text-center text-[0.875rem]">{t("beh.notEnough")}</p>
           ) : (
             <ul className="divide-line divide-y">
               {sources.map((row) => (
@@ -262,7 +264,7 @@ export function BehaviourBoard({
         </Panel>
 
         {/* ---- Coupons ------------------------------------------------ */}
-        <Panel title="Coupon attempts" description="Applied, and why the rest were refused.">
+        <Panel title={t("beh.coupons")} description={t("beh.couponsHint")}>
           <p className="text-ink text-[0.875rem]">
             <strong className="tabular-nums">{coupons.applied}</strong> applied
           </p>
@@ -280,14 +282,14 @@ export function BehaviourBoard({
               ))}
             </ul>
           ) : (
-            <p className="text-mist mt-2 text-[0.8125rem]">No refusals in this window.</p>
+            <p className="text-mist mt-2 text-[0.8125rem]">{t("beh.noRefusals")}</p>
           )}
         </Panel>
 
         {/* ---- Top searches ------------------------------------------- */}
-        <Panel title="Top searches" description="What people looked for and found.">
+        <Panel title={t("beh.topSearches")} description={t("beh.topSearchesHint")}>
           {searches.length === 0 ? (
-            <p className="text-mist py-6 text-center text-[0.875rem]">Not enough data yet.</p>
+            <p className="text-mist py-6 text-center text-[0.875rem]">{t("beh.notEnough")}</p>
           ) : (
             <ul className="divide-line divide-y">
               {searches.map((row) => (
@@ -304,7 +306,7 @@ export function BehaviourBoard({
       </div>
 
       <div className="mt-4">
-        <Panel title="Sessions over time">
+        <Panel title={t("beh.overTime")}>
           <div className="flex h-24 items-end gap-0.5">
             {series.map((point) => {
               const max = Math.max(...series.map((s) => s.sessions), 1);

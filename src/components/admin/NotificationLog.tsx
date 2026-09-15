@@ -1,7 +1,10 @@
+"use client";
+
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/format";
 import { EVENT_LABEL } from "@/lib/notify/templates";
 import { Panel } from "./AdminUI";
+import { useAdminLocale } from "./AdminLocale";
 import type { Notification } from "@/types";
 
 /**
@@ -21,19 +24,19 @@ export function NotificationLog({
   notifications: Notification[];
   providerConfigured: boolean;
 }) {
+  const { t } = useAdminLocale();
   return (
     <Panel
-      title="Messages"
+      title={t("notify.title")}
       description={
         providerConfigured
-          ? "What was sent to this customer about this order."
-          : "No mail provider is configured, so nothing is being sent."
+          ? t("notify.configured")
+          : t("notify.notConfigured")
       }
     >
       {notifications.length === 0 ? (
         <p className="text-mist text-[0.8125rem]">
-          Nothing yet. A message goes out when the order is paid, dispatched,
-          delivered or refunded.
+          {t("notify.empty")}
         </p>
       ) : (
         <ul className="divide-line divide-y">

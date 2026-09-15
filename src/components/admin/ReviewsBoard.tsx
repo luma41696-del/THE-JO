@@ -9,6 +9,8 @@ import { formatDate } from "@/lib/format";
 import { getIdToken } from "@/lib/firebase/auth";
 import { summariseAll } from "@/lib/reviews";
 import { AdminPageHeader } from "./AdminShell";
+import { useAdminLocale } from "./AdminLocale";
+import type { AdminKey } from "@/lib/i18n/admin";
 import { Panel, StatTile } from "./AdminUI";
 import { Button } from "@/components/ui/Button";
 import type { Product, Review, ReviewStatus } from "@/types";
@@ -26,10 +28,10 @@ import type { Product, Review, ReviewStatus } from "@/types";
  * the site meaningless, including the good ones.
  */
 
-const STATUS_STYLE: Record<ReviewStatus, { label: string; tone: string }> = {
-  published: { label: "Published", tone: "bg-mint/12 text-mint" },
-  pending: { label: "Pending", tone: "bg-brand-mist text-brand-deep" },
-  hidden: { label: "Hidden", tone: "bg-paper-sunken text-mist" },
+const STATUS_STYLE: Record<ReviewStatus, { label: AdminKey; tone: string }> = {
+  published: { label: "reviews.published", tone: "bg-mint/12 text-mint" },
+  pending: { label: "reviews.pending", tone: "bg-brand-mist text-brand-deep" },
+  hidden: { label: "reviews.hidden", tone: "bg-paper-sunken text-mist" },
 };
 
 export function ReviewsBoard({
@@ -39,6 +41,7 @@ export function ReviewsBoard({
   reviews: Review[];
   products: Product[];
 }) {
+  const { t } = useAdminLocale();
   const router = useRouter();
   const [filter, setFilter] = useState<ReviewStatus | "all">("pending");
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -79,16 +82,16 @@ export function ReviewsBoard({
         body: JSON.stringify({ id, ...payload }),
       });
       const data = (await response.json()) as { ok?: boolean; error?: string; persisted?: boolean };
-      if (!response.ok || !data.ok) throw new Error(data.error ?? "Update failed");
+      if (!response.ok || !data.ok) throw new Error(data.error ?? t("reviews.updateFailed"));
       if (data.persisted === false) {
-        setError("Validated, but not stored: Firebase Admin is not configured here.");
+        setError(t("reviews.notStored"));
         return;
       }
       setReplyFor(null);
       setReplyText("");
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "The review could not be updated.");
+      setError(err instanceof Error ? err.message : t("reviews.updateError"));
     } finally {
       setBusyId(null);
     }
@@ -96,7 +99,7 @@ export function ReviewsBoard({
 
   function hide(review: Review) {
     const note = window.prompt(
-      "Why is this being hidden? The author is shown this.",
+      t("reviews.hideReason"),
       "",
     );
     if (!note || note.trim().length < 3) return;
@@ -106,16 +109,16 @@ export function ReviewsBoard({
   return (
     <>
       <AdminPageHeader
-        title="Reviews"
-        description="Publish, hold or reply. Customer words and ratings are never edited."
+        title={t("reviews.title")}
+        description={t("reviews.subtitle")}
       />
 
       <div className="mb-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatTile label="Waiting" value={counts.pending.toString()} emphasis={counts.pending > 0} />
-        <StatTile label="Published" value={counts.published.toString()} />
-        <StatTile label="Hidden" value={counts.hidden.toString()} />
+        <StatTile label={t("reviews.waiting")} value={counts.pending.toString()} emphasis={counts.pending > 0} />
+        <StatTile label={t("reviews.published")} value={counts.published.toString()} />
+        <StatTile label={t("reviews.hidden")} value={counts.hidden.toString()} />
         <StatTile
-          label="Products with reviews"
+          label={t("reviews.withReviews")}
           value={Object.keys(summaries).length.toString()}
         />
       </div>
@@ -151,8 +154,8 @@ export function ReviewsBoard({
         <Panel>
           <p className="text-mist py-12 text-center text-[0.875rem]">
             {filter === "pending"
-              ? "Nothing waiting. The queue is clear."
-              : "No reviews here yet."}
+              ? t("reviews.queueClear")
+              : t("reviews.empty")}
           </p>
         </Panel>
       ) : (
@@ -172,7 +175,7 @@ export function ReviewsBoard({
                       <p className="text-mist mt-0.5 text-[0.75rem]">
                         {review.authorName} · {formatDate(review.createdAt)}
                         {review.verifiedPurchase && (
-                          <span className="text-mint ms-2">Verified purchase</span>
+                          <span className="text-mint ms-2">{t("reviews.verified")}</span>
                         )}
                       </p>
                     </div>
@@ -182,7 +185,7 @@ export function ReviewsBoard({
                         style.tone,
                       )}
                     >
-                      {style.label}
+                      {t(style.label)}
                     </span>
                   </div>
 
@@ -239,7 +242,7 @@ export function ReviewsBoard({
                         value={replyText}
                         onChange={(e) => setReplyText(e.target.value)}
                         rows={3}
-                        placeholder="Answer as net sale…"
+                        placeholder={t("reviews.replyPlaceholder")}
                         className="border-line focus:border-brand bg-paper text-ink w-full rounded-md border px-3 py-2 text-[0.8125rem] outline-none"
                       />
                       <div className="mt-2 flex justify-end gap-2">
@@ -251,7 +254,7 @@ export function ReviewsBoard({
                           }}
                           className="text-smoke hover:text-ink cursor-pointer text-[0.75rem]"
                         >
-                          Cancel
+                          {t("common.cancel")}
                         </button>
                         <Button
                           variant="brand"
@@ -259,7 +262,7 @@ export function ReviewsBoard({
                           loading={busy}
                           onClick={() => patch(review.id, { reply: replyText })}
                         >
-                          Post reply
+                          {t("reviews.postReply")}
                         </Button>
                       </div>
                     </div>
@@ -268,12 +271,12 @@ export function ReviewsBoard({
                   <div className="border-line mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
                     {review.status !== "published" && (
                       <Action busy={busy} onClick={() => patch(review.id, { status: "published" })}>
-                        Publish
+                        {t("reviews.publish")}
                       </Action>
                     )}
                     {review.status !== "hidden" && (
                       <Action busy={busy} danger onClick={() => hide(review)}>
-                        Hide
+                        {t("reviews.hideAction")}
                       </Action>
                     )}
                     <Action
@@ -283,11 +286,11 @@ export function ReviewsBoard({
                         setReplyText(review.reply?.body ?? "");
                       }}
                     >
-                      {review.reply ? "Edit reply" : "Reply"}
+                      {review.reply ? t("reviews.editReply") : t("reviews.reply")}
                     </Action>
                     {review.reply && (
                       <Action busy={busy} onClick={() => patch(review.id, { reply: null })}>
-                        Remove reply
+                        {t("reviews.removeReply")}
                       </Action>
                     )}
                   </div>

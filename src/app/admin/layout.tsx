@@ -52,6 +52,43 @@ const baloo = localFont({
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
+/**
+ * Cairo — the admin's one typeface, in both languages.
+ *
+ * The storefront keeps its own faces; the brand identity is not up for
+ * revision. Operations is a different room: it is read for hours at a time, in
+ * two scripts, by people switching between them mid-shift, and the previous
+ * arrangement did not serve that.
+ *
+ * It was also quietly broken. `globals.css` swaps the body face for Arabic
+ * with `[dir="rtl"] body`, and the admin sets its direction on a div *inside*
+ * the body — so the selector could never match here, and choosing Arabic gave
+ * Arabic text set in a Latin face with Latin metrics. Cairo covers both
+ * scripts in one family, which removes the swap rather than repairing it.
+ *
+ * Six weights because the operator supplied six, and a dense screen uses them:
+ * 200/300 for quiet captions, 400 for tables, 600/700 for labels and headings,
+ * 900 where a number has to carry a panel.
+ *
+ * `preload: false` on purpose. This is 340KB behind an authentication gate —
+ * not a landing page — and the operator's second screen comes from cache.
+ */
+const cairo = localFont({
+  src: [
+    { path: "../../../public/fonts/Cairo-ExtraLight.woff2", weight: "200", style: "normal" },
+    { path: "../../../public/fonts/Cairo-Light.woff2", weight: "300", style: "normal" },
+    { path: "../../../public/fonts/Cairo-Regular.woff2", weight: "400", style: "normal" },
+    { path: "../../../public/fonts/Cairo-SemiBold.woff2", weight: "600", style: "normal" },
+    { path: "../../../public/fonts/Cairo-Bold.woff2", weight: "700", style: "normal" },
+    { path: "../../../public/fonts/Cairo-Black.woff2", weight: "900", style: "normal" },
+  ],
+  variable: "--font-cairo",
+  display: "swap",
+  preload: false,
+  adjustFontFallback: false,
+  fallback: ["Segoe UI", "Tahoma", "sans-serif"],
+});
+
 export const metadata: Metadata = {
   title: { default: "Operations · net sale", template: "%s · net sale Operations" },
   // Internal tooling must never be indexed, and the link must not leak either.
@@ -71,17 +108,27 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <html
       lang="en"
       dir="ltr"
-      className={`${quadrillion.variable} ${baloo.variable} ${inter.variable}`}
+      className={`${quadrillion.variable} ${baloo.variable} ${inter.variable} ${cairo.variable}`}
       suppressHydrationWarning
     >
-      <body className="bg-paper text-ink min-h-screen antialiased">
+      {/* `data-admin-root` is what redirects every font token to Cairo — see
+          the rule in globals.css. Scoped so the storefront is untouched. */}
+      <body data-admin-root className="bg-paper text-ink min-h-screen antialiased">
         <LocaleProvider locale="en">
           <AuthProvider>
-            <AdminGate>
-              <AdminLocaleProvider>
+            {/*
+              The language provider wraps the gate, not the other way round.
+
+              The gate renders the "sign in" and "no access" screens, and those
+              are the two screens a locked-out operator sees most — leaving
+              them outside the provider meant they were permanently English
+              while the rest of the tool had been translated.
+            */}
+            <AdminLocaleProvider>
+              <AdminGate>
                 <AdminShell live={live}>{children}</AdminShell>
-              </AdminLocaleProvider>
-            </AdminGate>
+              </AdminGate>
+            </AdminLocaleProvider>
           </AuthProvider>
         </LocaleProvider>
       </body>

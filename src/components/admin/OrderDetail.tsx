@@ -9,9 +9,12 @@ import { cn } from "@/lib/utils";
 import { formatDate, formatDeliveryWindow, formatPrice, t as pick } from "@/lib/format";
 import { getIdToken } from "@/lib/firebase/auth";
 import { AdminPageHeader } from "./AdminShell";
-import { ORDER_LABELS, OrderStatusPill, Panel } from "./AdminUI";
+import { orderLabel, OrderStatusPill, Panel } from "./AdminUI";
+import { useAdminLocale } from "./AdminLocale";
+import { paymentLabel } from "@/lib/payments";
 import { Button } from "@/components/ui/Button";
 import { shouldInvoice } from "@/lib/invoice";
+import { taxLabel } from "@/lib/pricing";
 import type { Order, OrderStatus } from "@/types";
 
 /**
@@ -39,6 +42,7 @@ const NEXT: Partial<Record<OrderStatus, OrderStatus[]>> = {
 };
 
 export function OrderDetail({ order: initial }: { order: Order }) {
+  const { t, locale } = useAdminLocale();
   const router = useLocalizedRouter();
   const [order, setOrder] = useState(initial);
   const [busy, setBusy] = useState<OrderStatus | null>(null);
@@ -81,17 +85,17 @@ export function OrderDetail({ order: initial }: { order: Order }) {
       });
 
       const data = (await response.json()) as { ok?: boolean; error?: string; persisted?: boolean };
-      if (!response.ok || !data.ok) throw new Error(data.error ?? "Update failed");
+      if (!response.ok || !data.ok) throw new Error(data.error ?? t("order.updateFailed"));
 
       if (data.persisted === false) {
         setError(
-          "Saved locally only — Firebase Admin is not configured, so this change was not written to Firestore.",
+          t("order.savedLocally"),
         );
       }
       router.refresh();
     } catch (caught) {
       setOrder(previous);
-      setError(caught instanceof Error ? caught.message : "Could not update the order.");
+      setError(caught instanceof Error ? caught.message : t("order.updateError"));
     } finally {
       setBusy(null);
     }
@@ -117,7 +121,7 @@ export function OrderDetail({ order: initial }: { order: Order }) {
             {shouldInvoice(order.status) && (
               <Link href={`/admin/invoices/${order.reference}`}>
                 <Button variant="secondary" size="sm">
-                  Invoice
+                  {t("order.invoice")}
                 </Button>
               </Link>
             )}
@@ -140,13 +144,13 @@ export function OrderDetail({ order: initial }: { order: Order }) {
               <input
                 value={tracking}
                 onChange={(event) => setTracking(event.target.value)}
-                placeholder="Tracking number"
+                placeholder={t("order.trackingPlaceholder")}
                 className="border-line focus:border-brand bg-paper text-ink placeholder:text-mist w-44 rounded-pill border px-4 py-2 text-[0.8125rem] outline-none transition-colors"
               />
             )}
 
             {next.length === 0 ? (
-              <span className="text-mist text-[0.8125rem]">No further action</span>
+              <span className="text-mist text-[0.8125rem]">{t("order.noAction")}</span>
             ) : (
               next.map((status) => (
                 <Button
@@ -156,7 +160,9 @@ export function OrderDetail({ order: initial }: { order: Order }) {
                   loading={busy === status}
                   onClick={() => void advance(status)}
                 >
-                  {status === "cancelled" ? "Cancel order" : `Mark ${ORDER_LABELS[status].toLowerCase()}`}
+                  {status === "cancelled"
+                    ? t("order.cancel")
+                    : `${t("order.markAs")} ${orderLabel(status, locale).toLowerCase()}`}
                 </Button>
               ))
             )}
@@ -177,7 +183,7 @@ export function OrderDetail({ order: initial }: { order: Order }) {
 
       <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
         <div className="flex flex-col gap-4">
-          <Panel title="Items" description={`${order.items.length} lines`}>
+          <Panel title={t("order.items")} description={`${order.items.length} ${t("order.lines")}`}>
             <ul className="divide-line divide-y">
               {order.items.map((item) => (
                 <li key={item.key} className="flex gap-4 py-3 first:pt-0 last:pb-0">
@@ -225,7 +231,7 @@ export function OrderDetail({ order: initial }: { order: Order }) {
             </ul>
           </Panel>
 
-          <Panel title="History">
+          <Panel title={t("order.history")}>
             <ol className="relative space-y-4 ps-6">
               <span className="bg-line absolute inset-y-1 start-[5px] w-px" aria-hidden="true" />
               {[...order.timeline].reverse().map((event, index) => (
@@ -238,7 +244,7 @@ export function OrderDetail({ order: initial }: { order: Order }) {
                     aria-hidden="true"
                   />
                   <p className="text-ink text-[0.8125rem] font-medium">
-                    {ORDER_LABELS[event.status]}
+                    {orderLabel(event.status, locale)}
                   </p>
                   <p className="text-mist mt-0.5 text-[0.75rem]">
                     {formatDate(event.at)}
@@ -254,38 +260,38 @@ export function OrderDetail({ order: initial }: { order: Order }) {
         </div>
 
         <div className="flex flex-col gap-4">
-          <Panel title="Totals">
+          <Panel title={t("order.totals")}>
             <dl className="space-y-2 text-[0.8125rem]">
-              <Row label="Subtotal" value={formatPrice(order.totals.subtotal, currency)} />
+              <Row label={t("col.subtotal")} value={formatPrice(order.totals.subtotal, currency)} />
               {order.totals.discount > 0 && (
                 <Row
-                  label="Discount"
+                  label={t("order.discount")}
                   value={`−${formatPrice(order.totals.discount, currency)}`}
                   tone="mint"
                 />
               )}
               <Row
-                label="Delivery"
+                label={t("order.delivery")}
                 value={
                   order.totals.shipping === 0
-                    ? "Free"
+                    ? t("order.free")
                     : formatPrice(order.totals.shipping, currency)
                 }
               />
-              <Row label="Sales tax (16%)" value={formatPrice(order.totals.tax, currency)} />
+              <Row label={taxLabel(locale)} value={formatPrice(order.totals.tax, currency)} />
               <div className="border-line flex items-baseline justify-between border-t pt-3">
-                <dt className="font-display text-ink font-semibold">Total</dt>
+                <dt className="font-display text-ink font-semibold">{t("col.total")}</dt>
                 <dd className="font-display text-ink text-lg font-semibold tabular-nums">
                   {formatPrice(order.totals.total, currency)}
                 </dd>
               </div>
             </dl>
             <p className="text-mist mt-3 text-[0.75rem] capitalize">
-              Paid by {order.paymentMethod.replace("-", " ")}
+              {t("order.paidBy")} {paymentLabel(order.paymentMethod, locale)}
             </p>
           </Panel>
 
-          <Panel title="Delivery">
+          <Panel title={t("order.delivery")}>
             <p className="text-ink text-[0.8125rem] leading-relaxed">
               {order.shippingAddress.fullName}
               <br />
@@ -314,7 +320,7 @@ export function OrderDetail({ order: initial }: { order: Order }) {
             </div>
           </Panel>
 
-          <Panel title="Customer">
+          <Panel title={t("col.customer")}>
             <p className="text-ink text-[0.8125rem] font-medium">
               {order.shippingAddress.fullName}
             </p>

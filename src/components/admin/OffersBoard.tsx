@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { countdownParts, formatDate, formatPrice, t as pick } from "@/lib/format";
 import { AdminPageHeader } from "./AdminShell";
+import { useAdminLocale } from "./AdminLocale";
 import { DataTable, Panel, StatTile, type Column } from "./AdminUI";
 import { ExportMenu } from "./ExportMenu";
 import { Button } from "@/components/ui/Button";
@@ -42,6 +43,7 @@ export function OffersBoard({
   products?: Product[];
   now: number;
 }) {
+  const { t, locale } = useAdminLocale();
   const router = useRouter();
   const [tab, setTab] = useState<"codes" | "campaigns">("codes");
 
@@ -188,7 +190,7 @@ export function OffersBoard({
   const offerColumns: Column<Offer>[] = [
     {
       key: "code",
-      header: "Code",
+      header: t("off.code"),
       cell: (offer) => (
         <span>
           <span className="text-ink block font-mono font-medium">{offer.code}</span>
@@ -199,7 +201,7 @@ export function OffersBoard({
     },
     {
       key: "value",
-      header: "Discount",
+      header: t("off.discount"),
       cell: (offer) => (
         <span className="text-ink font-medium tabular-nums">
           {offer.type === "percentage"
@@ -215,7 +217,7 @@ export function OffersBoard({
     },
     {
       key: "minimum",
-      header: "Minimum",
+      header: t("off.minimum"),
       align: "end",
       cell: (offer) => (
         <span className="text-smoke tabular-nums">
@@ -226,7 +228,7 @@ export function OffersBoard({
     },
     {
       key: "usage",
-      header: "Redeemed",
+      header: t("off.redeemed"),
       align: "end",
       cell: (offer) => {
         const share = offer.usageLimit ? offer.usageCount / offer.usageLimit : 0;
@@ -253,7 +255,7 @@ export function OffersBoard({
     },
     {
       key: "window",
-      header: "Window",
+      header: t("off.window"),
       cell: (offer) => {
         const parts = countdownParts(offer.endsAt, now);
         const running = offer.startsAt <= now && !parts.expired;
@@ -281,7 +283,7 @@ export function OffersBoard({
     },
     {
       key: "status",
-      header: "Status",
+      header: t("col.status"),
       cell: (offer) => {
         const status = offerStatus(offer);
         const tone =
@@ -309,35 +311,35 @@ export function OffersBoard({
         const busy = busyId === offer.id;
         return (
           <span className="inline-flex items-center justify-end gap-1">
-            <IconAction label="Copy code" onClick={() => copyCode(offer.code)}>
+            <IconAction label={t("off.copyCode")} onClick={() => copyCode(offer.code)}>
               {copied === offer.code ? "✓" : "⧉"}
             </IconAction>
-            <IconAction label="Edit" onClick={() => openEdit(offer)}>
+            <IconAction label={t("common.edit")} onClick={() => openEdit(offer)}>
               ✎
             </IconAction>
-            <IconAction label="Duplicate" onClick={() => duplicate(offer)}>
+            <IconAction label={t("off.duplicate")} onClick={() => duplicate(offer)}>
               +
             </IconAction>
 
             {/* Pause and resume are one button: the opposite of the current
                 state is the only thing a merchant wants to click. */}
             {status === "active" ? (
-              <IconAction label="Pause" busy={busy} onClick={() => setStatus(offer, "paused")}>
+              <IconAction label={t("off.pause")} busy={busy} onClick={() => setStatus(offer, "paused")}>
                 ❙❙
               </IconAction>
             ) : status !== "archived" ? (
-              <IconAction label="Activate" busy={busy} onClick={() => setStatus(offer, "active")}>
+              <IconAction label={t("off.activate")} busy={busy} onClick={() => setStatus(offer, "active")}>
                 ▶
               </IconAction>
             ) : (
-              <IconAction label="Restore" busy={busy} onClick={() => setStatus(offer, "paused")}>
+              <IconAction label={t("off.restore")} busy={busy} onClick={() => setStatus(offer, "paused")}>
                 ↩
               </IconAction>
             )}
 
             {status !== "archived" && (
               <IconAction
-                label="Archive"
+                label={t("off.archive")}
                 busy={busy}
                 danger
                 onClick={() => setStatus(offer, "archived")}
@@ -354,40 +356,40 @@ export function OffersBoard({
   return (
     <>
       <AdminPageHeader
-        title="Offers & campaigns"
-        description="The discount and the shopfront that sells it, managed together."
+        title={t("off.title")}
+        description={t("off.subtitle")}
         actions={
           <>
             <ExportMenu
               rows={offers}
               columns={[
-                { header: "Code", value: (o) => o.code, width: 16 },
-                { header: "Title", value: (o) => pick(o.title, "en"), width: 30 },
-                { header: "Type", value: (o) => o.type },
-                { header: "Value", value: (o) => o.value, format: "number" },
-                { header: "Minimum", value: (o) => o.minSubtotal ?? 0, format: "currency" },
-                { header: "Redeemed", value: (o) => o.usageCount, format: "number" },
-                { header: "Limit", value: (o) => o.usageLimit ?? "", format: "number" },
-                { header: "Starts", value: (o) => new Date(o.startsAt), format: "date", width: 18 },
-                { header: "Ends", value: (o) => new Date(o.endsAt), format: "date", width: 18 },
-                { header: "Active", value: (o) => (o.active ? "yes" : "no") },
+                { header: t("off.code"), value: (o) => o.code, width: 16 },
+                { header: t("col.titleEn"), value: (o) => pick(o.title, locale), width: 30 },
+                { header: t("off.type"), value: (o) => o.type },
+                { header: t("off.value"), value: (o) => o.value, format: "number" },
+                { header: t("off.minimum"), value: (o) => o.minSubtotal ?? 0, format: "currency" },
+                { header: t("off.redeemed"), value: (o) => o.usageCount, format: "number" },
+                { header: t("off.limit"), value: (o) => o.usageLimit ?? "", format: "number" },
+                { header: t("off.starts"), value: (o) => new Date(o.startsAt), format: "date", width: 18 },
+                { header: t("off.ends"), value: (o) => new Date(o.endsAt), format: "date", width: 18 },
+                { header: t("off.activeCol"), value: (o) => (o.active ? t("off.yes") : t("off.no")) },
               ]}
               filename="net-sale-offers"
-              title="net sale — offers"
+              title={t("off.title")}
             />
             <Button variant="brand" size="sm">
-              New {tab === "codes" ? "offer" : "campaign"}
+              {tab === "codes" ? t("off.newOffer") : t("off.newCampaign")}
             </Button>
           </>
         }
       />
 
       <div className="mb-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatTile label="Live offers" value={live.length.toString()} emphasis={live.length > 0} />
-        <StatTile label="Total redemptions" value={redemptions.toLocaleString("en-GB")} />
-        <StatTile label="Campaigns" value={banners.length.toString()} />
+        <StatTile label={t("off.liveOffers")} value={live.length.toString()} emphasis={live.length > 0} />
+        <StatTile label={t("off.redemptions")} value={redemptions.toLocaleString("en-GB")} />
+        <StatTile label={t("off.campaigns")} value={banners.length.toString()} />
         <StatTile
-          label="Live campaigns"
+          label={t("off.liveCampaigns")}
           value={banners
             .filter((b) => b.active && (!b.endsAt || b.endsAt > now))
             .length.toString()}
@@ -417,24 +419,24 @@ export function OffersBoard({
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search code or title…"
-              aria-label="Search coupons"
+              placeholder={t("off.searchPlaceholder")}
+              aria-label={t("off.searchLabel")}
               className="border-line focus:border-brand bg-paper text-ink min-w-0 flex-1 rounded-md border px-3 py-2 text-[0.8125rem] outline-none sm:max-w-xs"
             />
             <select
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value as OfferStatus | "all")}
-              aria-label="Filter by status"
+              aria-label={t("off.filterStatus")}
               className="border-line focus:border-brand bg-paper text-ink rounded-md border px-3 py-2 text-[0.8125rem] outline-none"
             >
-              <option value="all">All except archived</option>
-              <option value="active">Active</option>
-              <option value="paused">Paused</option>
-              <option value="draft">Draft</option>
-              <option value="archived">Archived</option>
+              <option value="all">{t("off.allExceptArchived")}</option>
+              <option value="active">{t("off.active")}</option>
+              <option value="paused">{t("off.paused")}</option>
+              <option value="draft">{t("off.draft")}</option>
+              <option value="archived">{t("off.archived")}</option>
             </select>
             <Button variant="brand" size="sm" onClick={openNew}>
-              New coupon
+              {t("off.newCoupon")}
             </Button>
           </div>
 
@@ -451,8 +453,8 @@ export function OffersBoard({
             initialSort={{ key: "window", dir: "desc" }}
             empty={
               query || statusFilter !== "all"
-                ? "No coupons match this filter."
-                : "No discount codes yet. Create one to get started."
+                ? t("off.noMatch")
+                : t("off.empty")
             }
           />
         </>
@@ -462,11 +464,10 @@ export function OffersBoard({
             <p className="text-mist text-[0.75rem]">
               {/* The hero is the one placement where "off" has to be obvious,
                   because an empty first screen looks like a broken deploy. */}
-              The hero shows the highest-priority live banner. With none live,
-              the homepage falls back to a plain heading — not to old copy.
+              {t("off.heroHint")}
             </p>
             <Button variant="brand" size="sm" onClick={openNewBanner}>
-              New banner
+              {t("off.newBanner")}
             </Button>
           </div>
 
@@ -515,20 +516,20 @@ export function OffersBoard({
 
                   <dl className="text-mist mt-3 space-y-1 text-[0.6875rem]">
                     <div className="flex justify-between">
-                      <dt>Slot</dt>
+                      <dt>{t("off.slot")}</dt>
                       <dd className="text-ink-muted">{banner.slot}</dd>
                     </div>
                     <div className="flex justify-between">
-                      <dt>Tone</dt>
+                      <dt>{t("off.tone")}</dt>
                       <dd className="text-ink-muted">{banner.tone}</dd>
                     </div>
                     <div className="flex justify-between">
-                      <dt>Priority</dt>
+                      <dt>{t("off.priority")}</dt>
                       <dd className="text-ink-muted tabular-nums">{banner.priority}</dd>
                     </div>
                     {banner.endsAt && (
                       <div className="flex justify-between">
-                        <dt>Ends</dt>
+                        <dt>{t("off.ends")}</dt>
                         <dd className="text-ink-muted">{formatDate(banner.endsAt)}</dd>
                       </div>
                     )}
@@ -539,7 +540,7 @@ export function OffersBoard({
                       way from the artwork that identifies it. */}
                   <div className="border-line mt-3 flex flex-wrap items-center gap-1.5 border-t pt-3">
                     <SmallAction onClick={() => { setEditingBanner(banner); setBannerEditorOpen(true); }}>
-                      Edit
+                      {t("off.edit")}
                     </SmallAction>
 
                     {(banner.status ?? (banner.active ? "active" : "paused")) === "active" ? (
@@ -547,21 +548,21 @@ export function OffersBoard({
                         busy={bannerBusyId === banner.id}
                         onClick={() => patchBanner(banner, { status: "paused" })}
                       >
-                        Pause
+                        {t("off.pause")}
                       </SmallAction>
                     ) : (
                       <SmallAction
                         busy={bannerBusyId === banner.id}
                         onClick={() => patchBanner(banner, { status: "active" })}
                       >
-                        Make live
+                        {t("off.makeLive")}
                       </SmallAction>
                     )}
 
                     <SmallAction
                       busy={bannerBusyId === banner.id}
                       onClick={() => patchBanner(banner, { priority: (banner.priority ?? 0) + 10 })}
-                      label="Raise priority"
+                      label={t("off.raisePriority")}
                     >
                       ↑
                     </SmallAction>
@@ -570,7 +571,7 @@ export function OffersBoard({
                       onClick={() =>
                         patchBanner(banner, { priority: Math.max(0, (banner.priority ?? 0) - 10) })
                       }
-                      label="Lower priority"
+                      label={t("off.lowerPriority")}
                     >
                       ↓
                     </SmallAction>

@@ -5,7 +5,9 @@ import { useMemo, useState } from "react";
 import { Link, useLocalizedRouter } from "@/components/ui/Link";
 import { formatDate, formatPrice, t as pick } from "@/lib/format";
 import { AdminPageHeader } from "./AdminShell";
-import { DataTable, FilterChips, OrderStatusPill, ORDER_LABELS, type Column } from "./AdminUI";
+import { DataTable, FilterChips, OrderStatusPill, orderLabel, type Column } from "./AdminUI";
+import { useAdminLocale } from "./AdminLocale";
+import { paymentLabel } from "@/lib/payments";
 import { ExportMenu } from "./ExportMenu";
 import type { Order, OrderStatus } from "@/types";
 
@@ -30,6 +32,7 @@ export function OrdersBoard({
   orders: Order[];
   initialStatus?: string;
 }) {
+  const { t, locale } = useAdminLocale();
   const router = useLocalizedRouter();
   const [filter, setFilter] = useState<Filter>(
     (initialStatus as Filter) || "needs-action",
@@ -81,14 +84,14 @@ export function OrdersBoard({
   const columns: Column<Order>[] = [
     {
       key: "reference",
-      header: "Order",
+      header: t("col.order"),
       cell: (order) => (
         <span>
           <Link href={`/admin/orders/${order.reference}`} className="text-ink font-medium">
             {order.reference}
           </Link>
           <span className="text-mist mt-0.5 block text-[0.6875rem] tabular-nums">
-            {order.items.length} {order.items.length === 1 ? "line" : "lines"}
+            {order.items.length} {order.items.length === 1 ? t("orders.line") : t("orders.lines")}
           </span>
         </span>
       ),
@@ -96,7 +99,7 @@ export function OrdersBoard({
     },
     {
       key: "customer",
-      header: "Customer",
+      header: t("col.customer"),
       cell: (order) => (
         <span>
           <span className="text-ink block">{order.shippingAddress.fullName}</span>
@@ -107,25 +110,27 @@ export function OrdersBoard({
     },
     {
       key: "placed",
-      header: "Placed",
+      header: t("col.placed"),
       cell: (order) => <span className="text-smoke">{formatDate(order.createdAt)}</span>,
       sortValue: (order) => order.createdAt,
     },
     {
       key: "payment",
-      header: "Payment",
-      cell: (order) => <span className="text-ink-muted capitalize">{order.paymentMethod.replace("-", " ")}</span>,
+      header: t("col.payment"),
+      cell: (order) => (
+        <span className="text-ink-muted">{paymentLabel(order.paymentMethod, locale)}</span>
+      ),
       sortValue: (order) => order.paymentMethod,
     },
     {
       key: "status",
-      header: "Status",
+      header: t("col.status"),
       cell: (order) => <OrderStatusPill status={order.status} />,
       sortValue: (order) => order.status,
     },
     {
       key: "total",
-      header: "Total",
+      header: t("col.total"),
       align: "end",
       cell: (order) => (
         <span className="text-ink font-medium tabular-nums">
@@ -137,41 +142,41 @@ export function OrdersBoard({
   ];
 
   const FILTERS: { value: Filter; label: string }[] = [
-    { value: "needs-action", label: "Needs action" },
-    { value: "all", label: "All" },
-    { value: "paid", label: ORDER_LABELS.paid },
-    { value: "processing", label: ORDER_LABELS.processing },
-    { value: "shipped", label: ORDER_LABELS.shipped },
-    { value: "delivered", label: ORDER_LABELS.delivered },
-    { value: "refunded", label: ORDER_LABELS.refunded },
-    { value: "cancelled", label: ORDER_LABELS.cancelled },
+    { value: "needs-action", label: t("orders.needsAction") },
+    { value: "all", label: t("common.all") },
+    { value: "paid", label: orderLabel("paid", locale) },
+    { value: "processing", label: orderLabel("processing", locale) },
+    { value: "shipped", label: orderLabel("shipped", locale) },
+    { value: "delivered", label: orderLabel("delivered", locale) },
+    { value: "refunded", label: orderLabel("refunded", locale) },
+    { value: "cancelled", label: orderLabel("cancelled", locale) },
   ];
 
   return (
     <>
       <AdminPageHeader
-        title="Orders"
-        description="Every order, with the queue that still needs a person first."
+        title={t("orders.title")}
+        description={t("orders.subtitle")}
         actions={
           <ExportMenu
             rows={rows}
             columns={[
-              { header: "Reference", value: (o) => o.reference, width: 14 },
-              { header: "Placed", value: (o) => new Date(o.createdAt), format: "date", width: 18 },
-              { header: "Customer", value: (o) => o.shippingAddress.fullName, width: 24 },
-              { header: "Email", value: (o) => o.email, width: 28 },
-              { header: "City", value: (o) => o.shippingAddress.city },
-              { header: "Status", value: (o) => ORDER_LABELS[o.status] },
-              { header: "Payment", value: (o) => o.paymentMethod },
-              { header: "Items", value: (o) => o.items.reduce((s, i) => s + i.quantity, 0), format: "number" },
-              { header: "Subtotal", value: (o) => o.totals.subtotal, format: "currency" },
-              { header: "Shipping", value: (o) => o.totals.shipping, format: "currency" },
-              { header: "Tax", value: (o) => o.totals.tax, format: "currency" },
-              { header: "Total", value: (o) => o.totals.total, format: "currency" },
-              { header: "Tracking", value: (o) => o.trackingNumber ?? "" },
+              { header: t("col.reference"), value: (o) => o.reference, width: 14 },
+              { header: t("col.placed"), value: (o) => new Date(o.createdAt), format: "date", width: 18 },
+              { header: t("col.customer"), value: (o) => o.shippingAddress.fullName, width: 24 },
+              { header: t("col.email"), value: (o) => o.email, width: 28 },
+              { header: t("col.city"), value: (o) => o.shippingAddress.city },
+              { header: t("col.status"), value: (o) => orderLabel(o.status, locale) },
+              { header: t("col.payment"), value: (o) => paymentLabel(o.paymentMethod, locale) },
+              { header: t("col.items"), value: (o) => o.items.reduce((s, i) => s + i.quantity, 0), format: "number" },
+              { header: t("col.subtotal"), value: (o) => o.totals.subtotal, format: "currency" },
+              { header: t("col.shipping"), value: (o) => o.totals.shipping, format: "currency" },
+              { header: t("col.tax"), value: (o) => o.totals.tax, format: "currency" },
+              { header: t("col.total"), value: (o) => o.totals.total, format: "currency" },
+              { header: t("col.tracking"), value: (o) => o.trackingNumber ?? "" },
             ]}
             filename="net-sale-orders"
-            title="net sale — orders"
+            title={t("orders.export")}
           />
         }
       />
@@ -180,11 +185,11 @@ export function OrdersBoard({
         <FilterChips options={FILTERS} value={filter} onChange={setFilter} counts={counts} />
 
         <label className="relative">
-          <span className="sr-only">Search orders</span>
+          <span className="sr-only">{t("orders.searchLabel")}</span>
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Reference, customer, tracking…"
+            placeholder={t("orders.searchPlaceholder")}
             className="border-line focus:border-brand bg-paper-raised text-ink placeholder:text-mist w-64 rounded-pill border py-2 ps-9 pe-4 text-[0.8125rem] outline-none transition-colors"
           />
           <svg
@@ -211,13 +216,13 @@ export function OrdersBoard({
           search
             ? `Nothing matches "${search}".`
             : filter === "needs-action"
-              ? "Nothing waiting — every paid order has been dealt with."
-              : "No orders in this state."
+              ? t("orders.queueClear")
+              : t("orders.noneInState")
         }
       />
 
       <p className="text-mist mt-3 text-[0.75rem] tabular-nums">
-        Showing {rows.length} of {orders.length} orders
+        {t("orders.showing")} {rows.length} {t("common.of")} {orders.length} {t("orders.ordersWord")}
       </p>
     </>
   );

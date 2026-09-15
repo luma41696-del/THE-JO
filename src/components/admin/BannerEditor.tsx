@@ -9,6 +9,8 @@ import { transition } from "@/lib/motion";
 import { getIdToken } from "@/lib/firebase/auth";
 import { ACCEPT_ATTRIBUTE, uploadMerchandisingImage } from "@/lib/firebase/upload";
 import { Button } from "@/components/ui/Button";
+import { useAdminLocale } from "./AdminLocale";
+import type { AdminKey } from "@/lib/i18n/admin";
 import type {
   Banner,
   BannerSlot,
@@ -65,21 +67,21 @@ const PLACEMENT: Record<BannerTextPosition, string> = {
   "end-bottom": "items-end justify-end text-end",
 };
 
-const POSITION_LABELS: Record<BannerTextPosition, string> = {
-  "start-top": "Left, top",
-  "start-middle": "Left, middle",
-  "start-bottom": "Left, bottom",
-  "center-middle": "Centred",
-  "end-top": "Right, top",
-  "end-middle": "Right, middle",
-  "end-bottom": "Right, bottom",
+const POSITION_KEYS: Record<BannerTextPosition, AdminKey> = {
+  "start-top": "be.pos.start-top",
+  "start-middle": "be.pos.start-middle",
+  "start-bottom": "be.pos.start-bottom",
+  "center-middle": "be.pos.center-middle",
+  "end-top": "be.pos.end-top",
+  "end-middle": "be.pos.end-middle",
+  "end-bottom": "be.pos.end-bottom",
 };
 
-const STATUS_LABELS: Record<BannerStatus, string> = {
-  draft: "Draft — not on the site",
-  active: "Live — on the site now",
-  paused: "Paused — kept, not shown",
-  archived: "Archived — closed for good",
+const STATUS_KEYS: Record<BannerStatus, AdminKey> = {
+  draft: "be.statusDraft",
+  active: "be.statusActive",
+  paused: "be.statusPaused",
+  archived: "be.statusArchived",
 };
 
 type Draft = {
@@ -170,6 +172,7 @@ export function BannerEditor({
   onClose,
   onSaved,
 }: BannerEditorProps) {
+  const { t } = useAdminLocale();
   const [draft, setDraft] = useState<Draft>(() => toDraft(banner, defaultSlot));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -203,12 +206,16 @@ export function BannerEditor({
     const start = fromLocalInput(draft.startsAt);
     const end = fromLocalInput(draft.endsAt);
     const now = Date.now();
-    if (draft.status !== "active") return `Saved as ${draft.status}. Not on the site.`;
-    if (start && start > now) return `Scheduled. Goes live ${draft.startsAt.replace("T", " ")} Amman time.`;
-    if (end && end <= now) return "This window has already closed — it will not show.";
-    if (end) return `Live now, until ${draft.endsAt.replace("T", " ")} Amman time.`;
-    return "Live now, with no end date.";
-  }, [draft.startsAt, draft.endsAt, draft.status]);
+    if (draft.status !== "active") {
+      return `${t("be.savedAs")} ${draft.status}. ${t("be.notOnSite")}`;
+    }
+    if (start && start > now) {
+      return `${t("be.scheduledLive")} ${draft.startsAt.replace("T", " ")} ${t("be.ammanTime")}`;
+    }
+    if (end && end <= now) return t("be.windowClosed");
+    if (end) return `${t("be.liveUntil")} ${draft.endsAt.replace("T", " ")} ${t("be.ammanTime")}`;
+    return t("be.liveNoEnd");
+  }, [draft.startsAt, draft.endsAt, draft.status, t]);
 
   async function pickImage(files: FileList | null, which: "desktop" | "mobile") {
     if (!files || files.length === 0) return;
@@ -218,11 +225,11 @@ export function BannerEditor({
     try {
       const alt =
         window.prompt(
-          "Describe this image for screen readers",
+          t("be.altPrompt"),
           draft.titleEn ? `${draft.titleEn} — campaign artwork` : "",
         ) ?? "";
       if (!alt.trim()) {
-        setError("Every image needs alt text. Nothing was uploaded.");
+        setError(t("be.altRequired"));
         return;
       }
       // Banners live under `banners/` in Storage; the rules allow staff writes
@@ -230,7 +237,7 @@ export function BannerEditor({
       const uploaded = await uploadMerchandisingImage("banners", file, alt);
       set(which === "desktop" ? "media" : "mediaMobile", uploaded);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "That image could not be uploaded.");
+      setError(err instanceof Error ? err.message : t("be.uploadError"));
     } finally {
       setUploading(null);
     }
@@ -239,7 +246,7 @@ export function BannerEditor({
   async function save() {
     setError(null);
     if (!draft.titleEn.trim() || !draft.titleAr.trim()) {
-      return setError("A title is required in both English and Arabic.");
+      return setError(t("be.titleRequired"));
     }
 
     setSaving(true);
@@ -288,15 +295,15 @@ export function BannerEditor({
         error?: string;
         persisted?: boolean;
       };
-      if (!response.ok || !data.ok) throw new Error(data.error ?? "Save failed");
+      if (!response.ok || !data.ok) throw new Error(data.error ?? t("be.saveFailed"));
       if (data.persisted === false) {
-        setError("Validated, but not stored: Firebase Admin is not configured here.");
+        setError(t("be.notStored"));
         return;
       }
       onSaved();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "The banner could not be saved.");
+      setError(err instanceof Error ? err.message : t("be.saveError"));
     } finally {
       setSaving(false);
     }
@@ -315,7 +322,7 @@ export function BannerEditor({
           />
           <motion.aside
             role="dialog"
-            aria-label={banner ? "Edit banner" : "New banner"}
+            aria-label={banner ? t("be.editBanner") : t("be.newBanner")}
             className="bg-paper border-line fixed inset-y-0 end-0 z-[160] flex w-full max-w-3xl flex-col border-s"
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
@@ -324,12 +331,12 @@ export function BannerEditor({
           >
             <header className="border-line flex items-center justify-between border-b px-5 py-4">
               <h2 className="font-display text-ink text-lg font-semibold">
-                {banner ? "Edit banner" : "New banner"}
+                {banner ? t("be.editBanner") : t("be.newBanner")}
               </h2>
               <button
                 type="button"
                 onClick={onClose}
-                aria-label="Close"
+                aria-label={t("common.close")}
                 className="text-mist hover:text-ink cursor-pointer p-2 transition-colors"
               >
                 ✕
@@ -341,14 +348,14 @@ export function BannerEditor({
               <div className="mb-5">
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <span className="text-mist text-[0.6875rem] tracking-[0.12em] uppercase">
-                    Preview
+                    {t("common.preview")}
                   </span>
                   <div className="flex gap-1">
                     <Toggle on={!previewMobile} onClick={() => setPreviewMobile(false)}>
-                      Desktop
+                      {t("common.desktop")}
                     </Toggle>
                     <Toggle on={previewMobile} onClick={() => setPreviewMobile(true)}>
-                      Phone
+                      {t("common.phone")}
                     </Toggle>
                     <span className="mx-1" />
                     <Toggle on={previewLocale === "en"} onClick={() => setPreviewLocale("en")}>
@@ -371,7 +378,7 @@ export function BannerEditor({
                     <Image src={shownImage.url} alt="" fill sizes="600px" className="object-cover" />
                   ) : (
                     <div className="text-mist grid h-full place-items-center text-[0.75rem]">
-                      No image yet
+                      {t("common.noImage")}
                     </div>
                   )}
 
@@ -411,7 +418,7 @@ export function BannerEditor({
                           dark ? "text-white" : "text-ink",
                         )}
                       >
-                        {title || "Your headline"}
+                        {title || t("be.yourHeadline")}
                       </p>
                       {copy && (
                         <p
@@ -439,7 +446,7 @@ export function BannerEditor({
 
                 <p className="text-mist mt-2 text-center text-[0.6875rem]">
                   {previewMobile && !draft.mediaMobile && draft.media
-                    ? "No phone image — the desktop crop is being letterboxed."
+                    ? t("be.noPhoneImage")
                     : scheduleNote}
                 </p>
               </div>
@@ -447,28 +454,28 @@ export function BannerEditor({
               {/* ---- Fields -------------------------------------------- */}
               <div className="grid gap-4">
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Row label="Placement">
+                  <Row label={t("be.placement")}>
                     <select
                       value={draft.slot}
                       onChange={(e) => set("slot", e.target.value as BannerSlot)}
                       className={inputClass}
                     >
-                      <option value="hero">Hero — the first screen</option>
-                      <option value="promo-rail">Promo rail</option>
-                      <option value="spotlight">Spotlight</option>
-                      <option value="category-strip">Category strip</option>
-                      <option value="announcement">Announcement bar</option>
+                      <option value="hero">{t("be.slotHero")}</option>
+                      <option value="promo-rail">{t("be.slotPromo")}</option>
+                      <option value="spotlight">{t("be.slotSpotlight")}</option>
+                      <option value="category-strip">{t("be.slotCategory")}</option>
+                      <option value="announcement">{t("be.slotAnnouncement")}</option>
                     </select>
                   </Row>
-                  <Row label="Status">
+                  <Row label={t("gift.statusLabel")}>
                     <select
                       value={draft.status}
                       onChange={(e) => set("status", e.target.value as BannerStatus)}
                       className={inputClass}
                     >
-                      {(Object.keys(STATUS_LABELS) as BannerStatus[]).map((s) => (
+                      {(Object.keys(STATUS_KEYS) as BannerStatus[]).map((s) => (
                         <option key={s} value={s}>
-                          {STATUS_LABELS[s]}
+                          {t(STATUS_KEYS[s])}
                         </option>
                       ))}
                     </select>
@@ -477,16 +484,16 @@ export function BannerEditor({
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <ImageSlot
-                    label="Desktop image"
-                    hint="Wide crop, 21:9 or thereabouts."
+                    label={t("be.desktopImage")}
+                    hint={t("be.desktopHint")}
                     image={draft.media}
                     busy={uploading === "desktop"}
                     onPick={(files) => pickImage(files, "desktop")}
                     onClear={() => set("media", null)}
                   />
                   <ImageSlot
-                    label="Phone image"
-                    hint="Portrait. Without one, the desktop crop is letterboxed."
+                    label={t("be.phoneImage")}
+                    hint={t("be.phoneHint")}
                     image={draft.mediaMobile}
                     busy={uploading === "mobile"}
                     onPick={(files) => pickImage(files, "mobile")}
@@ -495,14 +502,14 @@ export function BannerEditor({
                 </div>
 
                 <Pair
-                  label="Eyebrow"
+                  label={t("be.eyebrow")}
                   en={draft.eyebrowEn}
                   ar={draft.eyebrowAr}
                   onEn={(v) => set("eyebrowEn", v)}
                   onAr={(v) => set("eyebrowAr", v)}
                 />
                 <Pair
-                  label="Headline"
+                  label={t("be.headline")}
                   multiline
                   en={draft.titleEn}
                   ar={draft.titleAr}
@@ -510,7 +517,7 @@ export function BannerEditor({
                   onAr={(v) => set("titleAr", v)}
                 />
                 <Pair
-                  label="Body"
+                  label={t("be.body")}
                   multiline
                   en={draft.bodyEn}
                   ar={draft.bodyAr}
@@ -518,14 +525,14 @@ export function BannerEditor({
                   onAr={(v) => set("bodyAr", v)}
                 />
                 <Pair
-                  label="Button label"
+                  label={t("be.buttonLabel")}
                   en={draft.ctaLabelEn}
                   ar={draft.ctaLabelAr}
                   onEn={(v) => set("ctaLabelEn", v)}
                   onAr={(v) => set("ctaLabelAr", v)}
                 />
 
-                <Row label="Button link" hint="An internal path, beginning with /.">
+                <Row label={t("be.buttonLink")} hint={t("be.buttonLinkHint")}>
                   <input
                     value={draft.ctaHref}
                     onChange={(e) => set("ctaHref", e.target.value)}
@@ -535,27 +542,27 @@ export function BannerEditor({
                 </Row>
 
                 <div className="grid gap-4 sm:grid-cols-3">
-                  <Row label="Text position">
+                  <Row label={t("be.textPosition")}>
                     <select
                       value={draft.textPosition}
                       onChange={(e) => set("textPosition", e.target.value as BannerTextPosition)}
                       className={inputClass}
                     >
-                      {(Object.keys(POSITION_LABELS) as BannerTextPosition[]).map((p) => (
+                      {(Object.keys(POSITION_KEYS) as BannerTextPosition[]).map((p) => (
                         <option key={p} value={p}>
-                          {POSITION_LABELS[p]}
+                          {t(POSITION_KEYS[p])}
                         </option>
                       ))}
                     </select>
                   </Row>
-                  <Row label="Text colour">
+                  <Row label={t("be.textColour")}>
                     <select
                       value={draft.textTone}
                       onChange={(e) => set("textTone", e.target.value as BannerTextTone)}
                       className={inputClass}
                     >
-                      <option value="light">Light — for a dark photo</option>
-                      <option value="dark">Dark — for a light photo</option>
+                      <option value="light">{t("be.light")}</option>
+                      <option value="dark">{t("be.dark")}</option>
                     </select>
                   </Row>
                   <Row label={`Dimming ${Math.round(draft.scrim * 100)}%`}>
@@ -572,7 +579,7 @@ export function BannerEditor({
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-3">
-                  <Row label="Starts" hint="Amman time">
+                  <Row label={t("be.starts")} hint={t("oe.ammanTime")}>
                     <input
                       type="datetime-local"
                       value={draft.startsAt}
@@ -580,7 +587,7 @@ export function BannerEditor({
                       className={inputClass}
                     />
                   </Row>
-                  <Row label="Ends" hint="Blank means no end">
+                  <Row label={t("be.ends")} hint={t("be.endsHint")}>
                     <input
                       type="datetime-local"
                       value={draft.endsAt}
@@ -588,7 +595,7 @@ export function BannerEditor({
                       className={inputClass}
                     />
                   </Row>
-                  <Row label="Priority" hint="Higher shows first.">
+                  <Row label={t("be.priority")} hint={t("be.priorityHint")}>
                     <input
                       type="number"
                       min={0}
@@ -613,7 +620,7 @@ export function BannerEditor({
                 onClick={onClose}
                 className="text-smoke hover:text-ink cursor-pointer text-[0.8125rem]"
               >
-                Cancel
+                {t("common.cancel")}
               </button>
               <Button variant="brand" size="md" loading={saving} onClick={save}>
                 {banner ? "Save changes" : "Create banner"}
@@ -708,6 +715,7 @@ function ImageSlot({
   onPick: (files: FileList | null) => void;
   onClear: () => void;
 }) {
+  const { t } = useAdminLocale();
   return (
     <div>
       <span className="text-ink-muted mb-1.5 block text-[0.75rem]">{label}</span>
@@ -739,7 +747,7 @@ function ImageSlot({
             onClick={onClear}
             className="text-alert cursor-pointer text-[0.75rem]"
           >
-            Remove
+            {t("common.remove")}
           </button>
         )}
       </div>

@@ -97,7 +97,7 @@ export function AdminShell({
       <Link href="/admin" className="flex items-center gap-2.5 px-2">
         <NetSaleMark className="h-8 w-8 shrink-0" title={null} />
         <span className="min-w-0">
-          <span className="font-display text-ink block text-[0.875rem] font-semibold tracking-[0.14em] uppercase">
+          <span className="ns-wordmark font-display text-ink block text-[0.875rem] font-semibold tracking-[0.14em] uppercase">
             net&nbsp;sale
           </span>
           <span className="text-mist block text-[0.6875rem] tracking-[0.1em] uppercase">
@@ -106,7 +106,7 @@ export function AdminShell({
         </span>
       </Link>
 
-      <nav className="mt-8 flex flex-1 flex-col gap-6" aria-label="Admin">
+      <nav className="mt-8 flex flex-1 flex-col gap-6" aria-label={t("shell.operations")}>
         {NAV.map((section) => (
           <div key={section.group}>
             <p className="text-mist mb-2 px-3 text-[0.625rem] font-medium tracking-[0.14em] uppercase">
@@ -174,11 +174,7 @@ export function AdminShell({
               </button>
             ))}
           </div>
-          {rtl && (
-            <p className="text-mist mt-2 text-[0.6875rem] leading-relaxed">
-              {t("shell.partial")}
-            </p>
-          )}
+
         </div>
 
         {!live && (
@@ -229,8 +225,18 @@ export function AdminShell({
      * attribute.
      */
     <div className="bg-paper min-h-screen" dir={rtl ? "rtl" : "ltr"}>
-      {/* Desktop rail */}
-      <aside className="border-line bg-paper-raised fixed inset-y-0 start-0 z-30 hidden w-64 flex-col border-e p-5 lg:flex">
+      {/*
+        Desktop rail.
+
+        `overflow-y-auto` is load-bearing, not defensive: the rail is a fixed
+        full-height column and the navigation has outgrown a laptop screen —
+        sixteen destinations in four groups, plus the language switch, the
+        sample-data notice, the account and the sign-out. Without it the last
+        group and the account block are simply unreachable below the fold, and
+        `overscroll-contain` stops a flick inside the rail from scrolling the
+        board behind it once the list ends.
+      */}
+      <aside className="border-line bg-paper-raised fixed inset-y-0 start-0 z-30 hidden w-64 flex-col overflow-y-auto overscroll-contain border-e p-5 lg:flex">
         {rail}
       </aside>
 
@@ -239,13 +245,13 @@ export function AdminShell({
         <Link href="/admin" className="flex items-center gap-2">
           <NetSaleMark className="h-7 w-7" title={null} />
           <span className="font-display text-[0.8125rem] font-semibold tracking-[0.14em] uppercase">
-            Operations
+            {t("shell.operations")}
           </span>
         </Link>
         <button
           type="button"
           onClick={() => setMobileOpen(true)}
-          aria-label="Open menu"
+          aria-label={t("shell.openMenu")}
           className="text-ink grid h-9 w-9 cursor-pointer place-items-center rounded-md"
           data-cursor="hover"
         >
@@ -267,10 +273,10 @@ export function AdminShell({
               type="button"
               className="bg-ink/30 absolute inset-0 backdrop-blur-sm"
               onClick={() => setMobileOpen(false)}
-              aria-label="Close menu"
+              aria-label={t("shell.closeMenu")}
             />
             <motion.aside
-              className="bg-paper-raised absolute inset-y-0 start-0 flex w-72 flex-col p-5 shadow-hover"
+              className="bg-paper-raised absolute inset-y-0 start-0 flex w-72 flex-col overflow-y-auto overscroll-contain p-5 shadow-hover"
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}

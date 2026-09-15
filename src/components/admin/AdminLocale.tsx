@@ -65,6 +65,34 @@ export function AdminLocaleProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /*
+   * The document's own language and direction.
+   *
+   * The shell already mirrors itself from a `dir` on its wrapper, so this is
+   * not what moves the rail. It is what everything *outside* that wrapper
+   * reads: a screen reader choosing an Arabic voice, the browser's spell
+   * checker, `:lang()` rules, and text selection behaviour. Leaving `<html>`
+   * at `lang="en"` while the screen is Arabic tells all of them the wrong
+   * thing.
+   *
+   * Applied in an effect rather than rendered, for the same reason the locale
+   * itself is: the choice lives in this browser's storage, and the server has
+   * already sent its HTML by the time it can be read.
+   */
+  useEffect(() => {
+    const root = document.documentElement;
+    const previousLang = root.lang;
+    const previousDir = root.dir;
+
+    root.lang = locale;
+    root.dir = locale === "ar" ? "rtl" : "ltr";
+
+    return () => {
+      root.lang = previousLang;
+      root.dir = previousDir;
+    };
+  }, [locale]);
+
   const value = useMemo<Value>(
     () => ({
       locale,

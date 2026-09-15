@@ -1,6 +1,9 @@
+"use client";
+
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/format";
 import { Panel } from "./AdminUI";
+import { useAdminLocale } from "./AdminLocale";
 import type { ErrorReport } from "@/lib/monitoring/fingerprint";
 
 /**
@@ -14,25 +17,24 @@ import type { ErrorReport } from "@/lib/monitoring/fingerprint";
  * important one; the one that has happened four hundred times is.
  */
 export function ErrorReports({ reports }: { reports: (ErrorReport & { resolved?: boolean })[] }) {
+  const { t } = useAdminLocale();
   const open = reports.filter((r) => !r.resolved);
   const total = open.reduce((sum, r) => sum + r.count, 0);
 
   return (
     <Panel
-      title="Errors"
+      title={t("errors.title")}
       description={
         open.length === 0
-          ? "Nothing has crashed."
-          : `${open.length} distinct ${open.length === 1 ? "fault" : "faults"}, ${total} ${
-              total === 1 ? "occurrence" : "occurrences"
+          ? t("errors.none")
+          : `${open.length} ${open.length === 1 ? t("errors.fault") : t("errors.faults")}, ${total} ${
+              total === 1 ? t("errors.occurrence") : t("errors.occurrences")
             }.`
       }
     >
       {open.length === 0 ? (
         <p className="text-mist text-[0.8125rem]">
-          Error boundaries report here automatically. An empty list means no
-          page has thrown since reporting was switched on — not that nothing is
-          being watched.
+          {t("errors.explainer")}
         </p>
       ) : (
         <ul className="divide-line divide-y">

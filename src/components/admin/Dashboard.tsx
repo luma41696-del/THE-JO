@@ -17,6 +17,8 @@ import {
   type RangeKey,
 } from "@/lib/admin/analytics";
 import { AdminPageHeader } from "./AdminShell";
+import { useAdminLocale } from "./AdminLocale";
+import type { AdminKey } from "@/lib/i18n/admin";
 import { DataTable, FilterChips, OrderStatusPill, Panel, StatTile, type Column } from "./AdminUI";
 import { CompositionDonut, RankedBars, RevenueChart } from "./charts/Charts";
 import { ExportMenu } from "./ExportMenu";
@@ -49,6 +51,7 @@ export function Dashboard({
   /** Department id → display name. Charts label with names, not slugs. */
   categoryNames?: Record<string, string>;
 }) {
+  const { t, locale } = useAdminLocale();
   const [range, setRange] = useState<RangeKey>("30d");
 
   /*
@@ -57,7 +60,7 @@ export function Dashboard({
    * been deleted still charts its revenue instead of vanishing from a total.
    */
   const nameOf = (id: string) =>
-    categoryNames[id] ?? (id === "other" ? "Other" : id);
+    categoryNames[id] ?? (id === "other" ? t("common.other") : id);
 
   const kpis = useMemo(() => computeKpis(orders, range, now), [orders, range, now]);
   const series = useMemo(() => buildTimeseries(orders, range, now), [orders, range, now]);
@@ -68,7 +71,7 @@ export function Dashboard({
 
   const openTickets = tickets.filter((t) => t.status === "open" || t.status === "pending");
   const currency = kpis.currency;
-  const rangeLabel = `vs previous ${RANGES[range].days} days`;
+  const rangeLabel = `${t("dash.vsPrevious")} ${RANGES[range].days} ${t("dash.days")}`;
 
   // Sparklines follow the same buckets as the main chart, so a tile and the
   // curve below it can never tell different stories.
@@ -78,7 +81,7 @@ export function Dashboard({
   const queueColumns: Column<Order>[] = [
     {
       key: "reference",
-      header: "Order",
+      header: t("col.order"),
       cell: (order) => (
         <Link href={`/admin/orders/${order.reference}`} className="text-ink font-medium">
           {order.reference}
@@ -88,25 +91,25 @@ export function Dashboard({
     },
     {
       key: "customer",
-      header: "Customer",
+      header: t("col.customer"),
       cell: (order) => <span className="text-ink-muted">{order.shippingAddress.fullName}</span>,
       sortValue: (order) => order.shippingAddress.fullName,
     },
     {
       key: "placed",
-      header: "Placed",
+      header: t("col.placed"),
       cell: (order) => <span className="text-smoke">{formatDate(order.createdAt)}</span>,
       sortValue: (order) => order.createdAt,
     },
     {
       key: "status",
-      header: "Status",
+      header: t("col.status"),
       cell: (order) => <OrderStatusPill status={order.status} />,
       sortValue: (order) => order.status,
     },
     {
       key: "total",
-      header: "Total",
+      header: t("col.total"),
       align: "end",
       cell: (order) => (
         <span className="text-ink font-medium tabular-nums">
@@ -120,14 +123,14 @@ export function Dashboard({
   return (
     <>
       <AdminPageHeader
-        title="Dashboard"
-        description="Trading performance and today's queue."
+        title={t("dash.title")}
+        description={t("dash.subtitle")}
         actions={
           <>
             <FilterChips
               options={(Object.keys(RANGES) as RangeKey[]).map((key) => ({
                 value: key,
-                label: RANGES[key].label.replace("Last ", ""),
+                label: t(`dash.range.${key}` as AdminKey),
               }))}
               value={range}
               onChange={setRange}
@@ -135,13 +138,13 @@ export function Dashboard({
             <ExportMenu
               rows={series}
               columns={[
-                { header: "Date", value: (p) => new Date(p.t), format: "date", width: 18 },
-                { header: "Revenue", value: (p) => p.revenue, format: "currency" },
-                { header: "Orders", value: (p) => p.orders, format: "number" },
-                { header: "Units", value: (p) => p.units, format: "number" },
+                { header: t("col.date"), value: (p) => new Date(p.t), format: "date", width: 18 },
+                { header: t("col.revenue"), value: (p) => p.revenue, format: "currency" },
+                { header: t("col.orders"), value: (p) => p.orders, format: "number" },
+                { header: t("col.units"), value: (p) => p.units, format: "number" },
               ]}
               filename="net-sale-sales"
-              title={`net sale — sales, ${RANGES[range].label.toLowerCase()}`}
+              title={`${t("dash.salesExport")}, ${t(`dash.range.${range}` as AdminKey)}`}
               currency={currency}
             />
           </>
@@ -151,7 +154,7 @@ export function Dashboard({
       {/* 1. Where the business is */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatTile
-          label="Revenue"
+          label={t("col.revenue")}
           value={formatPrice(kpis.revenue, currency)}
           change={kpis.revenueChange}
           changeLabel={rangeLabel}
@@ -159,26 +162,26 @@ export function Dashboard({
           emphasis
         />
         <StatTile
-          label="Orders"
+          label={t("col.orders")}
           value={kpis.orders.toLocaleString("en-GB")}
           change={kpis.ordersChange}
           changeLabel={rangeLabel}
           spark={ordersSpark}
         />
         <StatTile
-          label="Average order"
+          label={t("dash.averageOrder")}
           value={formatPrice(kpis.averageOrderValue, currency)}
           change={kpis.aovChange}
           changeLabel={rangeLabel}
         />
-        <StatTile label="Units sold" value={kpis.units.toLocaleString("en-GB")} />
+        <StatTile label={t("dash.unitsSold")} value={kpis.units.toLocaleString("en-GB")} />
       </div>
 
       {/* 2. What needs doing */}
       <div className="mt-4 grid gap-4 lg:grid-cols-[2fr_1fr]">
         <Panel
-          title="Needs fulfilment"
-          description="Oldest first — these are paid and waiting."
+          title={t("dash.needsFulfilment")}
+          description={t("dash.needsFulfilmentHint")}
           actions={
             <Link
               href="/admin/orders?status=paid"
@@ -194,20 +197,20 @@ export function Dashboard({
               rows={queue}
               columns={queueColumns}
               rowKey={(order) => order.id}
-              empty="Nothing waiting. Every paid order has been packed."
+              empty={t("dash.queueEmpty")}
             />
           </div>
         </Panel>
 
         <div className="flex flex-col gap-4">
-          <Panel title="Fulfilment queue">
+          <Panel title={t("dash.fulfilmentQueue")}>
             <ul className="space-y-2.5">
               {(
                 [
-                  ["paid", "Paid, not started"],
-                  ["processing", "Processing"],
-                  ["packed", "Packed"],
-                  ["shipped", "In transit"],
+                  ["paid", t("dash.paidNotStarted")],
+                  ["processing", t("status.order.processing")],
+                  ["packed", t("status.order.packed")],
+                  ["shipped", t("dash.inTransit")],
                 ] as const
               ).map(([status, label]) => (
                 <li key={status} className="flex items-center justify-between gap-3">
@@ -223,7 +226,7 @@ export function Dashboard({
                 </li>
               ))}
               <li className="border-line flex items-center justify-between gap-3 border-t pt-2.5">
-                <span className="text-smoke text-[0.8125rem]">Cancelled / refunded</span>
+                <span className="text-smoke text-[0.8125rem]">{t("dash.cancelledRefunded")}</span>
                 <span className="text-smoke text-[0.9375rem] tabular-nums">
                   {counts.cancelled + counts.refunded}
                 </span>
@@ -232,13 +235,13 @@ export function Dashboard({
           </Panel>
 
           <Panel
-            title="Support"
+            title={t("nav.support")}
             actions={
               <Link
                 href="/admin/support"
                 className="text-smoke hover:text-ink text-[0.75rem] transition-colors"
               >
-                Open →
+                {t("dash.open")} →
               </Link>
             }
           >
@@ -246,7 +249,7 @@ export function Dashboard({
               {openTickets.length}
             </p>
             <p className="text-mist mt-1 text-[0.75rem]">
-              {openTickets.length === 1 ? "ticket needs a reply" : "tickets need a reply"}
+              {openTickets.length === 1 ? t("dash.ticketNeedsReply") : t("dash.ticketsNeedReply")}
             </p>
 
             {openTickets[0] && (
@@ -269,7 +272,7 @@ export function Dashboard({
       {/* 3. What is selling */}
       <div className="mt-4">
         <Panel
-          title="Revenue"
+          title={t("col.revenue")}
           description={`${RANGES[range].label} · ${RANGES[range].bucket === "day" ? "daily" : "weekly"} buckets`}
         >
           <RevenueChart
@@ -281,19 +284,19 @@ export function Dashboard({
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <Panel
-          title="Best sellers"
-          description="By units — revenue ranks them differently."
+          title={t("dash.bestSellers")}
+          description={t("dash.bestSellersHint")}
           actions={
             <ExportMenu
               rows={products}
               columns={[
-                { header: "Product", value: (p) => pick(p.title, "en"), width: 32 },
-                { header: "Units", value: (p) => p.units, format: "number" },
-                { header: "Revenue", value: (p) => p.revenue, format: "currency" },
+                { header: t("col.product"), value: (p) => pick(p.title, locale), width: 32 },
+                { header: t("col.units"), value: (p) => p.units, format: "number" },
+                { header: t("col.revenue"), value: (p) => p.revenue, format: "currency" },
               ]}
               filename="net-sale-best-sellers"
               currency={currency}
-              label="Export"
+              label={t("common.export")}
             />
           }
         >
@@ -335,7 +338,7 @@ export function Dashboard({
           </ul>
         </Panel>
 
-        <Panel title="Revenue by category" description="Share of kept revenue in the window.">
+        <Panel title={t("dash.revenueByCategory")} description={t("dash.revenueByCategoryHint")}>
           <CompositionDonut
             data={categories.map((c) => ({ label: nameOf(c.categoryId), value: c.revenue }))}
             currency={currency}
@@ -344,7 +347,7 @@ export function Dashboard({
       </div>
 
       <div className="mt-4">
-        <Panel title="Units by category" description="Volume, which does not track revenue.">
+        <Panel title={t("dash.unitsByCategory")} description={t("dash.unitsByCategoryHint")}>
           <RankedBars
             data={categories.map((c) => ({
               label: nameOf(c.categoryId),

@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { formatDate, formatPrice } from "@/lib/format";
 import { AdminPageHeader } from "./AdminShell";
+import { useAdminLocale } from "./AdminLocale";
 import { DataTable, Panel, StatTile, type Column } from "./AdminUI";
 import { ExportMenu } from "./ExportMenu";
 import type { CustomerSummary } from "@/lib/admin/data";
@@ -24,6 +25,7 @@ export function CustomersBoard({
   customers: CustomerSummary[];
   now: number;
 }) {
+  const { t } = useAdminLocale();
   const [search, setSearch] = useState("");
 
   const stats = useMemo(() => {
@@ -52,7 +54,7 @@ export function CustomersBoard({
   const columns: Column<CustomerSummary>[] = [
     {
       key: "name",
-      header: "Customer",
+      header: t("col.customer"),
       cell: (c) => (
         <span>
           <span className="text-ink block font-medium">{c.name}</span>
@@ -63,20 +65,20 @@ export function CustomersBoard({
     },
     {
       key: "city",
-      header: "City",
+      header: t("col.city"),
       cell: (c) => <span className="text-ink-muted">{c.city}</span>,
       sortValue: (c) => c.city,
     },
     {
       key: "orders",
-      header: "Orders",
+      header: t("col.orders"),
       align: "end",
       cell: (c) => (
         <span className="tabular-nums">
           <span className="text-ink font-medium">{c.orders}</span>
           {c.orders > 1 && (
             <span className="bg-brand-mist text-brand-deep rounded-xs ms-2 px-1.5 py-0.5 text-[0.625rem]">
-              repeat
+              {t("customers.repeat")}
             </span>
           )}
         </span>
@@ -85,7 +87,7 @@ export function CustomersBoard({
     },
     {
       key: "revenue",
-      header: "Lifetime value",
+      header: t("customers.lifetimeValue"),
       align: "end",
       cell: (c) => (
         <span className="text-ink font-medium tabular-nums">{formatPrice(c.revenue, "JOD")}</span>
@@ -94,7 +96,7 @@ export function CustomersBoard({
     },
     {
       key: "last",
-      header: "Last order",
+      header: t("customers.lastOrder"),
       align: "end",
       cell: (c) => {
         const days = Math.round((now - c.lastOrderAt) / 86_400_000);
@@ -107,7 +109,8 @@ export function CustomersBoard({
                 days > 90 ? "text-alert" : "text-mist",
               )}
             >
-              {days}d ago
+              {days}
+              {t("customers.daysAgo")}
             </span>
           </span>
         );
@@ -119,39 +122,39 @@ export function CustomersBoard({
   return (
     <>
       <AdminPageHeader
-        title="Customers"
-        description="Derived from the order history, so these figures can never disagree with it."
+        title={t("customers.title")}
+        description={t("customers.subtitle")}
         actions={
           <ExportMenu
             rows={rows}
             columns={[
-              { header: "Name", value: (c) => c.name, width: 24 },
-              { header: "Email", value: (c) => c.email, width: 30 },
-              { header: "City", value: (c) => c.city },
-              { header: "Orders", value: (c) => c.orders, format: "number" },
-              { header: "Lifetime value", value: (c) => c.revenue, format: "currency" },
-              { header: "First order", value: (c) => new Date(c.firstOrderAt), format: "date", width: 18 },
-              { header: "Last order", value: (c) => new Date(c.lastOrderAt), format: "date", width: 18 },
+              { header: t("customers.name"), value: (c) => c.name, width: 24 },
+              { header: t("col.email"), value: (c) => c.email, width: 30 },
+              { header: t("col.city"), value: (c) => c.city },
+              { header: t("col.orders"), value: (c) => c.orders, format: "number" },
+              { header: t("customers.lifetimeValue"), value: (c) => c.revenue, format: "currency" },
+              { header: t("customers.firstOrder"), value: (c) => new Date(c.firstOrderAt), format: "date", width: 18 },
+              { header: t("customers.lastOrder"), value: (c) => new Date(c.lastOrderAt), format: "date", width: 18 },
             ]}
             filename="net-sale-customers"
-            title="net sale — customers"
+            title={t("customers.export")}
           />
         }
       />
 
       <div className="mb-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatTile label="Customers" value={stats.total.toLocaleString("en-GB")} />
+        <StatTile label={t("customers.title")} value={stats.total.toLocaleString("en-GB")} />
         <StatTile
-          label="Repeat rate"
+          label={t("customers.repeatRate")}
           value={`${Math.round(stats.repeatRate * 100)}%`}
-          changeLabel={`${stats.returning} returning`}
+          changeLabel={`${stats.returning} ${t("customers.returning")}`}
         />
         <StatTile
-          label="Revenue from repeats"
+          label={t("customers.revenueFromRepeats")}
           value={`${Math.round(stats.returningShare * 100)}%`}
           emphasis
         />
-        <StatTile label="Average lifetime value" value={formatPrice(stats.lifetimeAverage, "JOD")} />
+        <StatTile label={t("customers.averageLifetime")} value={formatPrice(stats.lifetimeAverage, "JOD")} />
       </div>
 
       <Panel padded={false}>
@@ -160,11 +163,11 @@ export function CustomersBoard({
             {rows.length} of {customers.length}
           </p>
           <label className="relative">
-            <span className="sr-only">Search customers</span>
+            <span className="sr-only">{t("customers.searchLabel")}</span>
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Name, email, city…"
+              placeholder={t("customers.searchPlaceholder")}
               className="border-line focus:border-brand bg-paper text-ink placeholder:text-mist w-56 rounded-pill border px-4 py-1.5 text-[0.8125rem] outline-none transition-colors"
             />
           </label>
@@ -175,7 +178,7 @@ export function CustomersBoard({
             columns={columns}
             rowKey={(c) => c.uid}
             initialSort={{ key: "revenue", dir: "desc" }}
-            empty={search ? `Nothing matches "${search}".` : "No customers yet."}
+            empty={search ? t("common.noMatch") : t("customers.empty")}
           />
         </div>
       </Panel>

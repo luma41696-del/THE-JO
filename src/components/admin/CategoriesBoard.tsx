@@ -9,6 +9,7 @@ import { getIdToken } from "@/lib/firebase/auth";
 import { ACCEPT_ATTRIBUTE, uploadMerchandisingImage } from "@/lib/firebase/upload";
 import { buildCategoryTree } from "@/lib/categories";
 import { AdminPageHeader } from "./AdminShell";
+import { useAdminLocale } from "./AdminLocale";
 import { Panel } from "./AdminUI";
 import { Button } from "@/components/ui/Button";
 import type { Category, CategoryNode, ProductImage } from "@/types";
@@ -76,6 +77,7 @@ function toDraft(category: Category | null, parentId: string | null = null): Dra
 }
 
 export function CategoriesBoard({ categories }: { categories: Category[] }) {
+  const { t } = useAdminLocale();
   const router = useRouter();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
@@ -93,7 +95,7 @@ export function CategoriesBoard({ categories }: { categories: Category[] }) {
     if (!draft) return;
     setError(null);
     if (!draft.nameEn.trim() || !draft.nameAr.trim()) {
-      return setError("A name is required in both English and Arabic.");
+      return setError(t("cat.nameRequired"));
     }
 
     setSaving(true);
@@ -128,15 +130,15 @@ export function CategoriesBoard({ categories }: { categories: Category[] }) {
         persisted?: boolean;
         repathed?: number;
       };
-      if (!response.ok || !data.ok) throw new Error(data.error ?? "Save failed");
+      if (!response.ok || !data.ok) throw new Error(data.error ?? t("cat.saveFailed"));
       if (data.persisted === false) {
-        setError("Validated, but not stored: Firebase Admin is not configured here.");
+        setError(t("cat.notStored"));
         return;
       }
       setDraft(null);
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "The category could not be saved.");
+      setError(err instanceof Error ? err.message : t("cat.saveError"));
     } finally {
       setSaving(false);
     }
@@ -158,14 +160,14 @@ export function CategoriesBoard({ categories }: { categories: Category[] }) {
         body: JSON.stringify({ updates }),
       });
       const data = (await response.json()) as { ok?: boolean; error?: string; persisted?: boolean };
-      if (!response.ok || !data.ok) throw new Error(data.error ?? "Update failed");
+      if (!response.ok || !data.ok) throw new Error(data.error ?? t("cat.updateFailed"));
       if (data.persisted === false) {
-        setError("Validated, but not stored: Firebase Admin is not configured here.");
+        setError(t("cat.notStored"));
         return;
       }
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "The categories could not be updated.");
+      setError(err instanceof Error ? err.message : t("cat.updateError"));
     } finally {
       setBusyId(null);
     }
@@ -194,15 +196,15 @@ export function CategoriesBoard({ categories }: { categories: Category[] }) {
     setError(null);
     try {
       const alt =
-        window.prompt("Describe this image for screen readers", draft.nameEn || "") ?? "";
+        window.prompt(t("cat.altPrompt"), draft.nameEn || "") ?? "";
       if (!alt.trim()) {
-        setError("Every image needs alt text. Nothing was uploaded.");
+        setError(t("cat.altRequired"));
         return;
       }
       const uploaded = await uploadMerchandisingImage("categories", files[0]!, alt);
       set("image", uploaded);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "That image could not be uploaded.");
+      setError(err instanceof Error ? err.message : t("cat.uploadError"));
     } finally {
       setUploading(false);
     }
@@ -211,11 +213,11 @@ export function CategoriesBoard({ categories }: { categories: Category[] }) {
   return (
     <>
       <AdminPageHeader
-        title="Categories"
-        description="The shop's departments and their subcategories, in the order they appear."
+        title={t("cat.title")}
+        description={t("cat.subtitle")}
         actions={
           <Button variant="brand" size="sm" onClick={() => setDraft(toDraft(null))}>
-            New department
+            {t("cat.newDepartment")}
           </Button>
         }
       />
@@ -227,10 +229,10 @@ export function CategoriesBoard({ categories }: { categories: Category[] }) {
       )}
 
       <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr] [&>*]:min-w-0">
-        <Panel title="The tree" description="Nudge to reorder. Hidden categories keep their URLs.">
+        <Panel title={t("cat.tree")} description={t("cat.treeHint")}>
           {tree.length === 0 ? (
             <p className="text-mist py-8 text-center text-[0.875rem]">
-              No categories yet. Create a department to begin.
+              {t("cat.empty")}
             </p>
           ) : (
             <ul className="divide-line divide-y">
@@ -282,27 +284,27 @@ export function CategoriesBoard({ categories }: { categories: Category[] }) {
         </Panel>
 
         <Panel
-          title={draft ? (draft.id ? "Edit category" : "New category") : "Nothing selected"}
+          title={draft ? (draft.id ? t("cat.edit") : t("cat.new")) : t("cat.nothingSelected")}
           description={
             draft
-              ? "Moving a category re-files every product beneath it."
-              : "Pick a category from the tree, or create one."
+              ? t("cat.movingHint")
+              : t("cat.pickHint")
           }
         >
           {!draft ? (
             <p className="text-mist py-8 text-center text-[0.875rem]">
-              Select a category to edit it.
+              {t("cat.selectToEdit")}
             </p>
           ) : (
             <div className="grid gap-4">
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Name (English)" value={draft.nameEn} onChange={(v) => set("nameEn", v)} />
+                <Field label={t("cat.nameEn")} value={draft.nameEn} onChange={(v) => set("nameEn", v)} />
                 <Field label="الاسم (عربي)" value={draft.nameAr} onChange={(v) => set("nameAr", v)} rtl />
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field
-                  label="Description (English)"
+                  label={t("cat.descEn")}
                   value={draft.descriptionEn}
                   onChange={(v) => set("descriptionEn", v)}
                   multiline
@@ -317,21 +319,21 @@ export function CategoriesBoard({ categories }: { categories: Category[] }) {
               </div>
 
               <Field
-                label="Slug"
+                label={t("cat.slug")}
                 value={draft.slug}
                 onChange={(v) => set("slug", v)}
                 mono
-                hint="The URL key. Changing it on a live category breaks existing links."
+                hint={t("cat.slugHint")}
               />
 
               <label className="block">
-                <span className="text-ink-muted mb-1.5 block text-[0.75rem]">Sits under</span>
+                <span className="text-ink-muted mb-1.5 block text-[0.75rem]">{t("cat.sitsUnder")}</span>
                 <select
                   value={draft.parentId ?? ""}
                   onChange={(e) => set("parentId", e.target.value || null)}
                   className={inputClass}
                 >
-                  <option value="">— A top-level department —</option>
+                  <option value="">— {t("cat.topLevel")} —</option>
                   {departments
                     .filter((d) => d.id !== draft.id)
                     .map((d) => (
@@ -348,7 +350,7 @@ export function CategoriesBoard({ categories }: { categories: Category[] }) {
               </label>
 
               <div>
-                <span className="text-ink-muted mb-1.5 block text-[0.75rem]">Tile image</span>
+                <span className="text-ink-muted mb-1.5 block text-[0.75rem]">{t("cat.tileImage")}</span>
                 <div className="flex items-center gap-2">
                   <label
                     className={cn(
@@ -367,7 +369,7 @@ export function CategoriesBoard({ categories }: { categories: Category[] }) {
                         />
                       </span>
                     ) : (
-                      <span>{uploading ? "…" : "Upload"}</span>
+                      <span>{uploading ? "…" : t("cat.upload")}</span>
                     )}
                     <input
                       type="file"
@@ -383,7 +385,7 @@ export function CategoriesBoard({ categories }: { categories: Category[] }) {
                       onClick={() => set("image", null)}
                       className="text-alert cursor-pointer text-[0.75rem]"
                     >
-                      Remove
+                      {t("common.remove")}
                     </button>
                   )}
                 </div>
@@ -391,18 +393,18 @@ export function CategoriesBoard({ categories }: { categories: Category[] }) {
 
               <div className="grid gap-3">
                 <Check
-                  label="Show in the navigation menu"
+                  label={t("cat.showInNav")}
                   checked={draft.showInNav}
                   onChange={(v) => set("showInNav", v)}
                 />
                 <Check
-                  label="Feature on the categories page"
+                  label={t("cat.feature")}
                   checked={draft.featured}
                   onChange={(v) => set("featured", v)}
                 />
                 <Check
-                  label="Hidden"
-                  hint="Keeps its products and its URL, but leaves the menu and the grid."
+                  label={t("cat.hiddenLabel")}
+                  hint={t("cat.hiddenHint")}
                   checked={draft.hidden}
                   onChange={(v) => set("hidden", v)}
                 />
@@ -414,10 +416,10 @@ export function CategoriesBoard({ categories }: { categories: Category[] }) {
                   onClick={() => setDraft(null)}
                   className="text-smoke hover:text-ink cursor-pointer text-[0.8125rem]"
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </button>
                 <Button variant="brand" size="sm" loading={saving} onClick={save}>
-                  {draft.id ? "Save changes" : "Create"}
+                  {draft.id ? t("cat.saveChanges") : t("cat.create")}
                 </Button>
               </div>
             </div>
@@ -458,6 +460,7 @@ function Row({
   onToggleNav: () => void;
   onAddChild?: () => void;
 }) {
+  const { t } = useAdminLocale();
   return (
     <div className="flex flex-wrap items-center gap-2">
       <button
@@ -477,27 +480,27 @@ function Row({
           <span className="text-mist ms-2 font-normal">{node.name.ar}</span>
         </span>
         <span className="text-mist block text-[0.6875rem] tabular-nums">
-          {node.productCount} pieces · /{node.slug}
-          {node.showInNav === false && " · not in menu"}
+          {node.productCount} {t("cat.pieces")} · /{node.slug}
+          {node.showInNav === false && ` · ${t("cat.notInMenu")}`}
         </span>
       </button>
 
       <div className="flex shrink-0 items-center gap-1">
         {onAddChild && (
-          <Mini onClick={onAddChild} label="Add a subcategory">
+          <Mini onClick={onAddChild} label={t("cat.addChild")}>
             +
           </Mini>
         )}
-        <Mini onClick={onUp} disabled={!canUp || busy} label="Move up">
+        <Mini onClick={onUp} disabled={!canUp || busy} label={t("cat.moveUp")}>
           ↑
         </Mini>
-        <Mini onClick={onDown} disabled={!canDown || busy} label="Move down">
+        <Mini onClick={onDown} disabled={!canDown || busy} label={t("cat.moveDown")}>
           ↓
         </Mini>
-        <Mini onClick={onToggleNav} disabled={busy} label="Show in menu">
+        <Mini onClick={onToggleNav} disabled={busy} label={t("cat.showInMenu")}>
           {node.showInNav === false ? "☐" : "☑"}
         </Mini>
-        <Mini onClick={onToggleHidden} disabled={busy} label="Hide" danger={!node.hidden}>
+        <Mini onClick={onToggleHidden} disabled={busy} label={t("cat.hide")} danger={!node.hidden}>
           {node.hidden ? "↩" : "⌫"}
         </Mini>
       </div>

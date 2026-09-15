@@ -16,6 +16,7 @@ import {
   uploadProductImage,
 } from "@/lib/firebase/upload";
 import { AdminPageHeader } from "./AdminShell";
+import { useAdminLocale } from "./AdminLocale";
 import { Panel } from "./AdminUI";
 import { Button } from "@/components/ui/Button";
 import type {
@@ -125,6 +126,7 @@ export function ProductEditor({
   categories: Category[];
   shippingClasses?: ShippingClass[];
 }) {
+  const { t } = useAdminLocale();
   const router = useLocalizedRouter();
   const [draft, setDraft] = useState<Draft>(() => toDraft(product));
   const [saving, setSaving] = useState(false);
@@ -210,7 +212,7 @@ export function ProductEditor({
     const nameAr = window.prompt("اسم التصميم (بالعربية)")?.trim() || name;
     const alt = window.prompt("Describe the thumbnail for screen readers", `${name} — `)?.trim();
     if (!alt) {
-      setUploadError("A design thumbnail needs alt text. Nothing was uploaded.");
+      setUploadError(t("pe.designAltRequired"));
       return;
     }
 
@@ -255,7 +257,7 @@ export function ProductEditor({
             draft.titleEn ? `${draft.titleEn} — ` : "",
           ) ?? "";
         if (!alt.trim()) {
-          setUploadError("Every image needs alt text. Nothing was uploaded.");
+          setUploadError(t("pe.imageAltRequired"));
           break;
         }
 
@@ -377,7 +379,7 @@ export function ProductEditor({
         router.refresh();
       }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not save.");
+      setError(caught instanceof Error ? caught.message : t("pe.couldNotSave"));
     } finally {
       setSaving(false);
     }
@@ -386,19 +388,19 @@ export function ProductEditor({
   return (
     <>
       <AdminPageHeader
-        title={isNew ? "New product" : draft.titleEn || "Untitled"}
-        description={isNew ? "Both languages are required before publishing." : `/product/${draft.slug}`}
+        title={isNew ? t("pe.newProduct") : draft.titleEn || t("pe.untitled")}
+        description={isNew ? t("pe.bothLanguages") : `/product/${draft.slug}`}
         actions={
           <>
             <Link href="/admin/products">
               <Button variant="ghost" size="sm">
-                ← Catalogue
+                ← {t("pe.catalogue")}
               </Button>
             </Link>
             {!isNew && (
               <Link href={`/en/product/${draft.slug}`}>
                 <Button variant="secondary" size="sm">
-                  View live
+                  {t("pe.viewLive")}
                 </Button>
               </Link>
             )}
@@ -407,10 +409,10 @@ export function ProductEditor({
               size="sm"
               loading={saving}
               success={saved}
-              successLabel="Saved"
+              successLabel={t("common.saved")}
               onClick={() => void save()}
             >
-              Save
+              {t("common.save")}
             </Button>
           </>
         }
@@ -430,28 +432,28 @@ export function ProductEditor({
 
       <div className="grid gap-4 lg:grid-cols-[1.7fr_1fr]">
         <div className="flex flex-col gap-4">
-          <Panel title="Names" description="English and Arabic, side by side on purpose.">
+          <Panel title={t("pe.names")} description={t("pe.namesHint")}>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field
-                label="Title (English)"
+                label={t("pe.titleEn")}
                 value={draft.titleEn}
                 onChange={(v) => set("titleEn", v)}
                 required
               />
               <Field
-                label="Title (Arabic)"
+                label={t("pe.titleAr")}
                 value={draft.titleAr}
                 onChange={(v) => set("titleAr", v)}
                 rtl
                 required
               />
               <Field
-                label="Subtitle (English)"
+                label={t("pe.subtitleEn")}
                 value={draft.subtitleEn}
                 onChange={(v) => set("subtitleEn", v)}
               />
               <Field
-                label="Subtitle (Arabic)"
+                label={t("pe.subtitleAr")}
                 value={draft.subtitleAr}
                 onChange={(v) => set("subtitleAr", v)}
                 rtl
@@ -460,13 +462,13 @@ export function ProductEditor({
 
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <Field
-                label="Description (English)"
+                label={t("pe.descEn")}
                 value={draft.descriptionEn}
                 onChange={(v) => set("descriptionEn", v)}
                 multiline
               />
               <Field
-                label="Description (Arabic)"
+                label={t("pe.descAr")}
                 value={draft.descriptionAr}
                 onChange={(v) => set("descriptionAr", v)}
                 rtl
@@ -477,8 +479,8 @@ export function ProductEditor({
 
           {product && (
             <Panel
-              title="Imagery"
-              description="The first image is the one used on listing cards. SVG is rejected — it is an executable document."
+              title={t("pe.imagery")}
+              description={t("pe.firstImageHint")}
             >
               <div className="flex flex-wrap gap-3">
                 {images.map((image, index) => (
@@ -496,7 +498,7 @@ export function ProductEditor({
 
                     {index === 0 && (
                       <span className="bg-ink absolute start-1 top-1 rounded-xs px-1.5 py-0.5 text-[0.5625rem] font-semibold tracking-wide text-white uppercase">
-                        Main
+                        {t("pe.main")}
                       </span>
                     )}
 
@@ -544,7 +546,7 @@ export function ProductEditor({
                   )}
                 >
                   <span className="text-center leading-tight">
-                    {uploading ? `${Math.round(uploadProgress * 100)}%` : <>+<br />Add</>}
+                    {uploading ? `${Math.round(uploadProgress * 100)}%` : <>+<br />{t("pe.add")}</>}
                   </span>
                   <input
                     type="file"
@@ -581,8 +583,8 @@ export function ProductEditor({
           */}
           {product && draft.type === "variable" && (
             <Panel
-              title="Designs"
-              description="Embroideries or prints, chosen separately from colour."
+              title={t("pe.designs")}
+              description={t("pe.designsHint")}
             >
               {designs.length === 0 && (
                 <p className="text-mist text-[0.8125rem]">
@@ -649,7 +651,7 @@ export function ProductEditor({
                           type="button"
                           onClick={() => moveDesign(index, -1)}
                           disabled={index === 0}
-                          aria-label="Move up"
+                          aria-label={t("pe.moveUp")}
                           className="text-mist hover:text-ink cursor-pointer px-1 disabled:opacity-25"
                         >
                           ↑
@@ -658,7 +660,7 @@ export function ProductEditor({
                           type="button"
                           onClick={() => moveDesign(index, 1)}
                           disabled={index === designs.length - 1}
-                          aria-label="Move down"
+                          aria-label={t("pe.moveDown")}
                           className="text-mist hover:text-ink cursor-pointer px-1 disabled:opacity-25"
                         >
                           ↓
@@ -669,16 +671,16 @@ export function ProductEditor({
                             onClick={() => patchDesign(design.id, { available: true })}
                             className="text-brand cursor-pointer px-2 text-[0.75rem] underline-offset-4 hover:underline"
                           >
-                            Restore
+                            {t("pe.restore")}
                           </button>
                         ) : (
                           <button
                             type="button"
                             onClick={() => withdrawDesign(design.id)}
-                            title="Takes it out of the picker; past orders keep the name"
+                            title={t("pe.retireHint")}
                             className="text-mist hover:text-alert cursor-pointer px-2 text-[0.75rem] underline-offset-4 hover:underline"
                           >
-                            Withdraw
+                            {t("pe.withdraw")}
                           </button>
                         )}
                       </span>
@@ -721,7 +723,7 @@ export function ProductEditor({
               under a "Stock is held per variant" heading reads as data that
               failed to load, rather than a product type that has none. */}
           {product && draft.type === "variable" && (
-            <Panel title="Variants" description="Stock is held per variant, not on the product.">
+            <Panel title={t("pe.variants")} description={t("pe.variantsHint")}>
               {/*
                 One design's table at a time. A colour × size × design cube
                 rendered flat is forty inputs with no headings a person can
@@ -732,7 +734,7 @@ export function ProductEditor({
                 <div
                   className="ns-no-scrollbar mb-4 flex gap-2 overflow-x-auto"
                   role="group"
-                  aria-label="Design being edited"
+                  aria-label={t("pe.designBeingEdited")}
                 >
                   {designs.map((design) => (
                     <button
@@ -759,7 +761,7 @@ export function ProductEditor({
                 <table className="w-full text-[0.8125rem]">
                   <thead>
                     <tr className="text-mist text-[0.625rem] tracking-[0.12em] uppercase">
-                      <th className="pb-2 text-start font-medium">Colour</th>
+                      <th className="pb-2 text-start font-medium">{t("pe.colour")}</th>
                       {product.sizes.map((size) => (
                         <th key={size.id} className="pb-2 text-center font-medium">
                           {size.label}
@@ -812,7 +814,7 @@ export function ProductEditor({
               </div>
               <p className="text-mist mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[0.75rem]">
                 <span>
-                  Total across all variants:{" "}
+                  {t("pe.totalAcross")}{" "}
                   <strong className="text-ink tabular-nums">
                     {variants.reduce((sum, v) => sum + v.stock, 0)}
                   </strong>
@@ -823,8 +825,7 @@ export function ProductEditor({
                 <span>
                   {/* The product's own total is derived server-side from these
                       rows, so the two can never disagree. */}
-                  Saved with the product; the checkout decrements the variant,
-                  not the total.
+                  {t("pe.savedWithProduct")}
                 </span>
               </p>
             </Panel>
@@ -832,28 +833,28 @@ export function ProductEditor({
         </div>
 
         <div className="flex flex-col gap-4">
-          <Panel title="Pricing">
+          <Panel title={t("pe.pricing")}>
             <div className="grid gap-4">
               <NumberField
-                label="Price"
+                label={t("pe.price")}
                 value={draft.price}
                 onChange={(v) => set("price", v)}
                 step={step}
                 hint={`${formatPrice(draft.price || 0, "JOD")} — the dinar carries three decimals`}
               />
               <NumberField
-                label="Compare at (optional)"
+                label={t("pe.compareAt")}
                 value={draft.compareAtPrice === "" ? 0 : draft.compareAtPrice}
                 onChange={(v) => set("compareAtPrice", v === 0 ? "" : v)}
                 step={step}
-                hint="Shown struck through. Must be higher than the price to display."
+                hint={t("pe.compareAtHint")}
               />
             </div>
           </Panel>
 
-          <Panel title="Organisation">
+          <Panel title={t("pe.organisation")}>
             <div className="grid gap-4">
-              <Field label="Slug" value={draft.slug} onChange={(v) => set("slug", v)} required mono />
+              <Field label={t("pe.slug")} value={draft.slug} onChange={(v) => set("slug", v)} required mono />
 
               <label className="block">
                 <span className="text-ink-muted mb-1.5 block text-[0.75rem]">Category</span>
@@ -884,29 +885,29 @@ export function ProductEditor({
                   onChange={(event) => set("status", event.target.value as Product["status"])}
                   className="border-line focus:border-brand bg-paper text-ink w-full rounded-md border px-3 py-2 text-[0.8125rem] outline-none"
                 >
-                  <option value="draft">Draft — hidden from the store</option>
-                  <option value="active">Active — on sale</option>
-                  <option value="archived">Archived</option>
+                  <option value="draft">{t("pe.statusDraft")}</option>
+                  <option value="active">{t("pe.statusActive")}</option>
+                  <option value="archived">{t("pe.statusArchived")}</option>
                 </select>
               </label>
 
               <NumberField
-                label="Total stock"
+                label={t("pe.totalStock")}
                 value={draft.totalStock}
                 onChange={(v) => set("totalStock", v)}
                 step={1}
               />
 
               <Field
-                label="Tags"
+                label={t("pe.tags")}
                 value={draft.tags}
                 onChange={(v) => set("tags", v)}
-                hint="Comma separated. Used by search and related products."
+                hint={t("pe.tagsHint")}
               />
             </div>
           </Panel>
 
-          <Panel title="Commerce">
+          <Panel title={t("pe.commerce")}>
             <div className="grid gap-4">
               <label className="block">
                 <span className="text-ink-muted mb-1.5 block text-[0.75rem]">Product type</span>
@@ -915,8 +916,8 @@ export function ProductEditor({
                   onChange={(event) => set("type", event.target.value as ProductType)}
                   className="border-line focus:border-brand bg-paper text-ink w-full rounded-md border px-3 py-2 text-[0.8125rem] outline-none"
                 >
-                  <option value="simple">Simple — one item, no options</option>
-                  <option value="variable">Variable — colour and size variants</option>
+                  <option value="simple">{t("pe.typeSimple")}</option>
+                  <option value="variable">{t("pe.typeVariable")}</option>
                 </select>
                 <span className="text-mist mt-1.5 block text-[0.6875rem]">
                   {draft.type === "simple"
@@ -926,7 +927,7 @@ export function ProductEditor({
               </label>
 
               <Field
-                label="SKU"
+                label={t("pe.sku")}
                 value={draft.sku}
                 onChange={(v) => set("sku", v)}
                 mono
@@ -943,11 +944,11 @@ export function ProductEditor({
               {draft.type === "simple" && (
                 <div>
                   <Field
-                    label="GTIN"
+                    label={t("pe.gtin")}
                     value={draft.gtin}
                     onChange={(v) => set("gtin", v)}
                     mono
-                    hint="GTIN-8, -12, -13 or -14. The check digit is verified."
+                    hint={t("pe.gtinHint")}
                   />
                   {draft.gtin.trim() !== "" && (
                     <p
@@ -971,7 +972,7 @@ export function ProductEditor({
                   onChange={(event) => set("shippingClassId", event.target.value)}
                   className="border-line focus:border-brand bg-paper text-ink w-full rounded-md border px-3 py-2 text-[0.8125rem] outline-none"
                 >
-                  {shippingClasses.length === 0 && <option value="standard">Standard</option>}
+                  {shippingClasses.length === 0 && <option value="standard">{t("pe.standard")}</option>}
                   {shippingClasses.map((cls) => (
                     <option key={cls.id} value={cls.id}>
                       {cls.name.en}
@@ -985,7 +986,7 @@ export function ProductEditor({
               </label>
 
               <NumberField
-                label="Max per order"
+                label={t("pe.maxPerOrder")}
                 value={draft.maxPerOrder === "" ? 0 : draft.maxPerOrder}
                 onChange={(v) => set("maxPerOrder", v <= 0 ? "" : v)}
                 step={1}
@@ -999,26 +1000,26 @@ export function ProductEditor({
               </p>
 
               <Field
-                label="Upsells"
+                label={t("pe.upsells")}
                 value={draft.upsellIds}
                 onChange={(v) => set("upsellIds", v)}
                 mono
-                hint="Product ids, comma separated. Shown on this product's page as the upgrade — keep them dearer than this one."
+                hint={t("pe.upsellsHint")}
               />
 
               <Field
-                label="Cross-sells"
+                label={t("pe.crossSells")}
                 value={draft.crossSellIds}
                 onChange={(v) => set("crossSellIds", v)}
                 mono
-                hint="Product ids, comma separated. Shown in the bag once this product is in it."
+                hint={t("pe.crossSellsHint")}
               />
             </div>
           </Panel>
 
           {missing.length > 0 && (
             <Panel>
-              <p className="text-ink text-[0.8125rem] font-medium">Before publishing</p>
+              <p className="text-ink text-[0.8125rem] font-medium">{t("pe.beforePublishing")}</p>
               <ul className="mt-2 space-y-1">
                 {missing.map((item) => (
                   <li key={item} className="text-smoke flex items-center gap-2 text-[0.75rem]">
