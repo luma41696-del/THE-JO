@@ -12,6 +12,7 @@ import {
   getUpsellProducts,
 } from "@/lib/catalog";
 import { getStoreSettings } from "@/lib/settings";
+import { absoluteUrl } from "@/lib/site";
 import { categoryTrail } from "@/lib/categories";
 import { ProductDetail } from "@/components/product/ProductDetail";
 import { ProductRail } from "@/components/product/ProductRail";
@@ -106,7 +107,9 @@ export default async function ProductPage({
    * and rating chips in search results, which measurably lifts click-through on
    * product queries.
    */
-  const url = `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/${locale}/product/${product.slug}`;
+  // Absolute, always. A relative URL in JSON-LD validates as present and is
+  // useless to a search engine.
+  const url = absoluteUrl(`${locale}/product/${product.slug}`);
 
   /*
    * A variable product publishes one Offer per variant, each with its own SKU,

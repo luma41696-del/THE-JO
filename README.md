@@ -46,7 +46,7 @@ blocked on a backend.
 | `npm run build` / `start` | Production build / serve |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
-| `npm test` | All suites — 164 tests, Node's runner via `tsx --test` |
+| `npm test` | All suites — 178 tests, Node's runner via `tsx --test` |
 | `npm run test:rules` | Firestore security rules — 28 tests against the emulator |
 | `npm run test:storage-rules` | Storage security rules — 10 tests against the emulator |
 | `npm run brand` | Regenerate every brand asset from `scripts/brand-paths.json` |

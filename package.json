@@ -16,7 +16,7 @@
     "emulators": "firebase emulators:start",
     "grant-admin": "tsx scripts/grant-admin.ts",
     "test:offers": "tsx --test scripts/offers.test.ts",
-    "test": "npm run test:offers && npm run test:visibility && npm run test:phase3 && npm run test:phase4 && npm run test:designs && npm run test:zones && npm run test:invoice && npm run test:notify && npm run test:payments && npm run test:errors && npm run test:privacy && npm run test:firebase-runtime && npm run test:product-save",
+    "test": "npm run test:offers && npm run test:visibility && npm run test:phase3 && npm run test:phase4 && npm run test:designs && npm run test:zones && npm run test:invoice && npm run test:notify && npm run test:payments && npm run test:errors && npm run test:site && npm run test:privacy && npm run test:firebase-runtime && npm run test:product-save",
     "test:product-save": "node --test scripts/product-save.test.cjs",
     "test:visibility": "tsx --test scripts/visibility.test.ts",
     "test:phase3": "tsx --test scripts/phase3.test.ts",
@@ -31,7 +31,8 @@
     "test:rules": "firebase emulators:exec --only firestore \"npm run test:rules:run\"",
     "test:storage-rules:run": "tsx --test scripts/storage-rules.test.ts",
     "test:storage-rules": "firebase emulators:exec --only storage \"npm run test:storage-rules:run\"",
-    "test:errors": "tsx --test scripts/errors.test.ts"
+    "test:errors": "tsx --test scripts/errors.test.ts",
+    "test:site": "tsx --test scripts/site.test.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",

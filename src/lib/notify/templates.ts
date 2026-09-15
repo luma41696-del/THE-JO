@@ -1,4 +1,5 @@
 import { formatPrice, t } from "@/lib/format";
+import { absoluteUrl } from "@/lib/site";
 import type { Locale, Notification, NotificationEvent, Order } from "@/types";
 import type { StoreSettings } from "@/data/site-content";
 
@@ -41,9 +42,8 @@ export const EVENT_FOR_STATUS: Partial<Record<Order["status"], NotificationEvent
 };
 
 function orderUrl(reference: string, locale: Locale, settings: StoreSettings): string {
-  const base = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://netsale.shop").replace(/\/$/, "");
   void settings;
-  return `${base}/${locale}/orders/${reference}`;
+  return absoluteUrl(`${locale}/orders/${reference}`);
 }
 
 /**

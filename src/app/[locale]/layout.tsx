@@ -11,6 +11,7 @@ import { BrandCursor } from "@/components/cursor/BrandCursor";
 import { BrandIntro } from "@/components/brand/BrandIntro";
 import { LOCALES, LOCALE_META, isLocale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionaries";
+import { absoluteUrl, siteUrl } from "@/lib/site";
 import type { Locale } from "@/types";
 
 /* -------------------------------------------------------------------------- */
@@ -79,7 +80,7 @@ const instrument = Instrument_Serif({
 /*  Metadata                                                                  */
 /* -------------------------------------------------------------------------- */
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+// One source for the shop's own address — see `lib/site.ts`.
 
 export async function generateStaticParams() {
   return LOCALES.map((locale) => ({ locale }));
@@ -98,7 +99,7 @@ export async function generateMetadata({
   const title = `${t.brand.name} — ${locale === "ar" ? "net sale" : "نت سيل"} | ${t.brand.tagline}`;
 
   return {
-    metadataBase: new URL(siteUrl),
+    metadataBase: new URL(siteUrl()),
     title: { default: title, template: `%s · ${t.brand.name}` },
     description: t.brand.taglineLong,
     applicationName: "net sale",
@@ -111,7 +112,7 @@ export async function generateMetadata({
       siteName: "net sale — نت سيل",
       title,
       description: t.brand.taglineLong,
-      url: `${siteUrl}/${locale}`,
+      url: absoluteUrl(locale),
       locale: meta.ogLocale,
       alternateLocale: LOCALES.filter((l) => l !== locale).map((l) => LOCALE_META[l].ogLocale),
     },
