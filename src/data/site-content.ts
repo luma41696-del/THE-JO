@@ -29,6 +29,13 @@ export interface StoreSettings {
   returnWindowDays: number;
   /** Business days for standard delivery, inside Amman. */
   standardDeliveryDays: [number, number];
+  /**
+   * At or below this many units, a variant is flagged in the admin.
+   *
+   * Per variant, never against `totalStock` — a coat showing 40 in stock can
+   * be entirely large and extra-large while every middle size is gone.
+   */
+  lowStockThreshold: number;
   contact: {
     email: string;
     phone: string;
@@ -57,6 +64,7 @@ export const storeSettings: StoreSettings = {
   freeShippingThreshold: 75,
   returnWindowDays: 14,
   standardDeliveryDays: [3, 5],
+  lowStockThreshold: 3,
   contact: {
     email: "hello@netsale.shop",
     phone: "+962 7 9000 0000",

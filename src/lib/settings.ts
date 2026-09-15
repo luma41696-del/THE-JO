@@ -57,6 +57,7 @@ function merge(stored: Partial<StoreSettings> | undefined): StoreSettings {
       FALLBACK.freeShippingThreshold,
     ),
     returnWindowDays: number(stored.returnWindowDays, FALLBACK.returnWindowDays),
+    lowStockThreshold: number(stored.lowStockThreshold, FALLBACK.lowStockThreshold),
     standardDeliveryDays: [
       number(days[0], FALLBACK.standardDeliveryDays[0]),
       number(days[1], FALLBACK.standardDeliveryDays[1]),

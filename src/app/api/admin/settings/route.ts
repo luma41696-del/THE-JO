@@ -21,6 +21,7 @@ interface Body {
   freeShippingThreshold?: number;
   returnWindowDays?: number;
   standardDeliveryDays?: [number, number];
+  lowStockThreshold?: number;
   contact?: StoreSettings["contact"];
   social?: { label: string; href: string }[];
   legal?: StoreSettings["legal"];
@@ -96,6 +97,7 @@ export async function POST(request: Request) {
     payload = {
       freeShippingThreshold: positive(body.freeShippingThreshold, "Free delivery threshold", 100000),
       returnWindowDays: Math.round(positive(body.returnWindowDays, "Return window", 365)),
+      lowStockThreshold: Math.round(positive(body.lowStockThreshold, "Low-stock threshold", 1000)),
       standardDeliveryDays: [Math.round(min), Math.round(max)],
       contact: {
         email,

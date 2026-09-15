@@ -13,6 +13,7 @@ import {
   stockFor,
   variantFor,
 } from "@/lib/product";
+import { lowStockAlerts, stockState } from "@/lib/stock";
 import { cartKey } from "@/lib/utils";
 import type { Product, ProductDesign, ProductImage, ProductVariant } from "@/types";
 
@@ -243,4 +244,80 @@ test("the bag thumbnail is the artwork the customer chose", () => {
 
   const line = buildCartItem(tee, resolveSelection(tee, "bone", "s", "palm"), "bone", "s", 1, "palm");
   assert.equal(line.image.url, "/demo/palm-1.svg");
+});
+
+/* -------------------------------------------------------------------------- */
+/*  Low-stock alerts                                                          */
+/* -------------------------------------------------------------------------- */
+
+test("alerts are per variant, not against the product total", () => {
+  // The case the whole feature exists for: 40 units in stock, and every size
+  // anybody actually orders is gone.
+  const coat = p({
+    id: "coat",
+    totalStock: 40,
+    sizes: [
+      { id: "s", label: "S", system: "alpha" },
+      { id: "m", label: "M", system: "alpha" },
+      { id: "l", label: "L", system: "alpha" },
+    ],
+    variants: [
+      variant("bone", "s", undefined, 0),
+      variant("bone", "m", undefined, 1),
+      variant("bone", "l", undefined, 39),
+    ],
+  });
+
+  const alerts = lowStockAlerts([coat], 3);
+  assert.equal(alerts.length, 2, "the healthy total hides nothing");
+  assert.equal(alerts[0]?.state, "out", "sold out leads");
+  assert.equal(alerts[1]?.stock, 1);
+});
+
+test("the threshold is inclusive, and above it is silence", () => {
+  const tee = p({
+    variants: [variant("bone", "s", undefined, 3), variant("ink", "s", undefined, 4)],
+  });
+  const alerts = lowStockAlerts([tee], 3);
+  assert.equal(alerts.length, 1);
+  assert.equal(alerts[0]?.colorName, "Bone");
+});
+
+test("draft and archived products are not in the buying queue", () => {
+  const draft = p({ status: "draft", variants: [variant("bone", "s", undefined, 0)] });
+  const archived = p({ status: "archived", variants: [variant("bone", "s", undefined, 0)] });
+  assert.deepEqual(lowStockAlerts([draft, archived], 3), []);
+});
+
+test("a simple product reports one row from its own total", () => {
+  const comb = p({ type: "simple", colors: [], sizes: [], variants: [], totalStock: 2 });
+  const alerts = lowStockAlerts([comb], 3);
+  assert.equal(alerts.length, 1);
+  assert.equal(alerts[0]?.stock, 2);
+  assert.equal(alerts[0]?.colorName, "", "there is no colour to name");
+});
+
+test("an alert names the design, so the SKU is not the only clue", () => {
+  const tee = embroidered({
+    variants: [variant("bone", "s", "palm", 1), variant("bone", "m", "wave", 30)],
+  });
+  const alerts = lowStockAlerts([tee], 3);
+  assert.equal(alerts.length, 1);
+  assert.equal(alerts[0]?.designName, "palm");
+});
+
+test("ties break on a stable key, so the list does not reshuffle", () => {
+  const a = p({ id: "a", title: { en: "Aaa", ar: "أ" }, variants: [variant("bone", "s", undefined, 1)] });
+  const b = p({ id: "b", title: { en: "Bbb", ar: "ب" }, variants: [variant("bone", "s", undefined, 1)] });
+
+  const one = lowStockAlerts([a, b], 3).map((x) => x.title.en);
+  const two = lowStockAlerts([b, a], 3).map((x) => x.title.en);
+  assert.deepEqual(one, two);
+  assert.deepEqual(one, ["Aaa", "Bbb"]);
+});
+
+test("stockState tells the two urgencies apart", () => {
+  assert.equal(stockState(0, 3), "out");
+  assert.equal(stockState(3, 3), "low");
+  assert.equal(stockState(4, 3), "ok");
 });

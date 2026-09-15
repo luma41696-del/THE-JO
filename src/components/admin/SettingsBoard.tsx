@@ -110,6 +110,14 @@ export function SettingsBoard({ settings }: { settings: StoreSettings }) {
               preview={`"Returns within ${form.returnWindowDays} days"`}
             />
 
+            <NumberRow
+              label="Low-stock alert at"
+              suffix="units per variant"
+              value={form.lowStockThreshold}
+              onChange={(v) => patch("lowStockThreshold", v)}
+              preview={`Flags any colour, size or design down to ${form.lowStockThreshold} — not the product total`}
+            />
+
             <div>
               <span className="text-ink-muted mb-1.5 block text-[0.8125rem]">
                 Standard delivery
