@@ -46,7 +46,7 @@ blocked on a backend.
 | `npm run build` / `start` | Production build / serve |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
-| `npm test` | All suites — 130 tests, Node's runner via `tsx --test` |
+| `npm test` | All suites — 164 tests, Node's runner via `tsx --test` |
 | `npm run brand` | Regenerate every brand asset from `scripts/brand-paths.json` |
 | `npm run seed` | Push the demo catalogue to Firestore (needs Admin SDK) |
 | `npm run seed -- --wipe` | Clear those collections first |
@@ -304,9 +304,17 @@ security rules.
 
 **Scaffolded, by design, and said so on screen:**
 
-- The payment gateway element — the card step is a labelled mount point, and
-  card fields are deliberately not in this codebase. Cash on delivery is the
-  only method offered, because it is the only one connected.
+- The payment gateway — cash on delivery is the only method offered, because
+  it is the only one connected. `src/lib/payments.ts` is the single list the
+  checkout renders from *and* the server validates against, so a method cannot
+  be offered without being accepted. Card fields are deliberately not in this
+  codebase; the card step is a labelled mount point. What a real gateway needs
+  — a Jordanian merchant account first, PCI scope, webhook-confirms-not-the-
+  browser — is written out in [PAYMENTS.md](PAYMENTS.md).
+- Order notifications are built and tested end to end, but send nothing until
+  `NOTIFY_PROVIDER`, `NOTIFY_API_KEY` and `NOTIFY_FROM` are set. Until then
+  every message is recorded as "not sent — no mail provider configured" on the
+  order, which is deliberately not the same state as a delivery failure.
 - Photorealistic try-on and cloth simulation. The fitting room's 3D figure is
   real and built from the customer's measurements; generating a photo of *this
   customer* wearing *this garment* needs a provider, keys and a per-image

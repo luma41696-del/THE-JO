@@ -10,6 +10,7 @@ import { EASE, transition } from "@/lib/motion";
 import { formatDeliveryWindow, formatPrice, t } from "@/lib/format";
 import { priceCart, subtotalOf } from "@/lib/pricing";
 import { zoneFor } from "@/lib/shipping";
+import { enabledPaymentMethods } from "@/lib/payments";
 import { evaluateOffer, findOfferByCode } from "@/lib/offers";
 import { track } from "@/lib/analytics/track";
 import { useCart } from "@/lib/store/cart";
@@ -618,16 +619,14 @@ export function CheckoutFlow({
                   </h2>
 
                   <div className="grid gap-3 sm:grid-cols-2">
-                    {(
-                      [
-                        { id: "card", en: "Card", ar: "بطاقة", note: "Visa · Mastercard · mada" },
-                        { id: "apple-pay", en: "Apple Pay", ar: "أبل باي", note: "One tap" },
-                        // CliQ is Jordan's instant bank-transfer rail — far more
-                        // widely used here than any card-on-file wallet.
-                        { id: "cliq", en: "CliQ", ar: "كليك", note: "Instant bank transfer" },
-                        { id: "cod", en: "Cash on delivery", ar: "الدفع عند الاستلام", note: rtl ? "ادفع عند استلام طلبك" : "Pay when your order arrives" },
-                      ] as const
-                    ).filter((option) => process.env.NODE_ENV !== "production" || option.id === "cod").map((option) => (
+                    {/*
+                      From `lib/payments.ts`, which is the same list the server
+                      validates against. It used to be a literal here filtered
+                      on NODE_ENV, with a matching NODE_ENV check on the
+                      server — the rule deciding whether money can be taken,
+                      written twice.
+                    */}
+                    {enabledPaymentMethods().map((option) => (
                       <label
                         key={option.id}
                         className={cn(
@@ -641,14 +640,16 @@ export function CheckoutFlow({
                           type="radio"
                           name="payment"
                           checked={payment === option.id}
-                          onChange={() => setPayment(option.id as PaymentMethod)}
+                          onChange={() => setPayment(option.id)}
                           className="accent-brand mt-0.5"
                         />
                         <span>
                           <span className="text-ink block text-[0.9375rem] font-medium">
-                            {locale === "ar" ? option.ar : option.en}
+                            {t(option.name, locale)}
                           </span>
-                          <span className="text-smoke block text-[0.75rem]">{option.note}</span>
+                          <span className="text-smoke block text-[0.75rem]">
+                            {t(option.note, locale)}
+                          </span>
                         </span>
                       </label>
                     ))}

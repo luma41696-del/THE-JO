@@ -9,6 +9,7 @@ import {
 } from "@/lib/catalog";
 import { priceCart } from "@/lib/pricing";
 import { notifyOrder } from "@/lib/notify/queue";
+import { DEFAULT_PAYMENT_METHOD, isPaymentMethodEnabled } from "@/lib/payments";
 import { getStoreSettings } from "@/lib/settings";
 import { designFor, hasDesigns, hasOptions, imagesFor, resolveSelection } from "@/lib/product";
 import { classesInCart, zoneFor } from "@/lib/shipping";
@@ -82,8 +83,18 @@ export async function POST(request: Request) {
     return bad("Malformed request body.");
   }
 
-  if (process.env.NODE_ENV === "production" && body.paymentMethod !== "cod") {
-    return bad("Only cash on delivery is currently available.");
+  /*
+   * The method must be one the shop can actually take money with — checked
+   * against the same list the checkout renders from, not against NODE_ENV.
+   *
+   * An environment check would have meant a development build accepting a
+   * card order that production refuses, which is the wrong way round: the
+   * thing you want to discover in development is precisely that the card
+   * path does not work yet.
+   */
+  const paymentMethod = body.paymentMethod ?? DEFAULT_PAYMENT_METHOD;
+  if (!isPaymentMethodEnabled(paymentMethod)) {
+    return bad("That payment method is not available.");
   }
 
   /* --- shape validation ------------------------------------------------- */
@@ -291,7 +302,7 @@ export async function POST(request: Request) {
     shippingAddress: { ...address, id: "shipping", isDefault: false },
     shippingMethod,
     ...(offer ? { appliedOfferCode: offer.code } : {}),
-    paymentMethod: body.paymentMethod ?? "cod",
+    paymentMethod,
     status: "pending",
     timeline,
     estimatedDeliveryAt: now + shippingMethod.maxDays * 86_400_000,
