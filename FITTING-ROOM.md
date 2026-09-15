@@ -31,30 +31,52 @@ screen, not in a footnote.
 - Accuracy: good for proportion and drape-direction; it is a mannequin, not a
   likeness.
 
-### Tier 2 — A photorealistic try-on image  ⛔ **blocked: needs a provider**
+### Tier 2 — A photorealistic try-on image  ⚠️ **implemented, never yet run against Google**
 
 Generating a photo of *this customer* wearing *this garment* — the thing the
 Google VTO demo you linked does. This is a diffusion model, not geometry.
 
-Requirements that do not exist in this project today:
+What it needs, and what the state of each is:
 
 | Requirement | Detail |
 |---|---|
 | Google Cloud project with Vertex AI enabled | billing account attached |
-| Model access | `virtual-try-on` on Vertex AI, region-restricted |
-| Service-account key | server-side only, never in the browser |
+| Model access | `virtual-try-on-001` (GA), region-restricted — the model id is **pinned**, not floating |
+| Service account | `VTO_SERVICE_ACCOUNT_JSON`, server-side only, exchanged for a short-lived OAuth token on the `cloud-platform` scope. **Not an API key** — an API key cannot call `:predict` at all |
 | Per-image cost | roughly **USD 0.04–0.10** per generated image at list price |
 | Latency | 5–20 seconds; needs a job queue, not a request |
-| Garment input | a clean, front-facing, flat-lay or on-model shot per product |
+| Garment input | a clean, front-facing, flat-lay or on-model shot per product, JPEG or PNG, under 7MB |
 
-The integration surface is written and wired (`src/lib/fitting/provider.ts`) —
-it reads `VTO_PROVIDER`, `VTO_API_KEY` and `VTO_PROJECT_ID` from the
-environment, queues a job, and reports `queued → running → done/failed` with
-retry. With no keys configured it returns `not-configured` and the UI says so
-plainly. **It never shows a fake result.**
+`src/lib/fitting/provider.ts` now implements the call:
 
-To enable: set those three variables and implement `callVertexVto()` — the
-request/response shape is documented in that file.
+    POST https://{location}-aiplatform.googleapis.com/v1/projects/{projectId}
+         /locations/{location}/publishers/google/models/virtual-try-on-001:predict
+
+It reads the customer's photograph from `users/{uid}/fitting/` with the Admin
+SDK, fetches the garment shot server-side, refuses anything that is not a JPEG
+or PNG under 7MB *before* spending a request, sends both inline as base64, and
+writes the returned image back into the same owner-only folder as
+`try-on-{token}.{png|jpg}` — the flat folder, deliberately: the storage rules
+match a single file name, so a result in a `results/` subfolder would be one
+its own owner could not read, and `deleteFittingPhotos` would not remove it.
+
+**Configuration** — three variables, none of them a key in a URL:
+
+    VTO_PROVIDER=vertex-vto
+    VTO_PROJECT_ID=the-jo-shop
+    VTO_LOCATION=me-central1
+    VTO_SERVICE_ACCOUNT_JSON={...}     # the whole service-account JSON
+
+`VTO_API_KEY` is **gone**. A shop that still sets it reads as not configured.
+
+**What is honest about its state:** the request shape, the validation, the
+retry wording, the ownership check and the result path are covered by 31 tests
+(`npm run test:vto`), and three of those guards were broken deliberately to
+confirm the tests fail. But **no call has ever been made to Google from this
+code** — there is no job runner and no UI path that invokes `callProvider()`
+yet, so nothing in the storefront can trigger one. The first real call is what
+proves the integration, and when it fails it will fail with Google's own
+message on the job rather than silently.
 
 ### Tier 3 — Cloth and fit simulation  ⛔ **blocked: needs authored assets**
 
@@ -100,8 +122,10 @@ supply none and the procedural one renders. Nothing has to change in the app.
 | | |
 |---|---|
 | Photos | `users/{uid}/fitting/` — owner-read only, **staff cannot read them** |
+| Generated try-on images | the same folder, `try-on-*` — same owner-only rule, and removed by the same "delete my photos" action |
+| Sent to Google | the photograph and the garment shot, inline in one request, under a service account that has no other access to the shop. Nothing identifying the customer travels with them — no uid, no name, no measurements |
 | Avatar parameters | the customer's own profile document |
-| Retention | 90 days for photos, then eligible for deletion; deletable by the owner at any time from the fitting room |
+| Retention | 90 days for photos, 30 for generated images (`RESULT_RETENTION_DAYS`), then eligible for deletion; deletable by the owner at any time from the fitting room |
 | External processing | never without the separate fitting-room consent, asked at the point of use — not bundled into the cookie banner |
 | Analytics | measurements and image URLs are on the analytics deny-list and are dropped by both the client and the server |
 
@@ -116,5 +140,5 @@ supply none and the procedural one renders. Nothing has to change in the app.
 | → a prepared garment on it | ✅ procedural garments, cut to each silhouette's ease. No authored glTF is loaded, and no product carries one |
 | → variant swap | ✅ colourway swaps on the same avatar, without rebuilding the body. Colour and size are the only variant axes the catalogue has — there is no separate "design" axis to swap |
 | → save the outfit and add to cart | ✅ saved to the account, restorable, deletable; pieces resolve to a real variant before reaching the bag, and anything that cannot be added is named |
-| Photoreal try-on image | ⛔ provider + keys + budget (tier 2 above) |
+| Photoreal try-on image | ⚠️ the Vertex AI call is implemented and tested (tier 2 above); no job runner invokes it yet, and it has never run against Google |
 | Fabric simulation | ⛔ authored glTF per garment (tier 3 above) |
