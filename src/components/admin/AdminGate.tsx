@@ -128,11 +128,13 @@ export function AdminGate({ children }: { children: ReactNode }) {
             <code className="bg-paper-sunken rounded-xs px-1.5 py-0.5 text-[0.8125rem]">
               {role ?? "customer"}
             </code>
-            . Grant access from a trusted machine:
+            . An existing admin can grant it from{" "}
+            <strong className="text-ink">Access</strong> in the admin. If nobody has
+            admin yet, it is granted from a trusted machine:
             <code className="bg-ink mt-4 block rounded-md px-4 py-3 text-start text-[0.8125rem] text-white">
               npm run grant-admin -- {user?.email}
             </code>
-            Then sign out and back in so the new token carries the claim.
+            Either way, sign out and back in so the new token carries the claim.
           </>
         }
         action={

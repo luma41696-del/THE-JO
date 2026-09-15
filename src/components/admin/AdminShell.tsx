@@ -54,6 +54,7 @@ const NAV: { group: AdminKey; items: { href: string; label: AdminKey; icon: Reac
     items: [
       { href: "/admin/customers", label: "nav.customers", icon: <UsersIcon /> },
       { href: "/admin/support", label: "nav.support", icon: <ChatIcon /> },
+      { href: "/admin/team", label: "nav.team", icon: <KeyIcon /> },
     ],
   },
   {
@@ -321,6 +322,20 @@ export function AdminPageHeader({
 }
 
 /* --- icons: 18px, 1.5 stroke -------------------------------------------- */
+
+function KeyIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <circle cx="6.25" cy="6.25" r="3.25" stroke="currentColor" strokeWidth="1.5" />
+      <path
+        d="M8.6 8.6 15 15m-2.4-.6 1.2-1.2m-3-3 1.2-1.2"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
 
 function ChartIcon() {
   return (

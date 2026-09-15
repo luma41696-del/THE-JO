@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { isAdminConfigured, verifyRequest } from "@/lib/firebase/admin";
-import type { TicketStatus } from "@/types";
+import { millis } from "@/lib/support";
+import type { SupportTicket, TicketMessage, TicketStatus } from "@/types";
 
 /**
  * Support replies.
@@ -21,6 +22,51 @@ interface Body {
   ticketId?: string;
   body?: string;
   status?: TicketStatus;
+}
+
+/**
+ * The inbox, re-read.
+ *
+ * The board is server-rendered, which was fine when only staff could write to
+ * a ticket: nothing changed unless the person looking at it changed something.
+ * Now the customer can write too, so a thread left open on screen goes stale
+ * the moment they answer. This is what the board polls while it is in front.
+ */
+export async function GET(request: Request) {
+  if (!isAdminConfigured()) {
+    return NextResponse.json({ ok: true, tickets: [], persisted: false });
+  }
+
+  const caller = await verifyRequest(request);
+  if (!caller) return bad("Not signed in.", 401);
+  if (caller.role !== "admin" && caller.role !== "staff") {
+    return bad("This account does not have permission to read tickets.", 403);
+  }
+
+  try {
+    const { getAdminDb } = await import("@/lib/firebase/admin");
+    const snap = await getAdminDb().collection("tickets").limit(500).get();
+
+    const tickets = snap.docs
+      .map((doc) => {
+        const data = doc.data();
+        const messages = Array.isArray(data.messages) ? (data.messages as TicketMessage[]) : [];
+        return {
+          ...(data as SupportTicket),
+          id: doc.id,
+          // Tickets are written with epoch numbers now; anything older holds a
+          // Timestamp, which does not survive JSON in a usable shape.
+          createdAt: millis(data.createdAt),
+          updatedAt: millis(data.updatedAt),
+          messages: messages.map((message) => ({ ...message, at: millis(message.at) })),
+        } as SupportTicket;
+      })
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+
+    return NextResponse.json({ ok: true, tickets });
+  } catch {
+    return bad("The inbox could not be read.", 500);
+  }
 }
 
 const STATUSES: TicketStatus[] = ["open", "pending", "resolved", "closed"];
@@ -94,7 +140,13 @@ export async function POST(request: Request) {
        * is stamped once and never overwritten — a second reply must not reset
        * it, and a slow first reply must not be hidden by a fast second one.
        */
-      const createdAt = Number(data.createdAt ?? now);
+      /*
+       * `millis`, not `Number`. Tickets carry epoch numbers, but one written
+       * before that was settled holds a Firestore `Timestamp`, and
+       * `Number(timestamp)` is NaN — which would stamp NaN into the single
+       * metric support is judged on, silently and permanently.
+       */
+      const createdAt = millis(data.createdAt) || now;
       const firstResponseMinutes =
         typeof data.firstResponseMinutes === "number"
           ? data.firstResponseMinutes
@@ -108,7 +160,10 @@ export async function POST(request: Request) {
         ...(message ? { messages } : {}),
         status: nextStatus,
         ...(firstResponseMinutes === undefined ? {} : { firstResponseMinutes }),
-        updatedAt: new Date(now),
+        // A number, matching `SupportTicket` and the customer's own route. A
+        // field holding both numbers and Timestamps sorts by type before
+        // value, which would scramble the order of the inbox.
+        updatedAt: now,
       });
 
       return { status: nextStatus, at: now };

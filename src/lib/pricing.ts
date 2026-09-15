@@ -11,6 +11,7 @@ import type {
   CartItem,
   CartTotals,
   CurrencyCode,
+  Locale,
   Offer,
   ShippingClass,
   ShippingMethod,
@@ -22,17 +23,36 @@ import { evaluateOffer, type OfferEvaluation } from "@/lib/offers";
 
 /**
  * Jordan's general sales tax, applied to the discounted subtotal before
- * shipping. Kept as a single constant so a rate change is one edit, and so the
- * client-side summary and the server-side order can never disagree about it.
- */
-/**
- * Jordan's general sales tax.
+ * shipping.
  *
- * Exported because it was declared twice — here and in the invoice builder —
- * and two copies of a tax rate is one rate plus a future discrepancy between
- * what a customer was charged and what their invoice says.
+ * Exported because it was once declared twice — here and in the invoice
+ * builder — and two copies of a tax rate is one rate plus a future discrepancy
+ * between what a customer was charged and what their invoice says.
  */
 export const TAX_RATE = 0.16;
+
+/** The same rate as a whole number, for the places that say it out loud. */
+export const TAX_PERCENT = Math.round(TAX_RATE * 100);
+
+/**
+ * What the tax line is called on screen.
+ *
+ * Derived from `TAX_RATE` rather than typed, because it was typed: the cart
+ * and the checkout both said "VAT (15%)" over a figure computed at 16%, and
+ * the invoice said 16% — three copies of one number, two of them wrong. A
+ * customer adding up the summary by hand would have found the shop's own
+ * arithmetic disagreeing with its own label.
+ *
+ * Latin digits in Arabic on purpose, the same decision `formatPrice` makes:
+ * the figure sits beside prices that are checked against invoices and bank
+ * apps, and switching numeral systems between the two costs the reader a
+ * translation.
+ */
+export function taxLabel(locale: Locale): string {
+  return locale === "ar"
+    ? `ضريبة المبيعات (${TAX_PERCENT}٪)`
+    : `VAT (${TAX_PERCENT}%)`;
+}
 
 export interface PriceInput {
   items: CartItem[];

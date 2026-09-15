@@ -4,6 +4,7 @@ import { Footer } from "@/components/layout/Footer";
 import { SearchOverlay } from "@/components/layout/SearchOverlay";
 import { CartDrawer } from "@/components/cart/CartDrawer";
 import { ConsentBanner } from "@/components/analytics/ConsentBanner";
+import { GiftInvite } from "@/components/gift/GiftInvite";
 import { PageTracker } from "@/components/analytics/PageTracker";
 import { getStoreSettings } from "@/lib/settings";
 import { getCategoryTree } from "@/lib/catalog";
@@ -50,6 +51,12 @@ export default async function StoreLayout({
       <PageTracker />
       <ConsentBanner locale={locale} />
       <SearchOverlay locale={locale} />
+      {/*
+        The gift game comes to the customer once they are signed in, instead of
+        waiting on a page nobody navigates to. It asks the server whether they
+        may play before it renders anything, and asks once per turn.
+      */}
+      <GiftInvite locale={locale} />
     </>
   );
 }

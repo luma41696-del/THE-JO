@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 
 import { Link } from "@/components/ui/Link";
@@ -26,6 +26,9 @@ import type { SupportTicket, TicketStatus } from "@/types";
  */
 
 type Filter = "needs-reply" | "all" | TicketStatus;
+
+/** Slower than the storefront's poll: an operator is reading, not waiting. */
+const POLL_MS = 15_000;
 
 export function SupportBoard({ tickets: initial }: { tickets: SupportTicket[] }) {
   const [tickets, setTickets] = useState(initial);
@@ -166,12 +169,81 @@ export function SupportBoard({ tickets: initial }: { tickets: SupportTicket[] })
     }
   }
 
-  function setStatus(status: TicketStatus) {
+  /**
+   * Resolve a ticket — for real.
+   *
+   * This used to move the pill in local state and stop there. The customer's
+   * thread stayed open, the next refresh put it back, and the queue counted it
+   * as unresolved while the person who closed it believed otherwise. The route
+   * has always accepted a status; nothing was ever sending one.
+   */
+  async function setStatus(status: TicketStatus) {
     if (!selected) return;
+
+    const snapshot = tickets;
+    setSendError(null);
     setTickets((current) =>
       current.map((t) => (t.id === selected.id ? { ...t, status, updatedAt: Date.now() } : t)),
     );
+
+    try {
+      const token = await getIdToken().catch(() => null);
+      const response = await fetch("/api/admin/support", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ ticketId: selected.id, status }),
+      });
+
+      const data = (await response.json()) as { ok?: boolean; error?: string; persisted?: boolean };
+      if (!response.ok || !data.ok) throw new Error(data.error ?? "The status was not saved.");
+      if (data.persisted === false) throw new Error("Not saved: Firebase Admin is not configured.");
+    } catch (error) {
+      setTickets(snapshot);
+      setSendError(
+        error instanceof Error ? error.message : "The status could not be saved.",
+      );
+    }
   }
+
+  /**
+   * Re-read the inbox while it is on screen.
+   *
+   * The board is server-rendered once. Customers can now write into a thread,
+   * so an inbox left open is an inbox going quietly out of date — and support
+   * answering from a stale thread is how a question gets answered twice or not
+   * at all. Paused when the tab is behind: an unwatched board needs nothing.
+   */
+  useEffect(() => {
+    const refresh = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const token = await getIdToken().catch(() => null);
+        if (!token) return;
+        const response = await fetch("/api/admin/support", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) return;
+        const data = (await response.json()) as { ok?: boolean; tickets?: SupportTicket[] };
+        // `persisted: false` comes back with no tickets — that is "not
+        // configured", not "inbox zero", and must not wipe the board.
+        if (data.ok && Array.isArray(data.tickets) && data.tickets.length > 0) {
+          setTickets(data.tickets);
+        }
+      } catch {
+        // A failed refresh leaves the last good read on screen.
+      }
+    };
+
+    const timer = setInterval(refresh, POLL_MS);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, []);
 
   const FILTERS: { value: Filter; label: string }[] = [
     { value: "needs-reply", label: "Needs reply" },

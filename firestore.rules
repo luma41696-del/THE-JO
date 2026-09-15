@@ -163,15 +163,21 @@ service cloud.firestore {
     /* ------------------------------------------------------------------ */
 
     match /tickets/{ticketId} {
-      // A customer sees their own thread and may open one. Replies from staff
-      // are written by /api/admin/support with the Admin SDK, so no client
-      // needs write access to an existing ticket — which also means a customer
-      // cannot edit what support said, or mark their own ticket resolved.
+      // A customer sees their own thread. Staff see every thread.
       allow read: if isSignedIn() && (resource.data.uid == request.auth.uid || isStaff());
-      allow create: if isSignedIn()
-        && request.resource.data.uid == request.auth.uid
-        && appCheckOk();
-      allow update, delete: if false;
+
+      /*
+       * No client writes at all — not even a customer creating their own
+       * ticket, which this used to allow.
+       *
+       * Both sides of the conversation now go through the Admin SDK:
+       * /api/support for the customer, /api/admin/support for staff. That is
+       * what stops a browser writing `fromStaff: true` and forging an answer
+       * from the shop, editing what support actually said, or filing a ticket
+       * with no reference, no status and no priority — a document the inbox
+       * would list and no one could work.
+       */
+      allow write: if false;
     }
 
     /* ------------------------------------------------------------------ */

@@ -86,6 +86,15 @@ export default async function AboutPage({ params }: { params: Promise<{ locale: 
             <p className="text-mist mt-1 text-[0.8125rem]">
               {t(settings.contact.hours, locale)}
             </p>
+            {/* The live conversation lives on the contact page; this is the
+                signpost to it, not a second copy of it. */}
+            <Link
+              href="/help/contact"
+              className="text-brand hover:text-brand-deep mt-3 inline-block text-[0.8125rem] underline transition-colors"
+              data-cursor="hover"
+            >
+              {rtl ? "تواصل مع الدعم" : "Talk to support"}
+            </Link>
           </div>
         </div>
       </div>

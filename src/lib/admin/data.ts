@@ -227,8 +227,14 @@ export const getAdminInvoiceByNumber = cache(async (number: string) => {
 
 /* -------------------------------------------------------------------------- */
 
+/*
+ * `tickets`, not `supportTickets`. This screen read one collection while every
+ * write — the staff reply route, the security rules, and now the customer's own
+ * messages — used the other, so the inbox could never have shown a real ticket,
+ * and a staff reply would have failed against a document that was not there.
+ */
 export const getAdminTickets = cache(async (): Promise<{ rows: SupportTicket[]; live: boolean }> =>
-  readCollection("supportTickets", "updatedAt", 500, () => demoTickets),
+  readCollection("tickets", "updatedAt", 500, () => demoTickets),
 );
 
 export const getAdminTicketByReference = cache(async (reference: string) => {

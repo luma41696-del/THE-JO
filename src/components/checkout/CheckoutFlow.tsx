@@ -8,7 +8,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { EASE, transition } from "@/lib/motion";
 import { formatDeliveryWindow, formatPrice, t } from "@/lib/format";
-import { priceCart, subtotalOf } from "@/lib/pricing";
+import { priceCart, subtotalOf, taxLabel } from "@/lib/pricing";
 import { zoneFor } from "@/lib/shipping";
 import { enabledPaymentMethods } from "@/lib/payments";
 import { evaluateOffer, findOfferByCode } from "@/lib/offers";
@@ -837,7 +837,7 @@ export function CheckoutFlow({
                 </p>
               )}
               <div className="flex justify-between">
-                <dt className="text-smoke">{rtl ? "ضريبة ١٥٪" : "VAT (15%)"}</dt>
+                <dt className="text-smoke">{taxLabel(locale)}</dt>
                 <dd className="text-ink tabular-nums">
                   {formatPrice(totals.tax, totals.currency, locale)}
                 </dd>

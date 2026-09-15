@@ -15,7 +15,20 @@ import type { Locale } from "@/types";
  * Sibling documents are listed at the foot, because a customer reading the
  * returns policy is one question away from wanting the delivery one.
  */
-export function PolicyArticle({ doc, locale = "en" }: { doc: PolicyDoc; locale?: Locale }) {
+export function PolicyArticle({
+  doc,
+  locale = "en",
+  lead,
+}: {
+  doc: PolicyDoc;
+  locale?: Locale;
+  /**
+   * Something interactive above the prose. Only the contact page uses it, and
+   * only for the support chat: a customer who came here to reach a person
+   * should meet the way to do that before the opening hours, not after them.
+   */
+  lead?: React.ReactNode;
+}) {
   const siblings = policiesIn(doc.group).filter((d) => d.slug !== doc.slug);
   const rtl = locale === "ar";
 
@@ -30,6 +43,8 @@ export function PolicyArticle({ doc, locale = "en" }: { doc: PolicyDoc; locale?:
 
       <div className="ns-container pb-20 md:pb-28">
         <article className="max-w-[65ch]">
+          {lead && <div className="mb-12">{lead}</div>}
+
           {doc.sections.map((section) => (
             <section key={section.heading.en} className="mt-10 first:mt-0">
               <h2 className="font-display text-ink text-xl font-semibold tracking-tight text-balance">

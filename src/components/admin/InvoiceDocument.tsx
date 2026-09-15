@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Link } from "@/components/ui/Link";
 import { cn } from "@/lib/utils";
 import { formatDate, formatPrice, t as pick } from "@/lib/format";
+import { taxLabel } from "@/lib/pricing";
 import { printToPdf } from "@/lib/admin/export";
 import { NetSaleMark } from "@/components/brand/NetSaleMark";
 import { Button } from "@/components/ui/Button";
@@ -63,7 +64,7 @@ export function InvoiceDocument({
     subtotal: rtl ? "المجموع الفرعي" : "Subtotal",
     discount: rtl ? "الخصم" : "Discount",
     shipping: rtl ? "التوصيل" : "Delivery",
-    tax: rtl ? "ضريبة المبيعات (١٦٪)" : "Sales tax (16%)",
+    tax: taxLabel(locale),
     total: rtl ? "الإجمالي" : "Total",
     paidBy: rtl ? "طريقة الدفع" : "Paid by",
     thanks: rtl ? "شكراً لتسوّقك من نت سيل." : "Thank you for shopping with net sale.",

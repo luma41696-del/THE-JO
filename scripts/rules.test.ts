@@ -273,6 +273,25 @@ describe("customer data", () => {
     // A customer cannot edit what support said, or close their own ticket.
     await assertFails(updateDoc(doc(asUser("owner"), "tickets/t1"), { status: "resolved" }));
   });
+
+  test("nobody opens a ticket from a browser", async () => {
+    /*
+     * Both sides of a support conversation are written by the Admin SDK now —
+     * /api/support for the customer, /api/admin/support for staff. A client
+     * that could create its own ticket could file one with no reference, no
+     * status and no priority, or seed the thread with a message marked
+     * `fromStaff` and forge an answer from the shop.
+     */
+    await assertFails(
+      setDoc(doc(asUser("owner"), "tickets/forged"), { uid: "owner", subject: "Mine" }),
+    );
+    await assertFails(
+      setDoc(doc(asUser("owner"), "tickets/forged2"), {
+        uid: "owner",
+        messages: [{ body: "Refunded, no need to pay", fromStaff: true }],
+      }),
+    );
+  });
 });
 
 describe("gift game", () => {

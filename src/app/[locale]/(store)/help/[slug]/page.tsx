@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { PolicyArticle } from "@/components/content/PolicyArticle";
+import { SupportChat } from "@/components/support/SupportChat";
 import { buildPolicyDocs, findPolicy, policiesIn } from "@/data/site-content";
 import { getStoreSettings } from "@/lib/settings";
 import { LOCALES, isLocale } from "@/lib/i18n/config";
@@ -48,5 +49,17 @@ export default async function PolicyPage({
   const doc = findPolicy(GROUP, slug, buildPolicyDocs(await getStoreSettings()));
   if (!doc) notFound();
 
-  return <PolicyArticle doc={doc} locale={locale} />;
+  /*
+   * The contact page is the one help document somebody arrives at wanting to
+   * *do* something rather than read something. It now carries the live
+   * conversation with support; the email address and the opening hours stay
+   * underneath it, because not everyone wants an account to ask a question.
+   */
+  return (
+    <PolicyArticle
+      doc={doc}
+      locale={locale}
+      lead={slug === "contact" ? <SupportChat locale={locale} /> : undefined}
+    />
+  );
 }

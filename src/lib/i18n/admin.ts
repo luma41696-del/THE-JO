@@ -45,6 +45,7 @@ export const ADMIN_STRINGS = {
   "nav.reviews": { en: "Reviews", ar: "التقييمات" },
   "nav.customers": { en: "Customers", ar: "العملاء" },
   "nav.support": { en: "Support", ar: "الدعم" },
+  "nav.team": { en: "Access", ar: "الصلاحيات" },
   "nav.shipping": { en: "Delivery", ar: "التوصيل" },
   "nav.settings": { en: "Settings", ar: "الإعدادات" },
 
@@ -66,8 +67,53 @@ export const ADMIN_STRINGS = {
    * wonder whether something failed to load.
    */
   "shell.partial": {
-    en: "Settings, Delivery and the dashboard queue are in Arabic. The trading boards are English.",
-    ar: "الإعدادات والتوصيل وقائمة المخزون بالعربية. أما شاشات التشغيل الأخرى فبالإنجليزية.",
+    en: "Settings, Delivery, Access and the dashboard queue are in Arabic. The trading boards are English.",
+    ar: "الإعدادات والتوصيل والصلاحيات وقائمة المخزون بالعربية. أما شاشات التشغيل الأخرى فبالإنجليزية.",
+  },
+
+  /* ---- access ---- */
+  "team.title": { en: "Who can get in", ar: "من يملك الدخول" },
+  "team.subtitle": {
+    en: "Roles are Firebase claims, not a field in the database — which is why an account cannot grant itself one.",
+    ar: "الصلاحيات مخزّنة كـ claims في Firebase لا كحقل في قاعدة البيانات — ولهذا لا يستطيع أي حساب منح نفسه صلاحية.",
+  },
+  "team.admins": { en: "Admins", ar: "المديرون" },
+  "team.staff": { en: "Staff", ar: "الموظفون" },
+  "team.accounts": { en: "Accounts in total", ar: "إجمالي الحسابات" },
+  "team.grantTitle": { en: "Give someone access", ar: "منح صلاحية" },
+  "team.grantHint": {
+    en: "They must have signed in to the shop at least once, so there is an account to grant.",
+    ar: "يجب أن يكون قد سجّل الدخول إلى المتجر مرة واحدة على الأقل ليوجد حساب يُمنح الصلاحية.",
+  },
+  "team.email": { en: "Email address", ar: "البريد الإلكتروني" },
+  "team.role": { en: "Role", ar: "الصلاحية" },
+  "team.grant": { en: "Grant access", ar: "منح الصلاحية" },
+  "team.member": { en: "Person", ar: "الشخص" },
+  "team.lastSeen": { en: "Last signed in", ar: "آخر دخول" },
+  "team.never": { en: "Never", ar: "لم يدخل بعد" },
+  "team.remove": { en: "Remove access", ar: "إزالة الصلاحية" },
+  "team.makeAdmin": { en: "Make admin", ar: "تعيين مديراً" },
+  "team.makeStaff": { en: "Make staff", ar: "تعيين موظفاً" },
+  "team.you": { en: "you", ar: "أنت" },
+  "team.empty": {
+    en: "Nobody but you has access yet.",
+    ar: "لا أحد غيرك يملك صلاحية حتى الآن.",
+  },
+  "team.staffReadOnly": {
+    en: "Staff can see who has access. Only an admin can change it.",
+    ar: "يستطيع الموظف رؤية الصلاحيات. وتغييرها متاح للمدير فقط.",
+  },
+  /*
+   * The sentence that stops "it did not work" support tickets. A custom claim
+   * reaches a browser on the next token refresh, not at the moment it is set.
+   */
+  "team.tokenNote": {
+    en: "A new role reaches their browser on the next sign-in. Removing access signs them out immediately.",
+    ar: "تصل الصلاحية الجديدة عند تسجيل الدخول التالي. أما إزالتها فتُخرجه من الحساب فوراً.",
+  },
+  "team.confirmRemove": {
+    en: "Remove admin access from this account?",
+    ar: "إزالة صلاحية الإدارة من هذا الحساب؟",
   },
 
   /* ---- settings ---- */

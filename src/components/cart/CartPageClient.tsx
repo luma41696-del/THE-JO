@@ -8,7 +8,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { EASE, transition } from "@/lib/motion";
 import { formatDeliveryWindow, formatPrice, t } from "@/lib/format";
-import { priceCart, subtotalOf } from "@/lib/pricing";
+import { priceCart, subtotalOf, taxLabel } from "@/lib/pricing";
 import { classesInCart, quoteShipping } from "@/lib/shipping";
 import { evaluateOffer, findOfferByCode } from "@/lib/offers";
 import { track } from "@/lib/analytics/track";
@@ -655,7 +655,12 @@ export function CartPageClient({
                 locale={locale}
                 freeLabel={rtl ? "مجاني" : "Free"}
               />
-              <Row label={rtl ? "ضريبة القيمة المضافة ١٥٪" : "VAT (15%)"} value={totals.tax} currency={totals.currency} locale={locale} />
+              <Row
+                label={taxLabel(locale)}
+                value={totals.tax}
+                currency={totals.currency}
+                locale={locale}
+              />
 
               <div className="border-line flex items-baseline justify-between border-t pt-4">
                 <dt className="font-display text-ink text-base font-semibold">

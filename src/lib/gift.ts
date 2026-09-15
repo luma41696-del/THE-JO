@@ -158,6 +158,34 @@ export function drawPrize(
   return pool[pool.length - 1] ?? null;
 }
 
+/* -------------------------------------------------------------------------- */
+/*  The invitation                                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Which "turn" an invitation belongs to.
+ *
+ * The game used to wait on a page nobody visits. Now it comes to the customer
+ * when they sign in — which immediately raises the question the feature lives
+ * or dies on: how often is it allowed to interrupt?
+ *
+ * The answer is **once per eligible turn**. A turn is the campaign plus the
+ * number of attempts already made, so:
+ *
+ *  - dismissing it marks *this* turn dismissed, and it stays dismissed however
+ *    many times the customer signs in or reloads;
+ *  - playing increments `attempts`, which begins a new turn — and the cooldown
+ *    then makes them ineligible, so nothing appears again until they may play;
+ *  - a new campaign is a new turn, because the id changes.
+ *
+ * Pure, and the mark is kept per browser, so someone who dismisses on a phone
+ * is asked once more on a laptop. That is the right trade: the alternative is
+ * a server write every time anyone waves away a free game.
+ */
+export function inviteWindowKey(campaignId: string, attempts: number): string {
+  return `ns.gift.invite:${campaignId}:${attempts}`;
+}
+
 /** A short, unambiguous code. Excludes I, O, 0 and 1 so it can be read aloud. */
 export function giftCode(seed: string): string {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
