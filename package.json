@@ -16,10 +16,11 @@
     "emulators": "firebase emulators:start",
     "grant-admin": "tsx scripts/grant-admin.ts",
     "test:offers": "tsx --test scripts/offers.test.ts",
-    "test": "npm run test:offers && npm run test:visibility && npm run test:phase3 && npm run test:privacy && npm run test:firebase-runtime",
+    "test": "npm run test:offers && npm run test:visibility && npm run test:phase3 && npm run test:phase4 && npm run test:privacy && npm run test:firebase-runtime",
     "test:visibility": "tsx --test scripts/visibility.test.ts",
     "test:phase3": "tsx --test scripts/phase3.test.ts",
-    "test:privacy": "tsx --test scripts/analytics-privacy.test.ts"
+    "test:privacy": "tsx --test scripts/analytics-privacy.test.ts",
+    "test:phase4": "tsx --test scripts/phase4.test.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -33,6 +34,7 @@
     "react-dom": "19.1.9",
     "server-only": "^0.0.1",
     "tailwind-merge": "^3.0.0",
+    "three": "^0.186.0",
     "zustand": "^5.0.3"
   },
   "overrides": {
@@ -46,6 +48,7 @@
     "@types/node": "^22.10.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
+    "@types/three": "^0.186.0",
     "eslint": "^9.18.0",
     "eslint-config-next": "^15.5.0",
     "tailwindcss": "^4.1.0",

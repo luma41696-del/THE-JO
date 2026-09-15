@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { getShopProducts } from "@/lib/catalog";
+import { providerStatus } from "@/lib/fitting/provider";
 import { FittingRoom } from "@/components/fitting/FittingRoom";
 import { PageIntro } from "@/components/ui/PageIntro";
 import { isLocale } from "@/lib/i18n/config";
@@ -39,6 +40,14 @@ export default async function FittingRoomPage({
     (p) => p.type === "variable" && p.sizes.length > 0 && Boolean(p.fit),
   );
 
+  /*
+   * Read on the server and passed down as two booleans and a list of variable
+   * *names*. The keys themselves never cross into the client bundle — the
+   * panel only needs to know whether a try-on can be attempted, and if not,
+   * which environment variables an operator still has to set.
+   */
+  const provider = providerStatus();
+
   return (
     <>
       <PageIntro
@@ -47,7 +56,13 @@ export default async function FittingRoomPage({
         title={t.fitting.pageTitle}
         description={t.fitting.pageBody}
       />
-      <FittingRoom products={products} initialSlug={product} locale={locale} />
+      <FittingRoom
+        products={products}
+        initialSlug={product}
+        locale={locale}
+        providerConfigured={provider.configured}
+        providerMissing={provider.missing}
+      />
     </>
   );
 }

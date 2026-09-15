@@ -143,6 +143,38 @@ export async function uploadReviewImage(
   return uploadImage(`reviews/${uid}`, file, alt, options);
 }
 
+/**
+ * A fitting-room body photo.
+ *
+ * The most sensitive file the shop touches, and the rules reflect it:
+ * `users/{uid}/fitting/` is readable by its owner and by *nobody else* —
+ * staff included. Smaller than a product image because nothing here needs
+ * resolution, and every pixel is a pixel of a person.
+ */
+export async function uploadFittingPhoto(
+  uid: string,
+  file: File,
+  options: UploadOptions = {},
+): Promise<string> {
+  const image = await uploadImage(`users/${uid}/fitting`, file, "Fitting room photo", options);
+  return image.url;
+}
+
+/**
+ * Delete every fitting photo this account holds.
+ *
+ * Listing and deleting rather than tracking a single path: a customer asking
+ * to remove their photo means all of them, and a stale path left behind would
+ * make "deleted" untrue.
+ */
+export async function deleteFittingPhotos(uid: string): Promise<void> {
+  const { listAll } = await import("firebase/storage");
+  const folder = ref(getStorageClient(), `users/${uid}/fitting`);
+  const listing = await listAll(folder).catch(() => null);
+  if (!listing) return;
+  await Promise.all(listing.items.map((item) => deleteObject(item).catch(() => {})));
+}
+
 async function uploadImage(
   folder: string,
   file: File,

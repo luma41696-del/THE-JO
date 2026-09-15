@@ -55,19 +55,29 @@ const STRETCH_FORGIVENESS: Record<NonNullable<Product["fit"]>["stretch"], number
   high: 7,
 };
 
-/** Which measurement dominates, per category. */
-function weightsFor(categoryId: string) {
-  switch (categoryId) {
-    case "trousers":
-      return { chest: 0, waist: 0.65, hip: 0.35 };
-    case "dresses":
-      return { chest: 0.45, waist: 0.3, hip: 0.25 };
-    case "footwear":
-    case "bags":
-      return { chest: 0, waist: 0, hip: 0 };
-    default:
-      return { chest: 0.7, waist: 0.2, hip: 0.1 };
+/**
+ * Which measurement dominates, by **department**.
+ *
+ * This matched on `categoryId` — the leaf — which was correct until products
+ * were filed under subcategories. After that, `weightsFor("trousers-wide")`
+ * fell through to the default and sized a pair of trousers by the customer's
+ * *chest*: no error, no warning, just a recommendation quietly computed from
+ * the wrong part of the body.
+ *
+ * It reads the ancestry instead, so a department's rule applies to everything
+ * beneath it however deeply it is nested.
+ */
+function weightsFor(categoryPath: string[]) {
+  const has = (id: string) => categoryPath.includes(id);
+
+  if (has("trousers")) return { chest: 0, waist: 0.65, hip: 0.35 };
+  if (has("dresses")) return { chest: 0.45, waist: 0.3, hip: 0.25 };
+  // Shoes and bags have no body measurement worth scoring against; returning
+  // zero weight is what makes `scoreSize` decline to guess.
+  if (has("footwear") || has("bags") || has("objects")) {
+    return { chest: 0, waist: 0, hip: 0 };
   }
+  return { chest: 0.7, waist: 0.2, hip: 0.1 };
 }
 
 function scoreSize(
@@ -78,7 +88,12 @@ function scoreSize(
   const measurements = size.measurements;
   if (!measurements) return null;
 
-  const weights = weightsFor(product.categoryId);
+  // `categoryPath` is root-first and ends in the leaf, so a department rule
+  // reaches every subcategory. Falls back to the leaf for a product written
+  // before the tree existed.
+  const weights = weightsFor(
+    product.categoryPath?.length ? product.categoryPath : [product.categoryId],
+  );
   const totalWeight = weights.chest + weights.waist + weights.hip;
   if (totalWeight === 0) return null;
 
@@ -115,6 +130,24 @@ function scoreSize(
   return penalty / applied;
 }
 
+/**
+ * Past this penalty, the closest size is not a recommendation any more.
+ *
+ * The scale is weighted centimetres of deviation on the measurement that
+ * dominates the department, so 12 is roughly a hand's width of garment
+ * missing or spare. Naming a size at that distance is how a shop earns a
+ * return and a lost customer, so the honest answer — "nothing in this range
+ * fits you" — is given instead.
+ */
+const NO_SIZE_THRESHOLD = 12;
+
+/** Does the customer have anything for us to score against? */
+function hasBodyData(body: BodyProfile): boolean {
+  return (
+    body.chestCm !== undefined || body.waistCm !== undefined || body.hipCm !== undefined
+  );
+}
+
 export function recommendSize(product: Product, body: BodyProfile): FitRecommendation {
   const sized = product.sizes
     .map((size) => ({ size, score: scoreSize(size, product, body) }))
@@ -127,30 +160,77 @@ export function recommendSize(product: Product, body: BodyProfile): FitRecommend
     const fallback =
       product.sizes.find((s) => s.id === product.fit?.modelWearsSizeId) ?? product.sizes[0];
 
+    /*
+     * Two very different reasons land here, and they were previously given the
+     * same sentence — "no measurement table for this piece" was shown to a
+     * customer whose own measurements were simply blank, which reads as the
+     * shop's fault and gives them nothing to do about it.
+     */
+    const cause =
+      product.sizes.length === 1
+        ? "one-size"
+        : hasBodyData(body)
+          ? "no-table"
+          : "no-body";
+
+    const rationale: Record<Locale, string> = {
+      "one-size": {
+        en: "One size — no measurements needed.",
+        ar: "مقاس واحد — لا حاجة للقياسات.",
+      },
+      "no-table": {
+        en: "No measurement table for this piece yet; showing the size our model wears.",
+        ar: "لا يوجد جدول قياسات لهذه القطعة بعد؛ نعرض المقاس الذي ترتديه العارضة.",
+      },
+      "no-body": {
+        en: "Add your chest, waist or hip measurement and we can size this for you.",
+        ar: "أضف محيط الصدر أو الخصر أو الورك ليمكننا اقتراح المقاس.",
+      },
+    }[cause];
+
     return {
       productId: product.id,
       recommendedSizeId: fallback?.id ?? "",
-      confidence: product.sizes.length === 1 ? 1 : 0.4,
-      rationale:
-        product.sizes.length === 1
-          ? { en: "One size — no measurements needed.", ar: "مقاس واحد — لا حاجة للقياسات." }
-          : {
-              en: "No measurement table for this piece yet; showing the size our model wears.",
-              ar: "لا يوجد جدول قياسات لهذه القطعة بعد؛ نعرض المقاس الذي ترتديه العارضة.",
-            },
+      confidence: cause === "one-size" ? 1 : 0.4,
+      outcome: cause === "one-size" ? "recommended" : "unmeasured",
+      rationale,
     };
   }
 
   const best = sized[0]!;
   const runnerUp = sized[1];
 
+  // Even the closest size can be nowhere near. Checked before confidence,
+  // because two equally impossible sizes would otherwise score as a confident
+  // pick — they are well separated from nothing.
+  if (best.score > NO_SIZE_THRESHOLD) {
+    return {
+      productId: product.id,
+      recommendedSizeId: "",
+      confidence: 0,
+      outcome: "no-size",
+      deviation: Math.round(best.score),
+      /*
+       * The score is not quoted. It is a weighted penalty, not a measured
+       * gap, and "about 85cm out" would read as a tape measurement that was
+       * never taken. Naming the closest size is the part that is true and the
+       * part that is useful.
+       */
+      rationale: {
+        en: `Nothing in this piece's size range matches your measurements. The closest is ${best.size.label}, and it is not close enough to recommend.`,
+        ar: `لا يوجد مقاس في هذه القطعة يناسب قياساتك. أقربها ${best.size.label}، وهو غير قريب بما يكفي لنقترحه.`,
+      },
+    };
+  }
+
   // A clear winner is one that beats the alternative by a comfortable margin.
   // 6cm of separation is treated as full confidence.
   const separation = runnerUp ? runnerUp.score - best.score : 6;
   const confidence = Math.max(0.3, Math.min(1, separation / 6));
+  const between = confidence < 0.6 && runnerUp !== undefined;
 
   const rationale: Record<Locale, string> =
-    confidence < 0.6 && runnerUp
+    between && runnerUp
       ? {
           en: `You are between ${best.size.label} and ${runnerUp.size.label}. Take ${best.size.label} for a closer fit, ${runnerUp.size.label} for room.`,
           ar: `أنت بين مقاسي ${best.size.label} و${runnerUp.size.label}. اختر ${best.size.label} لقَصّة أقرب للجسم، و${runnerUp.size.label} لمساحة أوسع.`,
@@ -164,6 +244,8 @@ export function recommendSize(product: Product, body: BodyProfile): FitRecommend
     productId: product.id,
     recommendedSizeId: best.size.id,
     confidence,
+    outcome: between ? "between" : "recommended",
+    deviation: Math.round(best.score),
     rationale,
     alternativeSizeId: runnerUp?.size.id,
   };

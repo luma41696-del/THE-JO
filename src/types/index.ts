@@ -778,11 +778,38 @@ export interface Outfit {
   createdAt: number;
 }
 
+/**
+ * `outcome` exists so the UI never has to infer "we don't know" from a number.
+ *
+ * A recommendation that always names a size is a recommendation that lies at
+ * the edges: someone whose chest is 10cm past the largest size was previously
+ * told "XL" with a low confidence score the layout rendered as a pale chip.
+ * The four states are distinct answers, and each gets its own wording:
+ *
+ *   recommended  a size that genuinely matches
+ *   between      two sizes are equally close — the customer chooses
+ *   no-size      nothing in this product's range fits; say so plainly
+ *   unmeasured   nothing to score against, either no size table or no body
+ */
+export type FitOutcome = "recommended" | "between" | "no-size" | "unmeasured";
+
 export interface FitRecommendation {
   productId: string;
+  /** Empty string when `outcome` is `no-size` — there is nothing to add. */
   recommendedSizeId: string;
   /** 0-1. Below 0.6 the UI shows a "between sizes" state instead of a size. */
   confidence: number;
+  outcome: FitOutcome;
+  /**
+   * How far the best size sits from ideal — lower is closer.
+   *
+   * Deliberately **not** called centimetres. It is a weighted penalty across
+   * the measurements that matter for the department, with the tight side
+   * multiplied because a garment that will not close is worse than a roomy
+   * one. Quoting it to a customer as "12cm out" would be inventing a tape
+   * measurement nobody took. Use it for ranking and tests, not for copy.
+   */
+  deviation?: number;
   rationale: Localized;
   alternativeSizeId?: string;
 }
