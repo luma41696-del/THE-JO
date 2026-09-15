@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 
 import { OrderDetail } from "@/components/admin/OrderDetail";
-import { getAdminOrderByReference } from "@/lib/admin/data";
+import { NotificationLog } from "@/components/admin/NotificationLog";
+import { getAdminOrderByReference, getOrderNotifications } from "@/lib/admin/data";
+import { notifyStatus } from "@/lib/notify/provider";
 
 export async function generateMetadata({
   params,
@@ -21,5 +23,17 @@ export default async function AdminOrderPage({
   const order = await getAdminOrderByReference(reference);
   if (!order) notFound();
 
-  return <OrderDetail order={order} />;
+  const notifications = await getOrderNotifications(order.id);
+
+  return (
+    <>
+      <OrderDetail order={order} />
+      <div className="mt-4">
+        <NotificationLog
+          notifications={notifications}
+          providerConfigured={notifyStatus().configured}
+        />
+      </div>
+    </>
+  );
 }

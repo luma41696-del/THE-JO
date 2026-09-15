@@ -28,6 +28,7 @@ import type {
   GiftCampaign,
   GiftPlay,
   Invoice,
+  Notification,
   Offer,
   Order,
   Product,
@@ -162,6 +163,31 @@ export const getAdminOrders = cache(async (): Promise<{ rows: Order[]; live: boo
 export const getAdminOrderByReference = cache(async (reference: string) => {
   const { rows } = await getAdminOrders();
   return rows.find((order) => order.reference === reference) ?? null;
+});
+
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The delivery log for one order.
+ *
+ * No demo fallback, deliberately. An empty list means "nothing was sent",
+ * which is the truth for every order in the generated history — inventing
+ * plausible delivery records would put fabricated evidence of contact against
+ * a customer nobody ever emailed.
+ */
+export const getOrderNotifications = cache(async (orderId: string): Promise<Notification[]> => {
+  try {
+    const { getAdminDb } = await import("@/lib/firebase/admin");
+    const snap = await getAdminDb()
+      .collection("notifications")
+      .where("orderId", "==", orderId)
+      .get();
+    return snap.docs
+      .map((d) => serialise<Notification>({ ...d.data(), id: d.id }))
+      .sort((a, b) => b.queuedAt - a.queuedAt);
+  } catch {
+    return [];
+  }
 });
 
 /* -------------------------------------------------------------------------- */

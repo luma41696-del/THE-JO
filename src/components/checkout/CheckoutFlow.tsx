@@ -247,12 +247,22 @@ export function CheckoutFlow({
             productId: i.productId,
             colorId: i.colorId,
             sizeId: i.sizeId,
+            /*
+             * The chosen artwork. Without it the server re-resolves the line
+             * with no design and refuses a product that has them — so a tee
+             * sold with four embroideries could be added to the bag and never
+             * bought.
+             */
+            ...(i.designId ? { designId: i.designId } : {}),
             quantity: i.quantity,
           })),
           shippingMethodId: methodId,
           offerCode: offer?.code ?? null,
           paymentMethod: payment,
           shippingAddress: address,
+          // Recorded on the order so the dispatch notice is written in the
+          // language the customer actually shopped in.
+          locale,
           idempotencyKey: idempotencyKey.current,
         }),
       });

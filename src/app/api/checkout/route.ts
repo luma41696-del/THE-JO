@@ -8,13 +8,15 @@ import {
   getShippingZones,
 } from "@/lib/catalog";
 import { priceCart } from "@/lib/pricing";
+import { notifyOrder } from "@/lib/notify/queue";
+import { getStoreSettings } from "@/lib/settings";
 import { designFor, hasDesigns, hasOptions, imagesFor, resolveSelection } from "@/lib/product";
 import { classesInCart, zoneFor } from "@/lib/shipping";
 import { categoryPathsFor, evaluateOffer, redemptionId } from "@/lib/offers";
 import { isPurchasable, unavailableReason } from "@/lib/visibility";
 import { cartKey, orderReference } from "@/lib/utils";
 import { isAdminConfigured, verifyRequest } from "@/lib/firebase/admin";
-import type { CartItem, Offer, Order, OrderEvent, ProductVariant } from "@/types";
+import type { CartItem, Locale, Offer, Order, OrderEvent, ProductVariant } from "@/types";
 
 /**
  * Order creation.
@@ -52,6 +54,7 @@ interface CheckoutBody {
   offerCode?: string | null;
   paymentMethod?: Order["paymentMethod"];
   shippingAddress?: Order["shippingAddress"];
+  locale?: Locale;
   /**
    * Generated once per checkout attempt by the client and resent on retry.
    * The first request to claim it creates the order; later ones are told
@@ -282,6 +285,7 @@ export async function POST(request: Request) {
     reference,
     uid: caller?.uid ?? "guest",
     email,
+    locale: body.locale === "ar" ? "ar" : "en",
     items: priced,
     totals,
     shippingAddress: { ...address, id: "shipping", isDefault: false },
@@ -513,6 +517,25 @@ export async function POST(request: Request) {
         total: totals.total,
       };
     });
+
+    /*
+     * Confirm by email, after the transaction has committed.
+     *
+     * Outside it on purpose: a mail provider being down must never roll back a
+     * paid order and the stock decrement that went with it. `notifyOrder`
+     * never throws and is idempotent per order, so a retried checkout that
+     * lands on the duplicate path cannot send a second confirmation either.
+     */
+    if (!result.duplicate) {
+      const settings = await getStoreSettings();
+      await notifyOrder(
+        db,
+        { ...order, id: result.orderId } as Order,
+        "order-received",
+        settings,
+        now,
+      );
+    }
 
     return NextResponse.json({
       ok: true,

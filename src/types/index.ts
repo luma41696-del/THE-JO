@@ -838,6 +838,16 @@ export interface Order {
   reference: string;
   uid: string;
   email: string;
+  /**
+   * The language the order was placed in.
+   *
+   * Recorded rather than inferred later: it decides what language the
+   * dispatch notice is written in, and guessing from an address or a browser
+   * header months afterwards gets it wrong for exactly the bilingual
+   * customers this shop has most of. Absent on orders placed before this
+   * existed, which fall back to English.
+   */
+  locale?: Locale;
 
   items: CartItem[];
   totals: CartTotals;
@@ -1074,6 +1084,56 @@ export interface GiftPlay {
   code?: string;
   expiresAt?: number;
   playedAt: number;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Notifications                                                             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A message the shop owes a customer about their own order.
+ *
+ * Transactional, and deliberately not gated on marketing consent: somebody who
+ * has just paid is entitled to be told their parcel shipped. That is also why
+ * there is no "unsubscribe" on these — the way to stop receiving them is to
+ * stop ordering, and an unsubscribe link on a dispatch notice would be a
+ * promise the shop should not keep.
+ */
+export type NotificationChannel = "email";
+
+export type NotificationEvent =
+  | "order-received"
+  | "order-paid"
+  | "order-shipped"
+  | "order-delivered"
+  | "order-refunded";
+
+/**
+ * `skipped` is not a failure.
+ *
+ * It is the honest state for "no provider is configured", and it exists so the
+ * admin can tell the difference between a message that bounced and one the
+ * shop was never able to send. Collapsing the two would hide an unconfigured
+ * channel behind what looks like a delivery problem.
+ */
+export type NotificationState = "queued" | "sent" | "failed" | "skipped";
+
+export interface Notification {
+  id: string;
+  orderId: string;
+  orderReference: string;
+  event: NotificationEvent;
+  channel: NotificationChannel;
+  /** The address at the time of sending, not a live lookup. */
+  to: string;
+  locale: Locale;
+  subject: string;
+  state: NotificationState;
+  attempts: number;
+  /** The provider's own message, kept verbatim. */
+  error?: string;
+  queuedAt: number;
+  sentAt?: number;
 }
 
 /* -------------------------------------------------------------------------- */

@@ -344,6 +344,25 @@ service cloud.firestore {
     }
 
     /* ---------------------------------------------------------------- */
+    /*  Notifications — the delivery log                                 */
+    /* ---------------------------------------------------------------- */
+
+    match /notifications/{notificationId} {
+      /*
+       * Staff only. A customer already has the message in their inbox; what
+       * this collection adds is the *delivery outcome*, which is operational.
+       * It also carries the address the message went to, and a readable log
+       * of who was emailed about what is a small directory of the shop's
+       * customers.
+       */
+      allow read: if isStaff();
+
+      // Written by the server when an order changes state. A client that
+      // could write here could mark a message sent that never was.
+      allow write: if false;
+    }
+
+    /* ---------------------------------------------------------------- */
     /*  Counters — server-only sequences                                 */
     /* ---------------------------------------------------------------- */
 

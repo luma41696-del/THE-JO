@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 
 import { issueCreditNote, issueInvoice } from "@/lib/invoice.server";
+import { notifyOrder } from "@/lib/notify/queue";
+import { EVENT_FOR_STATUS } from "@/lib/notify/templates";
+import { getStoreSettings } from "@/lib/settings";
 
 import { isAdminConfigured, verifyRequest } from "@/lib/firebase/admin";
 import type { Order, OrderStatus } from "@/types";
@@ -137,17 +140,34 @@ export async function PATCH(request: Request) {
      */
     let invoiceNumber: string | undefined;
     let creditNote: string | undefined;
+    let notified: string | undefined;
 
     try {
-      const order = { ...(doc.data() as Order), id: doc.id };
+      const order = { ...(doc.data() as Order), id: doc.id, status };
       const at = now.getTime();
 
       if (status === "paid") {
         const { invoice, created } = await issueInvoice(db, order, at);
         if (created) invoiceNumber = invoice.number;
       } else if (status === "refunded") {
-        const note = await issueCreditNote(db, { ...order, status }, at);
+        const note = await issueCreditNote(db, order, at);
         if (note) creditNote = note.number;
+      }
+
+      /*
+       * Tell the customer, once per event. `notifyOrder` never throws and
+       * never double-sends, so this cannot turn a completed status change
+       * into an error the operator has to puzzle over.
+       *
+       * Only some statuses are worth a message — `processing` and `packed`
+       * are warehouse states, and a customer who gets four emails between
+       * paying and dispatch learns to ignore all of them.
+       */
+      const event = EVENT_FOR_STATUS[status];
+      if (event) {
+        const settings = await getStoreSettings();
+        const { notification } = await notifyOrder(db, order, event, settings, at);
+        if (notification) notified = notification.state;
       }
     } catch (error) {
       /*
@@ -167,6 +187,7 @@ export async function PATCH(request: Request) {
       to: status,
       ...(invoiceNumber ? { invoiceNumber } : {}),
       ...(creditNote ? { creditNote } : {}),
+      ...(notified ? { notified } : {}),
       actorUid: caller.uid,
       actorEmail: caller.email,
       at: now,
@@ -178,6 +199,7 @@ export async function PATCH(request: Request) {
       status,
       ...(invoiceNumber ? { invoiceNumber } : {}),
       ...(creditNote ? { creditNote } : {}),
+      ...(notified ? { notified } : {}),
     });
   } catch (error) {
     return NextResponse.json(
