@@ -9,6 +9,7 @@ import { printToPdf } from "@/lib/admin/export";
 import { NetSaleMark } from "@/components/brand/NetSaleMark";
 import { Button } from "@/components/ui/Button";
 import { AdminPageHeader } from "./AdminShell";
+import type { StoreSettings } from "@/data/site-content";
 import type { Invoice, Locale } from "@/types";
 
 /**
@@ -30,7 +31,21 @@ import type { Invoice, Locale } from "@/types";
  *
  * The customer's own language is the default, because the invoice is for them.
  */
-export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
+export function InvoiceDocument({
+  invoice,
+  settings,
+}: {
+  invoice: Invoice;
+  /**
+   * The shop's own details, from store settings.
+   *
+   * These were hard-coded — and had already drifted: the invoice said
+   * `hello@netsale.jo` while every other page said `hello@netsale.shop`. A
+   * wrong address on a tax document is the worst place for that particular
+   * class of bug, because it is the copy a customer keeps.
+   */
+  settings: StoreSettings;
+}) {
   const [locale, setLocale] = useState<Locale>("en");
   const rtl = locale === "ar";
 
@@ -118,11 +133,11 @@ export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
               net&nbsp;sale
             </p>
             <p className="text-smoke mt-2 text-[0.75rem] leading-relaxed">
-              {rtl ? "نت سيل للأزياء" : "net sale"}
+              {settings.legal.tradingName}
               <br />
-              {rtl ? "عمّان، الأردن" : "Amman, Jordan"}
+              {pick(settings.legal.country, locale)}
               <br />
-              hello@netsale.jo
+              {settings.contact.email}
             </p>
           </div>
 

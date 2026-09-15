@@ -316,6 +316,46 @@ service cloud.firestore {
     /*  Orders — read your own, write none                               */
     /* ---------------------------------------------------------------- */
 
+    /* ---------------------------------------------------------------- */
+    /*  Invoices — read your own, write none                             */
+    /* ---------------------------------------------------------------- */
+
+    match /invoices/{invoiceId} {
+      /*
+       * A customer may read their own invoices; staff read all of them. The
+       * ownership test goes through the order, not a `uid` on the invoice —
+       * an invoice is a record about an order, and duplicating the owner onto
+       * it is a second place for that fact to be wrong.
+       */
+      allow read: if isStaff()
+                  || (isSignedIn()
+                      && get(/databases/$(database)/documents/orders/$(resource.data.orderId))
+                           .data.uid == request.auth.uid);
+
+      /*
+       * Nothing writes here from a client, staff included. Invoice numbers
+       * are sequential and gapless, allocated in a transaction against a
+       * counter by `/api/admin/invoices` and the order route using the Admin
+       * SDK. A client able to create one could burn a number, and a client
+       * able to edit one could rewrite what a customer was charged after the
+       * fact — the two things the numbering exists to make impossible.
+       */
+      allow write: if false;
+    }
+
+    /* ---------------------------------------------------------------- */
+    /*  Counters — server-only sequences                                 */
+    /* ---------------------------------------------------------------- */
+
+    match /counters/{counterId} {
+      /*
+       * Entirely closed. These are the invoice sequences; a client that could
+       * read one learns the shop's order volume, and a client that could
+       * write one could reset the year's numbering.
+       */
+      allow read, write: if false;
+    }
+
     match /orders/{orderId} {
       allow read: if (isSignedIn() && resource.data.uid == request.auth.uid) || isStaff();
 

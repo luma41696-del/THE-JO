@@ -11,6 +11,7 @@ import { getIdToken } from "@/lib/firebase/auth";
 import { AdminPageHeader } from "./AdminShell";
 import { ORDER_LABELS, OrderStatusPill, Panel } from "./AdminUI";
 import { Button } from "@/components/ui/Button";
+import { shouldInvoice } from "@/lib/invoice";
 import type { Order, OrderStatus } from "@/types";
 
 /**
@@ -108,11 +109,18 @@ export function OrderDetail({ order: initial }: { order: Order }) {
                 ← All orders
               </Button>
             </Link>
-            <Link href={`/admin/invoices/${order.reference}`}>
-              <Button variant="secondary" size="sm">
-                Invoice
-              </Button>
-            </Link>
+            {/*
+              Only where one exists. Invoices are issued when an order reaches
+              `paid`, so a pending or cancelled order has none — and a button
+              that reliably 404s is worse than no button.
+            */}
+            {shouldInvoice(order.status) && (
+              <Link href={`/admin/invoices/${order.reference}`}>
+                <Button variant="secondary" size="sm">
+                  Invoice
+                </Button>
+              </Link>
+            )}
           </>
         }
       />

@@ -25,7 +25,14 @@ import { evaluateOffer, type OfferEvaluation } from "@/lib/offers";
  * shipping. Kept as a single constant so a rate change is one edit, and so the
  * client-side summary and the server-side order can never disagree about it.
  */
-const TAX_RATE = 0.16;
+/**
+ * Jordan's general sales tax.
+ *
+ * Exported because it was declared twice — here and in the invoice builder —
+ * and two copies of a tax rate is one rate plus a future discrepancy between
+ * what a customer was charged and what their invoice says.
+ */
+export const TAX_RATE = 0.16;
 
 export interface PriceInput {
   items: CartItem[];

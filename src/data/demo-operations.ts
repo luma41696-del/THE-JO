@@ -1,13 +1,11 @@
 import { demoProducts, demoShippingMethods } from "./demo";
-import { priceCart } from "@/lib/pricing";
+import { priceCart, TAX_RATE } from "@/lib/pricing";
+import { invoiceLines } from "@/lib/invoice";
 import { cartKey } from "@/lib/utils";
 import { resolveSelection } from "@/lib/product";
-import { t } from "@/lib/format";
 import type {
   CartItem,
   Invoice,
-  Locale,
-  Localized,
   Order,
   OrderEvent,
   OrderStatus,
@@ -302,28 +300,9 @@ export const demoOrders: Order[] = buildOrders();
 /*  Invoices                                                                  */
 /* -------------------------------------------------------------------------- */
 
-const TAX_RATE = 0.16;
 
-/**
- * An invoice line's description: the title plus whatever options resolved it.
- *
- * Built in both languages rather than one — the invoice renders either, and a
- * line that says "Bone · M" in an Arabic document is a document that was only
- * half translated.
- */
-function describeLine(item: CartItem): Localized {
-  const parts = (locale: Locale) =>
-    [
-      t(item.title, locale),
-      item.designName ? t(item.designName, locale) : "",
-      t(item.colorName, locale),
-      item.sizeLabel,
-    ]
-      .filter(Boolean)
-      .join(" · ");
 
-  return { en: parts("en"), ar: parts("ar") };
-}
+
 
 /**
  * One invoice per order that reached payment. Numbering is sequential and
@@ -353,19 +332,9 @@ export const demoInvoices: Invoice[] = demoOrders
         city: order.shippingAddress.city,
         countryCode: order.shippingAddress.countryCode,
       },
-      lines: order.items.map((item) => ({
-        /*
-         * The options belong in the description, not only on the packing slip.
-         * An invoice line reading "Boxy Cotton Tee" four times over, for four
-         * different embroideries at four different prices, is not a document
-         * anyone can reconcile — least of all a customer querying a charge.
-         */
-        description: describeLine(item),
-        sku: item.sku,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        total: Math.round(item.unitPrice * item.quantity * 1000) / 1000,
-      })),
+      // The same builder the live issuer uses, so a demo invoice and a real
+      // one cannot drift into describing their lines differently.
+      lines: invoiceLines(order.items),
       subtotal: order.totals.subtotal,
       discount: order.totals.discount,
       shipping: order.totals.shipping,

@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 
+import { issueCreditNote, issueInvoice } from "@/lib/invoice.server";
+
 import { isAdminConfigured, verifyRequest } from "@/lib/firebase/admin";
-import type { OrderStatus } from "@/types";
+import type { Order, OrderStatus } from "@/types";
 
 /**
  * Order mutations.
@@ -123,6 +125,39 @@ export async function PATCH(request: Request) {
       timeline: [...(doc.data().timeline ?? []), event],
     });
 
+    /*
+     * Accounting follows the status, and does it *after* the order is written.
+     *
+     * Deliberately not inside the order's own update: issuing a number is its
+     * own transaction (see `invoice.server.ts`), and a failure to invoice must
+     * not roll back a status the warehouse has already acted on. It is
+     * idempotent per order, so the operator can simply move the status again —
+     * or the next transition picks it up — without producing a second
+     * document.
+     */
+    let invoiceNumber: string | undefined;
+    let creditNote: string | undefined;
+
+    try {
+      const order = { ...(doc.data() as Order), id: doc.id };
+      const at = now.getTime();
+
+      if (status === "paid") {
+        const { invoice, created } = await issueInvoice(db, order, at);
+        if (created) invoiceNumber = invoice.number;
+      } else if (status === "refunded") {
+        const note = await issueCreditNote(db, { ...order, status }, at);
+        if (note) creditNote = note.number;
+      }
+    } catch (error) {
+      /*
+       * Reported, not thrown. The status change succeeded and the operator
+       * needs to know that; a 500 here would make them retry a transition
+       * that already happened and hit the "cannot go from paid to paid" wall.
+       */
+      console.error("[invoice] could not issue for", reference, error);
+    }
+
     // An audit row per transition. Who moved what, and when — the first thing
     // anyone asks when an order's history looks wrong.
     await db.collection("auditLog").add({
@@ -130,12 +165,20 @@ export async function PATCH(request: Request) {
       orderReference: reference,
       from: current,
       to: status,
+      ...(invoiceNumber ? { invoiceNumber } : {}),
+      ...(creditNote ? { creditNote } : {}),
       actorUid: caller.uid,
       actorEmail: caller.email,
       at: now,
     });
 
-    return NextResponse.json({ ok: true, persisted: true, status });
+    return NextResponse.json({
+      ok: true,
+      persisted: true,
+      status,
+      ...(invoiceNumber ? { invoiceNumber } : {}),
+      ...(creditNote ? { creditNote } : {}),
+    });
   } catch (error) {
     return NextResponse.json(
       {
