@@ -114,6 +114,17 @@ export function OrderDetail({ order: initial }: { order: Order }) {
               </Button>
             </Link>
             {/*
+              Every order, at any status. A receipt is what the customer is
+              handed at the counter or at the door, which happens well before
+              an order is settled — so unlike the invoice this one is never
+              conditional.
+            */}
+            <Link href={`/admin/orders/${order.reference}/receipt`}>
+              <Button variant="secondary" size="sm">
+                {t("order.receipt")}
+              </Button>
+            </Link>
+            {/*
               Only where one exists. Invoices are issued when an order reaches
               `paid`, so a pending or cancelled order has none — and a button
               that reliably 404s is worse than no button.

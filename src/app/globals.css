@@ -522,3 +522,194 @@
     break-inside: avoid;
   }
 }
+
+/* ===========================================================================
+   Receipt — thermal / point-of-sale
+
+   A roll, not a page. Everything below follows from four facts about the
+   medium: the paper has no fixed height, the head has no greyscale, the strip
+   is about 48–72mm wide at ~203dpi, and the receipt is read once at a counter.
+
+   `--receipt-width` is set inline by the component from the chosen paper, so
+   the preview on screen and the strip that prints are the same width.
+   ========================================================================= */
+
+.ns-receipt {
+  width: var(--receipt-width, 72mm);
+  /* Black on white, always. The admin's paper-and-ink palette is a set of
+     warm off-whites and soft greys, and a thermal head renders every one of
+     them as the same muddy dither. */
+  background: #ffffff;
+  color: #000000;
+  /* A face with real Arabic coverage first, then a monospace fallback for the
+     Latin digits so the amount column lines up. The system stack is
+     deliberate: the brand faces are hairline-thin display types that a 203dpi
+     head cannot resolve. */
+  font-family: "Noto Naskh Arabic", "Segoe UI", Tahoma, "DejaVu Sans Mono", monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  padding: 4mm 3mm 6mm;
+  margin-inline: auto;
+}
+
+/* On screen it is a preview, so it gets an edge and a shadow to read as
+   paper. Print takes both away — see the print block below. */
+@media screen {
+  .ns-receipt {
+    border: 1px solid var(--color-line);
+    border-radius: 4px;
+    box-shadow: 0 8px 24px rgb(0 0 0 / 0.08);
+  }
+}
+
+.ns-receipt-head {
+  text-align: center;
+}
+
+.ns-receipt-shop {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* Arabic is never letter-spaced — spacing breaks the cursive joins and the
+   word stops reading as a word. */
+.ns-receipt[lang="ar"] .ns-receipt-shop {
+  letter-spacing: normal;
+}
+
+.ns-receipt-meta {
+  font-size: 10px;
+}
+
+.ns-receipt-rule {
+  border-top: 1px dashed #000000;
+  margin: 2.5mm 0;
+}
+
+.ns-receipt-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 2mm;
+}
+
+.ns-receipt-facts dt,
+.ns-receipt-totals dt {
+  font-size: 10px;
+}
+
+.ns-receipt-facts dd {
+  font-weight: 600;
+  text-align: end;
+}
+
+.ns-receipt-lines {
+  display: grid;
+  gap: 2mm;
+}
+
+/* A line item split across a tear is unreadable, and on a roll the tear is
+   wherever the operator cuts. */
+.ns-receipt-lines > li {
+  break-inside: avoid;
+}
+
+.ns-receipt-name {
+  font-weight: 600;
+}
+
+.ns-receipt-sub {
+  font-size: 9.5px;
+  /* Not grey. On a thermal head grey is a dither pattern, which at this size
+     is a smudge — so a caption is separated by size, never by lightness. */
+  color: #000000;
+}
+
+.ns-receipt-sku {
+  font-variant-numeric: tabular-nums;
+}
+
+.ns-receipt-amount {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ns-receipt-totals {
+  display: grid;
+  gap: 0.8mm;
+}
+
+.ns-receipt-totals .is-total {
+  font-size: 14px;
+  font-weight: 700;
+  border-top: 1px solid #000000;
+  margin-top: 1.5mm;
+  padding-top: 1.5mm;
+}
+
+.ns-receipt-units {
+  font-size: 10px;
+  text-align: center;
+  margin-top: 2.5mm;
+}
+
+.ns-receipt-barcode {
+  margin: 4mm 0 2mm;
+  text-align: center;
+}
+
+.ns-receipt-barcode svg {
+  width: 100%;
+  height: 14mm;
+  /* Bars must land on whole printer dots or the scanner reads the wrong
+     widths. Crisp edges stop the browser smoothing them into grey. */
+  shape-rendering: crispEdges;
+}
+
+.ns-receipt-barcode figcaption {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  font-variant-numeric: tabular-nums;
+  margin-top: 1mm;
+}
+
+.ns-receipt-foot {
+  text-align: center;
+  font-size: 9.5px;
+  margin-top: 4mm;
+}
+
+@media print {
+  /* The receipt page prints the strip and nothing else — no admin chrome, no
+     card, no shadow, and no page margin, because the driver owns the margin
+     on a roll. */
+  body:has(.ns-receipt) {
+    background: #ffffff !important;
+  }
+
+  body:has(.ns-receipt) main {
+    padding: 0 !important;
+  }
+
+  .ns-receipt {
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    width: var(--receipt-width, 72mm) !important;
+  }
+
+  /* Bars are the one thing on the roll that must print exactly as drawn. */
+  .ns-receipt-barcode svg rect {
+    fill: #000000 !important;
+  }
+}
+
+/* A phone, a SKU, an email, an order reference: left-to-right whatever the
+   paragraph around them is doing. `<bdi>` isolates the run so Arabic cannot
+   reorder its pieces — see the `Ltr` component for what that looks like when
+   it goes wrong. */
+.ns-receipt-ltr {
+  unicode-bidi: isolate;
+  direction: ltr;
+}

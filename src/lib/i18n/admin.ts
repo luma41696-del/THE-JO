@@ -196,6 +196,8 @@ export const ADMIN_STRINGS = {
   "order.trackingPlaceholder": { en: "Tracking number", ar: "رقم التتبّع" },
   "order.noAction": { en: "No further action", ar: "لا إجراء إضافي" },
   "order.cancel": { en: "Cancel order", ar: "إلغاء الطلب" },
+  "order.backToOrder": { en: "Back to order", ar: "رجوع إلى الطلب" },
+  "order.receipt": { en: "Print receipt", ar: "طباعة إيصال" },
   "order.markAs": { en: "Mark", ar: "اجعله" },
   "order.items": { en: "Items", ar: "القطع" },
   "order.lines": { en: "lines", ar: "سطر" },
