@@ -9,6 +9,8 @@ import { taxLabel } from "@/lib/pricing";
 import { useAdminLocale } from "./AdminLocale";
 import { printToPdf } from "@/lib/admin/export";
 import { NetSaleMark } from "@/components/brand/NetSaleMark";
+import { QrBlock } from "./QrBlock";
+import { absoluteUrl } from "@/lib/site";
 import { Button } from "@/components/ui/Button";
 import { AdminPageHeader } from "./AdminShell";
 import type { StoreSettings } from "@/data/site-content";
@@ -74,6 +76,7 @@ export function InvoiceDocument({
       ? "تم إصدار هذه الفاتورة إلكترونياً وهي صالحة دون توقيع."
       : "This invoice was issued electronically and is valid without a signature.",
     credited: rtl ? "فاتورة دائنة" : "Credited",
+    scan: rtl ? "امسح لعرض الطلب" : "Scan to view the order",
   };
 
   return (
@@ -162,6 +165,26 @@ export function InvoiceDocument({
                 <dd className="text-ink font-mono">{invoice.orderReference}</dd>
               </div>
             </dl>
+
+            {/*
+              The order's own page, as a QR.
+
+              A link rather than encoded invoice data: the numbers are already
+              printed above it in words a person can read, and a QR that
+              duplicates them helps nobody. What a paper invoice cannot do is
+              take you to the live order — where the delivery is now, what was
+              actually shipped — and that is the one thing worth a scan.
+
+              Deliberately *not* presented as a tax or e-invoicing QR. This
+              shop has no e-invoicing integration, and a code that looked like
+              a fiscal seal would be claiming a compliance it does not have.
+            */}
+            <div className={cn("mt-5 flex", rtl ? "justify-start" : "justify-end")}>
+              <QrBlock
+                value={absoluteUrl(`${locale}/orders/${invoice.orderReference}`)}
+                caption={L.scan}
+              />
+            </div>
           </div>
         </header>
 
