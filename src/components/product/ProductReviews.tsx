@@ -235,16 +235,20 @@ export function ProductReviews({
             </div>
           )}
 
+          {/*
+            Only the filtered case speaks here.
+            
+            With no reviews at all, the summary column beside this one already
+            says so and offers the invitation to write the first — printing a
+            second, differently-worded "none yet" underneath made the page look
+            like it had failed to load rather than like a new product.
+          */}
           {visible.length === 0 ? (
-            <p className="text-mist py-8 text-[0.875rem]">
-              {starFilter
-                ? rtl
-                  ? "لا تقييمات بهذا العدد من النجوم."
-                  : "No reviews with that rating."
-                : rtl
-                  ? "لا توجد تقييمات منشورة بعد."
-                  : "No published reviews yet."}
-            </p>
+            starFilter ? (
+              <p className="text-mist py-8 text-[0.875rem]">
+                {rtl ? "لا تقييمات بهذا العدد من النجوم." : "No reviews with that rating."}
+              </p>
+            ) : null
           ) : (
             <ul className="divide-line divide-y">
               {visible.slice(0, shown).map((review) => (

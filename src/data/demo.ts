@@ -1240,15 +1240,6 @@ export const demoShippingMethods: ShippingMethod[] = [
     minDays: 0,
     maxDays: 0,
   },
-  {
-    id: "pickup",
-    speed: "pickup",
-    name: { en: "Boutique pickup", ar: "استلام من المتجر" },
-    description: { en: "Ready in 2 hours", ar: "جاهز خلال ساعتين" },
-    price: 0,
-    minDays: 0,
-    maxDays: 0,
-  },
 ];
 
 export const demoTestimonials: Testimonial[] = [

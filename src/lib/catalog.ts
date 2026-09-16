@@ -98,12 +98,25 @@ async function readOrFallback<T>(
     const rows = await withTimeout(read(), READ_TIMEOUT_MS);
     if (rows.length > 0) return rows;
   } catch (error) {
-    if (process.env.NODE_ENV !== "production") {
-      console.warn(
-        `[net sale] Firestore read "${label}" failed — serving the demo catalogue.`,
-        error instanceof Error ? error.message : error,
-      );
-    }
+    const message = error instanceof Error ? error.message : String(error);
+
+    /*
+     * Logged in production too, not just in development.
+     *
+     * The fallback exists so an unreachable Firestore cannot take the shop
+     * offline, and that is still right. But it cannot tell a network blip from
+     * a permanent misconfiguration, and the two need different reactions: a
+     * blip heals, a missing index never does. Silenced in production, a
+     * missing index is a page that says "no reviews yet" forever, with the
+     * only evidence on a developer's laptop. It cost this shop exactly that.
+     */
+    const missingIndex = /requires an index/i.test(message);
+    console.warn(
+      missingIndex
+        ? `[net sale] Firestore read "${label}" needs an index that does not exist — serving nothing. This will not heal on its own.`
+        : `[net sale] Firestore read "${label}" failed — serving the demo catalogue.`,
+      message,
+    );
   }
   return ALLOW_DEMO_FALLBACK ? fallback() : [];
 }
@@ -393,6 +406,20 @@ export async function getActiveGiftCampaign(): Promise<GiftCampaign | null> {
  * applied afterwards — a client reading this collection is bound by the same
  * rule in the security rules, so the two cannot drift into a state where the
  * server hides a review the browser can still fetch.
+ *
+ * ## Why the sort is in memory
+ *
+ * It used to be `orderBy("createdAt", "desc")`, which turns two equality
+ * filters into a query needing a composite index on
+ * `(productId, status, createdAt)`. That index was never declared, so every
+ * call threw `FAILED_PRECONDITION` — and the fallback below turned the throw
+ * into an empty list. The result was a product page that said "no reviews yet"
+ * while the admin showed a published one, with nothing anywhere to say why.
+ *
+ * Equality-only filters are served by Firestore's automatic single-field
+ * indexes, so this query needs nothing declared and cannot break again on a
+ * fresh project. Sorting at most 200 rows here costs nothing next to the round
+ * trip that fetched them.
  */
 export const getProductReviews = cache(async (productId: string): Promise<Review[]> =>
   readOrFallback(
@@ -403,11 +430,12 @@ export const getProductReviews = cache(async (productId: string): Promise<Review
           collection(getDb(), "reviews"),
           where("productId", "==", productId),
           where("status", "==", "published"),
-          orderBy("createdAt", "desc"),
           fsLimit(200),
         ),
       );
-      return snap.docs.map((d) => ({ ...(d.data() as Review), id: d.id }));
+      return snap.docs
+        .map((d) => ({ ...(d.data() as Review), id: d.id }))
+        .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
     },
     // No demo reviews. A hand-written testimonial counting toward a product's
     // average is the difference between a rating and an advertisement.

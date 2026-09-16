@@ -110,6 +110,7 @@ export function ShippingBoard({
                 <th className="pb-2 text-center font-medium">{t("shipping.price")}</th>
                 <th className="pb-2 text-center font-medium">{t("shipping.daysCol")}</th>
                 <th className="pb-2 text-center font-medium">{t("shipping.freeAbove")}</th>
+                <th className="pb-2" />
               </tr>
             </thead>
             <tbody className="divide-line divide-y">
@@ -148,6 +149,30 @@ export function ShippingBoard({
                       label={`Free above for ${method.name.en}`}
                       onChange={(v) => patchMethod(method.id, { freeAbove: v })}
                     />
+                  </td>
+                  <td className="py-2.5 text-end">
+                    {/*
+                      A merchant who stops doing boutique pickup had no way to
+                      say so: the board could change what a method costs but
+                      never that it exists. The last one cannot go — the
+                      checkout has to offer something — so the button is
+                      disabled rather than absent, which says why.
+                    */}
+                    <button
+                      type="button"
+                      disabled={methods.length < 2}
+                      onClick={() => setMethods((rows) => rows.filter((r) => r.id !== method.id))}
+                      title={
+                        methods.length < 2
+                          ? t("shipping.lastMethod")
+                          : `${t("common.remove")} ${method.name.en}`
+                      }
+                      aria-label={`${t("common.remove")} ${method.name.en}`}
+                      className="text-mist hover:text-alert cursor-pointer text-[0.75rem] transition-colors disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:text-mist"
+                      data-cursor="hover"
+                    >
+                      {t("common.remove")}
+                    </button>
                   </td>
                 </tr>
               ))}

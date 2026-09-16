@@ -916,6 +916,10 @@ export const ADMIN_STRINGS = {
 
   /* ---- the last of it ---- */
   "common.remove": { en: "Remove", ar: "إزالة" },
+  "shipping.lastMethod": {
+    en: "The checkout needs at least one delivery method.",
+    ar: "لا بد من طريقة توصيل واحدة على الأقل في الدفع.",
+  },
   "common.preview": { en: "Preview", ar: "معاينة" },
   "common.desktop": { en: "Desktop", ar: "سطح المكتب" },
   "common.phone": { en: "Phone", ar: "الهاتف" },

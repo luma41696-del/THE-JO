@@ -317,8 +317,18 @@ function MobileNav({ categoryTree = [] }: { categoryTree?: CategoryNode[] }) {
             aria-label={t.common.close}
           />
 
+          {/*
+            Capped to the viewport, and scrollable.
+            
+            It used to be `top-0` with no height and no overflow, inside a
+            `fixed inset-0` parent — so a shop with more than about six
+            departments grew a menu taller than the phone, and everything past
+            the fold was simply unreachable: clipped by the parent, with
+            nothing to scroll. `dvh` rather than `vh` because mobile browser
+            chrome moves, and `vh` measures the tallest the window ever gets.
+          */}
           <motion.div
-            className="bg-paper absolute inset-x-0 top-0 rounded-b-2xl px-6 pt-26 pb-10 shadow-hover"
+            className="bg-paper shadow-hover absolute inset-x-0 top-0 max-h-dvh overflow-y-auto overscroll-contain rounded-b-2xl px-6 pt-26 pb-[max(2.5rem,env(safe-area-inset-bottom))]"
             initial={{ y: "-100%" }}
             animate={{ y: 0 }}
             exit={{ y: "-100%" }}

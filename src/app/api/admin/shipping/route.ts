@@ -103,6 +103,17 @@ export async function POST(request: Request) {
     });
 
     /*
+     * At least one way to receive an order.
+     *
+     * Removing methods is now possible from the board, and removing the last
+     * one would leave the checkout with an empty delivery step — a shop that
+     * takes no orders, reached by pressing Save on a form that looked fine.
+     */
+    if (methods.length === 0) {
+      return bad("Keep at least one delivery method — the checkout has to offer something.");
+    }
+
+    /*
      * One area may belong to one zone. Two zones claiming "Amman" would make
      * the charge depend on document order, which is not a rule anybody could
      * explain to a customer who was charged the higher one.
