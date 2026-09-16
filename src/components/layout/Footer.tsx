@@ -1,4 +1,5 @@
 import { Link } from "@/components/ui/Link";
+import { cn } from "@/lib/utils";
 
 import { NetSaleLockup } from "@/components/brand/NetSaleLockup";
 import { BrandWave } from "@/components/brand/BrandWave";
@@ -171,13 +172,45 @@ export function Footer({
             is deliberately not added: this is a credit, and the referrer is
             the part that makes it worth anything to whoever built the shop.
           */}
-          <p className="tracking-[0.1em] uppercase">
-            {rtl ? "برمجة وتطوير " : "Built and developed by "}
+          <p
+            className={cn(
+              "flex items-center gap-2",
+              /*
+                Letter-spacing is for the Latin line only.
+
+                Arabic is cursive: its letters join, and the shape a letter
+                takes depends on what it is joined to. Tracking forces a gap
+                between every pair, which breaks those joins — the word stops
+                being written and becomes a row of isolated forms, and a reader
+                sees letters that look like the wrong ones. `uppercase` does
+                nothing to Arabic either way, but the pair travels together in
+                this codebase and both are wrong here.
+              */
+              rtl ? "text-[0.8125rem]" : "tracking-[0.1em] uppercase",
+            )}
+          >
+            <span>{rtl ? "برمجة وتطوير" : "Built and developed by"}</span>
             <a
               href="https://www.luma-jo.com/"
               target="_blank"
+              /*
+                `rel="noopener"` because it opens in a new tab and a target
+                without it hands the opened page a reference back to this one.
+                `noreferrer` is deliberately not added: this is a credit, and
+                the referrer is the part that makes it worth anything to
+                whoever built the shop.
+              */
               rel="noopener"
-              className="text-ink hover:text-brand underline underline-offset-2 transition-colors"
+              /*
+                White, not `text-ink`.
+
+                The footer is `bg-ink` — near-black — so ink-on-ink was a link
+                the same colour as the surface behind it. It was legible only
+                from its underline, which is exactly the failure a contrast
+                check exists to catch and which is invisible to whoever wrote
+                it on a light editor background.
+              */
+              className="hover:text-brand font-medium text-white underline underline-offset-2 transition-colors"
               data-cursor="hover"
             >
               LUMA AGENCY
