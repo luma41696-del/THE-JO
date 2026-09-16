@@ -2814,3 +2814,130 @@ describe("try-on jobs", () => {
     assert.equal(result.ok, true);
   });
 });
+/* -------------------------------------------------------------------------- */
+/*  Switching a combination off, and clearing the last few                    */
+/* -------------------------------------------------------------------------- */
+
+describe("combinations and stock markdowns", () => {
+  const db = () => adminSdk.getAdminDb();
+  const id = "e2e-opt2-tee";
+
+  const save = async (body: Record<string, unknown>) =>
+    json<{ ok: boolean; error?: string }>(
+      await products.POST(
+        request("/api/admin/products", {
+          method: "POST",
+          token: owner.token,
+          body: JSON.stringify({
+            id,
+            slug: id,
+            title: { en: "Options tee two", ar: "تي شيرت خيارات ٢" },
+            categoryId: "tees",
+            type: "variable",
+            price: 100,
+            status: "active",
+            colors: [{ id: "white", name: { en: "White", ar: "أبيض" }, hex: "#FBFAF3" }],
+            sizes: [
+              { id: "m", label: "M", system: "alpha" },
+              { id: "l", label: "L", system: "alpha" },
+            ],
+            ...body,
+          }),
+        }),
+      ),
+    );
+
+  test("a switched-off combination round-trips through the save", async () => {
+    const result = await save({
+      variants: [
+        { sku: "O2-WHT-M", colorId: "white", sizeId: "m", stock: 4 },
+        { sku: "O2-WHT-L", colorId: "white", sizeId: "l", stock: 12, available: false },
+      ],
+    });
+    assert.equal(result.ok, true, result.error);
+
+    const stored = (await db().collection("products").doc(id).get()).data()!;
+    const rows = stored.variants as { sku: string; available?: boolean }[];
+    assert.equal(rows.find((r) => r.sku === "O2-WHT-L")!.available, false);
+    // The one still sold carries no flag, so nothing is written that need not be.
+    assert.equal("available" in rows.find((r) => r.sku === "O2-WHT-M")!, false);
+  });
+
+  test("its units are not counted in the product's stock", async () => {
+    /*
+     * `totalStock` is derived server-side from the rows. Counting the twelve
+     * units nobody can buy would make the product read as well stocked and
+     * send shoppers to a page where the only stocked option is refused.
+     */
+    const stored = (await db().collection("products").doc(id).get()).data()!;
+    assert.equal(stored.totalStock, 4);
+    assert.equal(stored.inStock, true);
+  });
+
+  test("a product whose only stocked combination is off reads as out of stock", async () => {
+    await save({
+      variants: [{ sku: "O2-WHT-M", colorId: "white", sizeId: "m", stock: 9, available: false }],
+    });
+    const stored = (await db().collection("products").doc(id).get()).data()!;
+    assert.equal(stored.totalStock, 0);
+    assert.equal(stored.inStock, false);
+  });
+
+  test("markdown rules round-trip, and a bad one is refused", async () => {
+    const good = await save({
+      variants: [{ sku: "O2-WHT-M", colorId: "white", sizeId: "m", stock: 2 }],
+      stockPriceRules: [{ whenStockAtOrBelow: 3, percentOff: 20 }],
+    });
+    assert.equal(good.ok, true, good.error);
+
+    const stored = (await db().collection("products").doc(id).get()).data()!;
+    assert.deepEqual(stored.stockPriceRules, [{ whenStockAtOrBelow: 3, percentOff: 20 }]);
+
+    /*
+     * Validated on the server as well as in the editor, because the editor is
+     * not the only way in — an import or a script can write a product, and a
+     * rule that would give the last unit away should be refused wherever it
+     * arrives from.
+     */
+    const bad = await save({
+      variants: [{ sku: "O2-WHT-M", colorId: "white", sizeId: "m", stock: 2 }],
+      stockPriceRules: [{ whenStockAtOrBelow: 3, percentOff: 99 }],
+    });
+    assert.equal(bad.httpStatus, 400);
+
+    // The good rules are still there: a refused save writes nothing.
+    const after = (await db().collection("products").doc(id).get()).data()!;
+    assert.deepEqual(after.stockPriceRules, [{ whenStockAtOrBelow: 3, percentOff: 20 }]);
+  });
+
+  test("clearing the rules removes the field rather than storing an empty list", async () => {
+    await save({
+      variants: [{ sku: "O2-WHT-M", colorId: "white", sizeId: "m", stock: 2 }],
+      stockPriceRules: null,
+    });
+    const stored = (await db().collection("products").doc(id).get()).data()!;
+    assert.equal("stockPriceRules" in stored, false);
+  });
+
+  test("an image can be tied to one colourway", async () => {
+    /*
+     * The storefront has always filtered the gallery by colour; nothing had
+     * ever written the field, so every colour showed every photograph. This is
+     * the write half of a read that already worked.
+     */
+    const result = await save({
+      variants: [{ sku: "O2-WHT-M", colorId: "white", sizeId: "m", stock: 2 }],
+      images: [
+        { url: "https://firebasestorage.googleapis.com/v0/b/x/o/white.jpg", alt: "white", width: 8, height: 10, colorId: "white" },
+        { url: "https://firebasestorage.googleapis.com/v0/b/x/o/all.jpg", alt: "any", width: 8, height: 10 },
+      ],
+    });
+    assert.equal(result.ok, true, result.error);
+
+    const stored = (await db().collection("products").doc(id).get()).data()!;
+    const images = stored.images as { url: string; colorId?: string }[];
+    assert.equal(images.find((i) => i.url.includes("white"))!.colorId, "white");
+    // The unscoped one stays unscoped, so it shows for every colourway.
+    assert.equal("colorId" in images.find((i) => i.url.includes("all"))!, false);
+  });
+});

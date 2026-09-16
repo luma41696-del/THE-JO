@@ -1,4 +1,11 @@
-import type { Localized, ProductColor, ProductSize, ProductVariant, SizeSystem } from "@/types";
+import type {
+  Localized,
+  ProductColor,
+  ProductSize,
+  ProductVariant,
+  SizeSystem,
+  StockPriceRule,
+} from "@/types";
 
 /**
  * Colours, sizes, and the permutations they make.
@@ -293,6 +300,100 @@ export interface PriceTier {
  * this size" is the common intent, and the generous reading should be a
  * decision rather than a surprise on the invoice.
  */
+/**
+ * Is this permutation sold at all?
+ *
+ * Absent means yes, so every variant written before the flag existed keeps
+ * selling. The flag is the difference between "we have run out" and "we do not
+ * make this", and it matters to more than wording: a sold-out combination
+ * invites a back-in-stock alert, and one that was never cut can never satisfy
+ * it.
+ */
+export function isVariantAvailable(variant: Pick<ProductVariant, "available">): boolean {
+  return variant.available !== false;
+}
+
+/**
+ * The markdown that applies at a given remaining stock.
+ *
+ * The deepest matching rule wins, so "last 5 at 10% off, last 2 at 25%" reads
+ * the way a merchant means it rather than depending on which was typed first.
+ *
+ * **It never raises the price.** A rule that charges more as stock falls is
+ * surge pricing on a customer who can see the counter, and it is the fastest
+ * way to make a shop feel like it is working against the person in it. A rule
+ * that would raise the price is ignored rather than applied — the same
+ * treatment `priceForQuantity` gives a mistyped tier.
+ */
+export function priceForStock(
+  basePrice: number,
+  remainingStock: number,
+  rules: StockPriceRule[] = [],
+): number {
+  if (!Number.isFinite(remainingStock) || remainingStock < 0) return basePrice;
+  if (!Number.isFinite(basePrice) || basePrice <= 0) return basePrice;
+
+  const applicable = rules
+    .filter(
+      (rule) =>
+        Number.isFinite(rule.whenStockAtOrBelow) &&
+        Number.isFinite(rule.percentOff) &&
+        rule.whenStockAtOrBelow >= 0 &&
+        remainingStock <= rule.whenStockAtOrBelow,
+    )
+    // Deepest discount first, not lowest threshold: two rules at the same
+    // threshold should give the customer the better of the two.
+    .sort((a, b) => b.percentOff - a.percentOff);
+
+  const best = applicable[0];
+  if (!best) return basePrice;
+
+  const reduced = roundMoney(basePrice * (1 - Math.min(90, best.percentOff) / 100));
+  /*
+   * The clamp, and the only thing standing between a bad rule and a higher
+   * price. Validation rejects a negative markdown when a merchant types one,
+   * but a rule can also arrive from an import or a console edit, and this is
+   * what runs then.
+   */
+  return Math.min(basePrice, reduced);
+}
+
+/** Problems with a set of stock rules, in the merchant's own terms. */
+export function stockRuleProblems(rules: StockPriceRule[] = []): string[] {
+  const problems: string[] = [];
+  const seen = new Set<number>();
+
+  for (const rule of rules) {
+    if (!Number.isFinite(rule.whenStockAtOrBelow) || rule.whenStockAtOrBelow < 1) {
+      problems.push("A stock markdown starts at one unit or more.");
+      continue;
+    }
+    if (!Number.isFinite(rule.percentOff) || rule.percentOff <= 0) {
+      problems.push("A markdown has to take something off.");
+      continue;
+    }
+    /*
+     * Capped well below 100. A 100%-off rule gives the last unit away, and it
+     * is far more often a typo for 10 than a decision somebody made.
+     */
+    if (rule.percentOff > 90) {
+      problems.push(`${rule.percentOff}% off is more than this will apply.`);
+      continue;
+    }
+    if (seen.has(rule.whenStockAtOrBelow)) {
+      problems.push(`Two markdowns both start at ${rule.whenStockAtOrBelow} left.`);
+      continue;
+    }
+    seen.add(rule.whenStockAtOrBelow);
+  }
+
+  return problems;
+}
+
+function roundMoney(value: number): number {
+  return Math.round(value * 1000) / 1000;
+}
+
 export function priceForQuantity(
   basePrice: number,
   quantity: number,

@@ -7,7 +7,7 @@ import { motion } from "motion/react";
 import { Link, useLocalizedRouter } from "@/components/ui/Link";
 import { cn } from "@/lib/utils";
 import { EASE } from "@/lib/motion";
-import { formatPrice, minorUnits } from "@/lib/format";
+import { formatPrice, minorUnits, t as pick } from "@/lib/format";
 import { getIdToken } from "@/lib/firebase/auth";
 import { gtinKind, isValidGtin } from "@/lib/product";
 import { ACCEPT_ATTRIBUTE, uploadProductImage } from "@/lib/firebase/upload";
@@ -28,6 +28,7 @@ import type {
   ProductType,
   ProductVariant,
   ShippingClass,
+  StockPriceRule,
 } from "@/types";
 
 /**
@@ -232,6 +233,9 @@ export function ProductEditor({
    * anybody can read, let alone keep correct.
    */
   const [designs, setDesigns] = useState<ProductDesign[]>(product?.designs ?? []);
+  const [stockRules, setStockRules] = useState<StockPriceRule[]>(
+    product?.stockPriceRules ?? [],
+  );
   const [gridDesignId, setGridDesignId] = useState<string>(product?.designs?.[0]?.id ?? "");
   const [designBusy, setDesignBusy] = useState(false);
 
@@ -440,6 +444,22 @@ export function ProductEditor({
     setImages((current) => current.map((img) => (img.url === url ? { ...img, alt } : img)));
   }
 
+  /**
+   * Tie a photograph to one colourway, or to all of them.
+   *
+   * Written as `undefined` rather than an empty string for "all": the
+   * storefront asks whether the field is set, and an empty string is a set
+   * field that matches no colour — which would hide the image from every
+   * colourway instead of showing it in each.
+   */
+  function setImageColour(url: string, colorId: string) {
+    setImages((current) =>
+      current.map((img) =>
+        img.url === url ? { ...img, colorId: colorId || undefined } : img,
+      ),
+    );
+  }
+
   function moveImage(index: number, delta: number) {
     setImages((current) => {
       const next = [...current];
@@ -532,8 +552,8 @@ export function ProductEditor({
 
   /** Everything the form holds, as one comparable value. */
   const snapshot = useMemo(
-    () => JSON.stringify({ draft, images, colors, sizes, variants, designs }),
-    [draft, images, colors, sizes, variants, designs],
+    () => JSON.stringify({ draft, images, colors, sizes, variants, designs, stockRules }),
+    [draft, images, colors, sizes, variants, designs, stockRules],
   );
 
   const [baseline] = useState(snapshot);
@@ -711,6 +731,8 @@ export function ProductEditor({
           // Sent even when empty, so removing the last design actually clears
           // it rather than leaving the old array in place.
           ...(draft.type === "variable" ? { designs } : {}),
+          // null clears them; an empty array would read as "leave as they are".
+          stockPriceRules: stockRules.length > 0 ? stockRules : null,
           status: draft.status,
           tags: draft.tags.split(",").map((t) => t.trim()).filter(Boolean),
           type: draft.type,
@@ -1041,6 +1063,34 @@ export function ProductEditor({
                       image.alt.trim() ? "border-line" : "border-alert",
                     )}
                   />
+
+                  {/*
+                    Which colourway this shot belongs to.
+
+                    The storefront has always filtered the gallery by colour —
+                    `imagesFor` reads `image.colorId` — and nothing had ever
+                    written it, so every colour showed every photograph. The
+                    data model was right and the door to it was missing.
+
+                    Only offered once there are colours to choose between; on a
+                    single-colour product the control would be a question with
+                    one answer.
+                  */}
+                  {colors.length > 0 && (
+                    <select
+                      value={image.colorId ?? ""}
+                      onChange={(event) => setImageColour(image.url, event.target.value)}
+                      aria-label={`${t("opt.imageColour")} ${index + 1}`}
+                      className="border-line focus:border-brand bg-paper text-ink mt-1 w-24 rounded-md border px-1 py-1 text-[0.625rem] outline-none transition-colors"
+                    >
+                      <option value="">{t("opt.allColours")}</option>
+                      {colors.map((colour) => (
+                        <option key={colour.id} value={colour.id}>
+                          {pick(colour.name, locale)}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                   </div>
                 ))}
 
@@ -1331,6 +1381,8 @@ export function ProductEditor({
                   onColorsChange={setColors}
                   onSizesChange={setSizes}
                   onVariantsChange={setVariants}
+                  stockRules={stockRules}
+                  onStockRulesChange={setStockRules}
                 />
               </div>
             </Panel>

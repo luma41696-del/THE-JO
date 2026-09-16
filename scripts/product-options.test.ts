@@ -8,6 +8,9 @@ import {
   duplicateSkus,
   generateVariants,
   isHex,
+  isVariantAvailable,
+  priceForStock,
+  stockRuleProblems,
   normaliseSku,
   optionId,
   paletteColor,
@@ -266,6 +269,114 @@ describe("priceForQuantity", () => {
     assert.equal(priceForQuantity(12, 5), 12);
     assert.equal(priceForQuantity(12, 0, tiers), 12);
     assert.equal(priceForQuantity(12, Number.NaN, tiers), 12);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/*  Switching one combination off                                             */
+/* -------------------------------------------------------------------------- */
+
+describe("isVariantAvailable", () => {
+  test("a variant written before the flag existed still sells", () => {
+    // Otherwise adding the field would stop the whole catalogue selling.
+    assert.equal(isVariantAvailable({}), true);
+    assert.equal(isVariantAvailable({ available: true }), true);
+  });
+
+  test("only an explicit no switches it off", () => {
+    assert.equal(isVariantAvailable({ available: false }), false);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/*  Markdowns that follow the stock                                           */
+/* -------------------------------------------------------------------------- */
+
+describe("priceForStock", () => {
+  const rules = [
+    { whenStockAtOrBelow: 5, percentOff: 10 },
+    { whenStockAtOrBelow: 2, percentOff: 25 },
+  ];
+
+  test("above every threshold the price stands", () => {
+    assert.equal(priceForStock(100, 20, rules), 100);
+    assert.equal(priceForStock(100, 6, rules), 100);
+  });
+
+  test("the deepest matching markdown wins", () => {
+    /*
+     * "Last 5 at 10% off, last 2 at 25%" should read the way a merchant means
+     * it, rather than depending on which rule was typed first.
+     */
+    assert.equal(priceForStock(100, 5, rules), 90);
+    assert.equal(priceForStock(100, 3, rules), 90);
+    assert.equal(priceForStock(100, 2, rules), 75);
+    assert.equal(priceForStock(100, 1, rules), 75);
+  });
+
+  test("order in the array does not matter", () => {
+    assert.equal(priceForStock(100, 1, [...rules].reverse()), 75);
+  });
+
+  test("a rule never raises the price", () => {
+    /*
+     * A price that climbs as stock falls is surge pricing on somebody who can
+     * see the counter, and it is the fastest way to make a shop feel like it
+     * is working against the person in it.
+     */
+    assert.equal(priceForStock(100, 1, [{ whenStockAtOrBelow: 5, percentOff: -50 }]), 100);
+  });
+
+  test("a markdown is capped, so a typo cannot give the last one away", () => {
+    // 900 is far more often a slipped decimal than a decision.
+    assert.equal(priceForStock(100, 1, [{ whenStockAtOrBelow: 5, percentOff: 900 }]), 10);
+  });
+
+  test("no rules, or nonsense stock, leaves the price alone", () => {
+    assert.equal(priceForStock(100, 1), 100);
+    assert.equal(priceForStock(100, Number.NaN, rules), 100);
+    assert.equal(priceForStock(100, -3, rules), 100);
+  });
+
+  test("zero left still prices, because the page still shows one", () => {
+    assert.equal(priceForStock(100, 0, rules), 75);
+  });
+
+  test("the result lands on the currency's minor unit", () => {
+    // 33% off 10 is 6.7 exactly; nothing should store 6.700000000000001.
+    assert.equal(priceForStock(10, 1, [{ whenStockAtOrBelow: 5, percentOff: 33 }]), 6.7);
+  });
+});
+
+describe("stockRuleProblems", () => {
+  test("accepts a sane ladder", () => {
+    assert.deepEqual(
+      stockRuleProblems([
+        { whenStockAtOrBelow: 5, percentOff: 10 },
+        { whenStockAtOrBelow: 2, percentOff: 25 },
+      ]),
+      [],
+    );
+  });
+
+  test("refuses a threshold below one unit", () => {
+    assert.equal(stockRuleProblems([{ whenStockAtOrBelow: 0, percentOff: 10 }]).length, 1);
+  });
+
+  test("refuses a markdown that takes nothing off", () => {
+    assert.equal(stockRuleProblems([{ whenStockAtOrBelow: 5, percentOff: 0 }]).length, 1);
+  });
+
+  test("refuses a markdown that would give it away", () => {
+    assert.equal(stockRuleProblems([{ whenStockAtOrBelow: 5, percentOff: 95 }]).length, 1);
+  });
+
+  test("refuses two markdowns at the same threshold", () => {
+    const problems = stockRuleProblems([
+      { whenStockAtOrBelow: 5, percentOff: 10 },
+      { whenStockAtOrBelow: 5, percentOff: 20 },
+    ]);
+    assert.equal(problems.some((p) => p.includes("5")), true);
   });
 });
 

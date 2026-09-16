@@ -1369,6 +1369,18 @@ export const ADMIN_STRINGS = {
   "imp.status.running": { en: "Stopped partway", ar: "توقف في المنتصف" },
   "imp.status.done": { en: "Finished", ar: "اكتمل" },
   "imp.status.undone": { en: "Undone", ar: "متراجَع عنه" },
+  /* ---- options, continued ---- */
+  "opt.sold": { en: "Sold", ar: "يُباع" },
+  "opt.stockRules": { en: "Markdown on the last few", ar: "تخفيض على آخر القطع" },
+  "opt.stockRulesHint": {
+    en: "Takes a percentage off once this many units remain. It never raises a price.",
+    ar: "يخصم نسبة عندما يتبقى هذا العدد. لا يرفع السعر أبدًا.",
+  },
+  "opt.whenLeft": { en: "When this many left", ar: "عندما يتبقى" },
+  "opt.percentOff": { en: "% off", ar: "% خصم" },
+  "opt.addRule": { en: "Add a markdown", ar: "أضف تخفيضًا" },
+  "opt.imageColour": { en: "Shows for", ar: "تظهر مع" },
+  "opt.allColours": { en: "Every colour", ar: "كل الألوان" },
 } satisfies AdminDict;
 
 export type AdminKey = keyof typeof ADMIN_STRINGS;

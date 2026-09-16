@@ -118,6 +118,20 @@ export interface ProductVariant {
    */
   gtin?: string;
   barcode?: string;
+  /**
+   * Whether this permutation is sold at all.
+   *
+   * Absent means yes, so every variant written before this existed keeps
+   * selling.
+   *
+   * Distinct from a stock of zero, and the distinction is the point: zero
+   * says "we have run out", which invites the customer to wait for it and
+   * to ask to be told when it returns. `available: false` says "we do not
+   * make this" — a combination that was never cut, or has been retired.
+   * Using stock to express that is a lie the shop then has to keep telling,
+   * and it feeds a back-in-stock alert that can never come true.
+   */
+  available?: boolean;
 }
 
 export type ProductBadge =
@@ -190,6 +204,21 @@ export interface VisibilitySchedule {
  * without a resolved variant.
  */
 export type ProductType = "simple" | "variable";
+
+/**
+ * A markdown that applies once stock has fallen to a threshold.
+ *
+ * Deliberately a percentage off rather than a replacement price: a
+ * replacement price stops tracking the product when the base price changes,
+ * so a piece repriced upward would silently start selling at the old
+ * clearance figure.
+ */
+export interface StockPriceRule {
+  /** Applies when sellable units are at or below this. */
+  whenStockAtOrBelow: number;
+  /** 1-90. Off the base price, never added to it. */
+  percentOff: number;
+}
 
 export interface Product {
   id: string;
@@ -318,6 +347,19 @@ export interface Product {
    * that charges more for buying more is a bug the customer pays for.
    */
   priceTiers?: PriceTier[];
+
+  /**
+   * Markdowns that follow the remaining stock.
+   *
+   * "The last three at 20% off" — a real merchandising tool for clearing the
+   * tail of a run, and the reason it is specified as *markdown only* is the
+   * obvious alternative: a rule that raises the price as stock runs low is
+   * surge pricing on a customer who can see the counter, and it is the fastest
+   * way to make a shop feel like it is working against the person in it.
+   * `priceForStock` enforces that; a rule that would charge more is ignored
+   * rather than applied.
+   */
+  stockPriceRules?: StockPriceRule[];
 
   /**
    * Hard cap on units of this product in a single order.

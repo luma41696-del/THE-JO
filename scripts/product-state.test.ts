@@ -10,6 +10,7 @@ import {
   sellableUnits,
 } from "../src/lib/product-state";
 import { isPurchasable, isShoppable, storefrontState } from "../src/lib/visibility";
+import { resolveSelection } from "../src/lib/product";
 import type { Product } from "../src/types";
 
 /**
@@ -197,6 +198,98 @@ describe("stopping and resuming sales", () => {
   test("resuming a product that was never stopped is refused, not a no-op write", () => {
     // Otherwise a bulk "back on sale" would clear manual stops it never set.
     assert.equal(applyAction(product(), "restock").reason, "already");
+  });
+});
+
+describe("a combination the shop has switched off", () => {
+  const withDisabled = product({
+    variants: [
+      { sku: "A", colorId: "white", sizeId: "m", stock: 3 },
+      { sku: "B", colorId: "white", sizeId: "l", stock: 12, available: false },
+    ],
+  });
+
+  test("its units are not counted as sellable", () => {
+    /*
+     * Counting them would let a product read as "in stock" on the strength of
+     * twelve units nobody can buy, and the listing would send shoppers to a
+     * page where the only stocked option is refused.
+     */
+    assert.equal(sellableUnits(withDisabled), 3);
+  });
+
+  test("a product whose only stocked combination is off reads as out", () => {
+    const allOff = product({
+      variants: [{ sku: "A", colorId: "white", sizeId: "m", stock: 9, available: false }],
+    });
+    assert.equal(sellableUnits(allOff), 0);
+    assert.equal(allVariantsOut(allOff), true);
+  });
+
+  test("it cannot be bought, and it is not reported as sold out", () => {
+    /*
+     * The distinction the whole flag exists for. "Sold out" invites the
+     * customer to wait for it and to ask to be told when it returns — an alert
+     * that can never come true for something the shop does not make.
+     */
+    const selection = resolveSelection(withDisabled, "white", "l");
+    assert.equal(selection.buyable, false);
+    assert.equal(selection.unavailableCombination, true);
+    // Still resolvable, so the page can say which one and why.
+    assert.equal(selection.variant?.sku, "B");
+    assert.equal(selection.stock, 12);
+  });
+
+  test("its neighbours are unaffected", () => {
+    const selection = resolveSelection(withDisabled, "white", "m");
+    assert.equal(selection.buyable, true);
+    assert.equal(selection.unavailableCombination, false);
+  });
+
+  test("a variant with no flag is bought exactly as before", () => {
+    const selection = resolveSelection(product(), "white", "m");
+    assert.equal(selection.buyable, true);
+  });
+});
+
+describe("a markdown on the last few", () => {
+  const clearing = product({
+    price: 100,
+    stockPriceRules: [{ whenStockAtOrBelow: 2, percentOff: 25 }],
+    variants: [
+      { sku: "A", colorId: "white", sizeId: "m", stock: 9 },
+      { sku: "B", colorId: "white", sizeId: "l", stock: 2 },
+    ],
+  });
+
+  test("follows the permutation's own stock, not the product's total", () => {
+    /*
+     * "The last two" means the last two of the size in front of the customer.
+     * Discounting a medium because the shop is low on large is a price nobody
+     * can explain.
+     */
+    assert.equal(resolveSelection(clearing, "white", "m").price, 100);
+    assert.equal(resolveSelection(clearing, "white", "l").price, 75);
+  });
+
+  test("applies after a variant override, never instead of it", () => {
+    const overridden = product({
+      price: 100,
+      stockPriceRules: [{ whenStockAtOrBelow: 2, percentOff: 50 }],
+      variants: [{ sku: "A", colorId: "white", sizeId: "m", stock: 1, priceOverride: 40 }],
+    });
+    assert.equal(resolveSelection(overridden, "white", "m").price, 20);
+  });
+
+  test("a simple product uses its own count", () => {
+    const simple = product({
+      type: "simple",
+      price: 50,
+      variants: [],
+      totalStock: 1,
+      stockPriceRules: [{ whenStockAtOrBelow: 3, percentOff: 20 }],
+    });
+    assert.equal(resolveSelection(simple).price, 40);
   });
 });
 

@@ -14,9 +14,16 @@ import {
   generateVariants,
   isHex,
   normaliseSku,
+  stockRuleProblems,
   optionId,
 } from "@/lib/product-options";
-import type { ProductColor, ProductDesign, ProductSize, ProductVariant } from "@/types";
+import type {
+  ProductColor,
+  ProductDesign,
+  ProductSize,
+  ProductVariant,
+  StockPriceRule,
+} from "@/types";
 
 /**
  * Colours, sizes, and the table of sellable units they produce.
@@ -41,6 +48,8 @@ export interface OptionsEditorProps {
   onColorsChange: (next: ProductColor[]) => void;
   onSizesChange: (next: ProductSize[]) => void;
   onVariantsChange: (next: ProductVariant[]) => void;
+  stockRules?: StockPriceRule[];
+  onStockRulesChange?: (next: StockPriceRule[]) => void;
 }
 
 export function OptionsEditor({
@@ -52,6 +61,8 @@ export function OptionsEditor({
   onColorsChange,
   onSizesChange,
   onVariantsChange,
+  stockRules = [],
+  onStockRulesChange,
 }: OptionsEditorProps) {
   const { t, locale } = useAdminLocale();
 
@@ -63,6 +74,8 @@ export function OptionsEditor({
 
   const pending = combinationCount(colors, sizes, designs);
   const dupes = useMemo(() => duplicateSkus(variants), [variants]);
+  // Checked as they type, so a bad rule is named before the save refuses it.
+  const ruleProblems = useMemo(() => stockRuleProblems(stockRules), [stockRules]);
 
   /* ---- colours --------------------------------------------------------- */
 
@@ -312,6 +325,7 @@ export function OptionsEditor({
                     <th className="pb-2 text-end font-medium">{t("col.price")}</th>
                     <th className="pb-2 text-end font-medium">{t("col.stock")}</th>
                     <th className="pb-2 text-start font-medium">{t("pe.gtin")}</th>
+                    <th className="pb-2 text-center font-medium">{t("opt.sold")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-line divide-y">
@@ -377,7 +391,7 @@ export function OptionsEditor({
                             className="border-line focus:border-brand bg-paper text-ink w-16 rounded-md border px-2 py-1 text-end tabular-nums outline-none"
                           />
                         </td>
-                        <td className="py-2">
+                        <td className="py-2 pe-3">
                           <input
                             value={variant.gtin ?? ""}
                             onChange={(e) =>
@@ -385,6 +399,31 @@ export function OptionsEditor({
                             }
                             placeholder="—"
                             className="border-line focus:border-brand bg-paper text-ink placeholder:text-mist w-32 rounded-md border px-2 py-1 font-mono text-[0.75rem] outline-none"
+                          />
+                        </td>
+                        <td className="py-2 text-center">
+                          {/*
+                            Switching a combination off, which is not the same
+                            as setting its stock to zero.
+
+                            Zero says "we have run out" — it invites the
+                            customer to wait and to ask to be told when it
+                            returns. This says "we do not make this one", which
+                            is the truth for a permutation that was never cut,
+                            and it keeps the count intact for the day it is.
+                          */}
+                          <input
+                            type="checkbox"
+                            checked={variant.available !== false}
+                            onChange={(e) =>
+                              patchVariant(variant.sku, {
+                                // Written only when false, so a product that
+                                // never disables anything carries no new field.
+                                available: e.target.checked ? undefined : false,
+                              })
+                            }
+                            aria-label={`${t("opt.sold")} ${variant.sku}`}
+                            className="accent-brand h-3.5 w-3.5 cursor-pointer"
                           />
                         </td>
                       </tr>
@@ -395,6 +434,97 @@ export function OptionsEditor({
             </div>
 
             <p className="text-mist mt-3 text-[0.6875rem]">{t("opt.priceHint")}</p>
+
+            {/*
+              Clearing the tail of a run.
+
+              A markdown, never a mark-up: the control offers a percentage off
+              and nothing else, because a price that climbs as stock falls is
+              surge pricing on somebody who can see the counter. The rule
+              itself refuses to raise a price even if one arrives from an
+              import, so this is the door, not the lock.
+            */}
+            {onStockRulesChange && (
+              <div className="border-line mt-5 border-t pt-4">
+                <h4 className="text-ink text-[0.8125rem] font-medium">{t("opt.stockRules")}</h4>
+                <p className="text-mist mt-0.5 text-[0.6875rem]">{t("opt.stockRulesHint")}</p>
+
+                <ul className="mt-3 grid gap-2">
+                  {stockRules.map((rule, index) => (
+                    <li key={index} className="flex flex-wrap items-center gap-2">
+                      <span className="text-ink-muted text-[0.75rem]">{t("opt.whenLeft")}</span>
+                      <input
+                        value={rule.whenStockAtOrBelow}
+                        onChange={(event) =>
+                          onStockRulesChange(
+                            stockRules.map((existing, i) =>
+                              i === index
+                                ? {
+                                    ...existing,
+                                    whenStockAtOrBelow: Math.max(
+                                      0,
+                                      Math.floor(Number(event.target.value) || 0),
+                                    ),
+                                  }
+                                : existing,
+                            ),
+                          )
+                        }
+                        inputMode="numeric"
+                        aria-label={t("opt.whenLeft")}
+                        className="border-line focus:border-brand bg-paper text-ink w-16 rounded-md border px-2 py-1 text-end text-[0.75rem] tabular-nums outline-none"
+                      />
+                      <input
+                        value={rule.percentOff}
+                        onChange={(event) =>
+                          onStockRulesChange(
+                            stockRules.map((existing, i) =>
+                              i === index
+                                ? { ...existing, percentOff: Number(event.target.value) || 0 }
+                                : existing,
+                            ),
+                          )
+                        }
+                        inputMode="decimal"
+                        aria-label={t("opt.percentOff")}
+                        className="border-line focus:border-brand bg-paper text-ink w-16 rounded-md border px-2 py-1 text-end text-[0.75rem] tabular-nums outline-none"
+                      />
+                      <span className="text-ink-muted text-[0.75rem]">{t("opt.percentOff")}</span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onStockRulesChange(stockRules.filter((_, i) => i !== index))
+                        }
+                        className="text-mist hover:text-alert cursor-pointer text-[0.75rem]"
+                        data-cursor="hover"
+                      >
+                        {t("common.remove")}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+
+                {ruleProblems.length > 0 && (
+                  <p role="alert" className="text-alert mt-2 text-[0.75rem]">
+                    {ruleProblems[0]}
+                  </p>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    onStockRulesChange([
+                      ...stockRules,
+                      { whenStockAtOrBelow: 3, percentOff: 10 },
+                    ])
+                  }
+                  className="border-line hover:border-ink text-ink rounded-pill mt-3 cursor-pointer border px-3 py-1.5 text-[0.75rem] transition-colors"
+                  data-cursor="hover"
+                >
+                  {t("opt.addRule")}
+                </button>
+              </div>
+            )}
           </>
         )}
       </section>

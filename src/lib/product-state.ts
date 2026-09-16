@@ -1,3 +1,4 @@
+import { isVariantAvailable } from "@/lib/product-options";
 import type { Localized, Product } from "@/types";
 
 /**
@@ -120,7 +121,17 @@ export function canPublish(product: Partial<Product>): boolean {
 export function sellableUnits(product: Pick<Product, "variants" | "totalStock">): number {
   const variants = product.variants ?? [];
   if (variants.length === 0) return Math.max(0, product.totalStock ?? 0);
-  return variants.reduce((sum, v) => sum + Math.max(0, v.stock ?? 0), 0);
+  return variants.reduce(
+    /*
+     * Units in a combination the shop has switched off are not sellable, so
+     * they are not counted. Counting them would let a product read as "in
+     * stock" on the strength of twelve units of a permutation nobody can buy —
+     * and the listing would send shoppers to a page where every option is
+     * refused.
+     */
+    (sum, v) => sum + (isVariantAvailable(v) ? Math.max(0, v.stock ?? 0) : 0),
+    0,
+  );
 }
 
 /**

@@ -11,6 +11,7 @@ import {
   duplicateSkus,
   isHex,
   normaliseSku,
+  stockRuleProblems,
   tierProblems,
   type PriceTier,
 } from "@/lib/product-options";
@@ -24,6 +25,7 @@ import type {
   ProductType,
   ProductVariant,
   SizeSystem,
+  StockPriceRule,
 } from "@/types";
 
 /** The size systems the type allows, for validating what the editor sends. */
@@ -65,6 +67,7 @@ interface Body {
   variants?: ProductVariant[];
   designs?: ProductDesign[];
   priceTiers?: PriceTier[] | null;
+  stockPriceRules?: StockPriceRule[] | null;
   /** The `updatedAt` the editor loaded, for conflict detection. */
   expectedUpdatedAt?: number;
   type?: ProductType;
@@ -279,6 +282,32 @@ export async function POST(request: Request) {
     if (problems.length > 0) return bad(problems[0]!);
   }
 
+  /**
+   * Markdowns that follow the remaining stock. `null` clears them.
+   *
+   * Validated here as well as in the editor, because the editor is not the
+   * only way in: an import or a script can write a product, and a rule that
+   * would give the last unit away should be refused wherever it arrives from.
+   */
+  const stockPriceRules =
+    body.stockPriceRules === null
+      ? null
+      : Array.isArray(body.stockPriceRules)
+        ? body.stockPriceRules
+            .filter((rule) => rule && Number.isFinite(Number(rule.whenStockAtOrBelow)))
+            .map((rule) => ({
+              whenStockAtOrBelow: Math.floor(Number(rule.whenStockAtOrBelow)),
+              percentOff: Number(rule.percentOff) || 0,
+            }))
+            .sort((a, b) => a.whenStockAtOrBelow - b.whenStockAtOrBelow)
+            .slice(0, 6)
+        : undefined;
+
+  if (stockPriceRules) {
+    const problems = stockRuleProblems(stockPriceRules);
+    if (problems.length > 0) return bad(problems[0]!);
+  }
+
   /*
    * Variant stock, when the editor sends it.
    *
@@ -300,6 +329,16 @@ export async function POST(request: Request) {
             : { priceOverride: money(Number(v.priceOverride), "JOD") }),
           ...(v.gtin ? { gtin: String(v.gtin) } : {}),
           ...(v.barcode ? { barcode: String(v.barcode) } : {}),
+          /*
+           * Written only when the answer is no.
+           *
+           * The field means "is this permutation sold at all", and absent
+           * means yes — so a product where nothing is switched off carries no
+           * new field, and every variant written before the flag existed keeps
+           * selling. Storing `true` everywhere would be the same fact spelled
+           * more expensively, on four hundred rows.
+           */
+          ...(v.available === false ? { available: false } : {}),
         }))
         .slice(0, 400)
     : undefined;
@@ -403,8 +442,18 @@ export async function POST(request: Request) {
     }
   }
 
+  /*
+   * The product's stock is the sum of the rows it can actually sell.
+   *
+   * A switched-off combination contributes nothing, however many units it
+   * holds. Counting them would make a product read as well stocked on the
+   * strength of twelve units nobody can buy — the listing would show it as
+   * available, and every shopper who clicked through would find the only
+   * stocked option refused. The units are still there on the row for the day
+   * the combination is switched back on.
+   */
   const derivedStock = variants
-    ? variants.reduce((sum, v) => sum + v.stock, 0)
+    ? variants.reduce((sum, v) => sum + (v.available === false ? 0 : v.stock), 0)
     : undefined;
 
   const productId = body.id ?? slug;
@@ -448,6 +497,12 @@ export async function POST(request: Request) {
     ...(priceTiers === undefined
       ? {}
       : { priceTiers: priceTiers === null ? FieldValue.delete() : priceTiers }),
+    ...(stockPriceRules === undefined
+      ? {}
+      : {
+          stockPriceRules:
+            stockPriceRules === null ? FieldValue.delete() : stockPriceRules,
+        }),
     ...(variants ? { variants } : {}),
     ...(designs ? { designs } : {}),
     totalStock: derivedStock ?? totalStock,

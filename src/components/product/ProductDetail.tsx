@@ -628,7 +628,23 @@ export function ProductDetail({
               cannot have it — the only moment they will accept being asked
               for anything.
             */}
-            {variable && sizeId && !selection.buyable && (
+            {/*
+              Two different silences, said differently.
+
+              "Sold out" invites the customer to wait for it and to ask to be
+              told when it returns. For a combination the shop does not make,
+              that alert can never come true — so it is not offered, and the
+              wording says what is actually the case.
+            */}
+            {variable && sizeId && selection.unavailableCombination && (
+              <p className="text-mist text-[0.8125rem]">
+                {rtl
+                  ? "لا نصنع هذا المقاس بهذا اللون."
+                  : "We do not make this size in this colour."}
+              </p>
+            )}
+
+            {variable && sizeId && !selection.buyable && !selection.unavailableCombination && (
               <>
                 <p className="text-mist text-[0.8125rem]">
                   {rtl ? "هذا المقاس نفد حالياً." : "This size is sold out."}

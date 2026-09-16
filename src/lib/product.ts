@@ -11,6 +11,7 @@
  * and the admin all agree on the answer.
  */
 
+import { isVariantAvailable, priceForStock } from "@/lib/product-options";
 import { cartKey } from "@/lib/utils";
 import type { CartItem, Product, ProductDesign, ProductVariant } from "@/types";
 
@@ -153,7 +154,16 @@ export function availableSizeIds(product: Product, colorId: string, designId = "
   if (!isVariable(product) || !product.variants) return [];
   const seen = new Set<string>();
   for (const v of product.variants) {
-    if (v.colorId === colorId && v.stock > 0 && matchesDesign(v, designId)) seen.add(v.sizeId);
+    // A combination the shop has switched off is not available in any sense
+    // the picker cares about, whatever its count says.
+    if (
+      v.colorId === colorId &&
+      v.stock > 0 &&
+      isVariantAvailable(v) &&
+      matchesDesign(v, designId)
+    ) {
+      seen.add(v.sizeId);
+    }
   }
   return product.sizes.filter((s) => seen.has(s.id)).map((s) => s.id);
 }
@@ -219,6 +229,8 @@ export interface Selection {
   variant?: ProductVariant;
   design?: ProductDesign;
   /** `false` when a variable product still needs a choice, or stock is zero. */
+  /** Resolvable, but the shop has switched this permutation off. */
+  unavailableCombination?: boolean;
   buyable: boolean;
 }
 
@@ -239,7 +251,7 @@ export function resolveSelection(
     return {
       sku: product.sku,
       gtin: product.gtin,
-      price: product.price,
+      price: priceForStock(product.price, product.totalStock, product.stockPriceRules),
       compareAtPrice: product.compareAtPrice,
       stock: product.totalStock,
       cap,
@@ -259,19 +271,44 @@ export function resolveSelection(
    */
   const base = variant?.priceOverride ?? product.price;
 
+  /*
+   * The markdown follows *this* permutation's remaining stock, not the
+   * product's total. "The last two" means the last two of the size in front of
+   * the customer; discounting a medium because the shop is low on extra-large
+   * is a price that cannot be explained.
+   *
+   * Applied after the design delta so the discount is off what is actually
+   * being charged, and never above it — `priceForStock` refuses to raise.
+   */
+  const withDesign = Math.max(0, base + (design?.priceDelta ?? 0));
+  const price = priceForStock(withDesign, stock, product.stockPriceRules);
+
+  /*
+   * A combination the shop has switched off is resolvable but not buyable.
+   *
+   * Resolvable on purpose: the page can then say "we do not make this one"
+   * rather than behaving as though the size does not exist, which is what a
+   * missing variant looks like. Not buyable is enforced here, in the one
+   * function both the storefront and the checkout ask — so a client that
+   * ignores the disabled state still cannot buy it.
+   */
+  const available = !variant || isVariantAvailable(variant);
+
   return {
     sku: variant?.sku ?? product.sku,
     gtin: variant?.gtin,
-    price: Math.max(0, base + (design?.priceDelta ?? 0)),
+    price,
     compareAtPrice: product.compareAtPrice,
     stock,
     cap,
     variant,
     design,
+    unavailableCombination: Boolean(variant) && !available,
     // A product that offers artwork is not resolved until one is picked.
     buyable:
       product.status === "active" &&
       Boolean(variant) &&
+      available &&
       stock > 0 &&
       (!hasDesigns(product) || Boolean(design)),
   };
