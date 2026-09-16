@@ -91,6 +91,41 @@ export interface ProductDesign {
   position?: number;
 }
 
+/**
+ * One value of one attribute — "White", "1.5 L", "60 cm".
+ */
+export interface AttributeValue {
+  id: string;
+  label: Localized;
+  /** Swatch fill, for attributes that are colours. Ignored otherwise. */
+  hex?: string;
+}
+
+/**
+ * An axis a product can vary along, defined per category.
+ *
+ * Colour and size are not enough. A kettle varies by capacity, an oven by
+ * width, a rug by length — and hard-coding two axes means every category that
+ * is not clothing has to pretend its capacity is a "size".
+ *
+ * `colorId` and `sizeId` stay first-class on the variant rather than being
+ * folded into this: the cart key, every stored order line, the storefront
+ * picker and `variantFor` all address them by name, and moving them into a
+ * map would orphan every basket and every order already written.
+ */
+export interface ProductAttribute {
+  id: string;
+  name: Localized;
+  /**
+   * `color`, `size` and `design` write through to the variant's own fields;
+   * a `custom` axis lives in the variant's `attributes` map.
+   */
+  kind: "color" | "size" | "design" | "custom";
+  values: AttributeValue[];
+  /** Column order in the variant table. */
+  position?: number;
+}
+
 export interface ProductVariant {
   /** Stable SKU, also used as the Firestore document id in `variants`. */
   sku: string;
@@ -132,6 +167,22 @@ export interface ProductVariant {
    * and it feeds a back-in-stock alert that can never come true.
    */
   available?: boolean;
+  /**
+   * A reduced price for this permutation, shown struck through against
+   * `priceOverride` (or the product price when there is no override).
+   *
+   * Separate from `compareAtPrice`, which is the *product's* was-price: a
+   * single size can go on sale without the whole product doing so, and
+   * reusing one field for both would put every size on sale together.
+   */
+  salePrice?: number;
+  /**
+   * Values for attributes beyond colour and size, keyed by attribute id.
+   *
+   * Absent on every variant written before attributes existed, which is why
+   * it is optional and why colour and size were left where they are.
+   */
+  attributes?: Record<string, string>;
 }
 
 export type ProductBadge =
@@ -281,6 +332,15 @@ export interface Product {
   designs?: ProductDesign[];
   /** Variable products only. One row per sellable permutation. */
   variants?: ProductVariant[];
+  /**
+   * Axes beyond colour and size — capacity, width, length.
+   *
+   * Seeded from the category and then owned by the product, because two
+   * kettles in one category may well be sold in different capacities. Absent
+   * on everything that varies only by colour and size, which is most of the
+   * catalogue; `attributesFor` reconstructs those two from the fields above.
+   */
+  attributes?: ProductAttribute[];
 
   /**
    * Simple products only — the product *is* the trade item, so it carries the
@@ -430,6 +490,14 @@ export interface Category {
    * every link that ever pointed at it.
    */
   hidden?: boolean;
+  /**
+   * The axes products in this category vary along.
+   *
+   * Inherited by a product as a starting point, never as a cage: a product
+   * keeps its own copy once it has one, so editing a category cannot silently
+   * rewrite the variant table of everything already filed under it.
+   */
+  attributes?: ProductAttribute[];
   createdAt?: number;
   updatedAt?: number;
 }

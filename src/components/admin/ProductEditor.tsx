@@ -17,10 +17,13 @@ import { AdminPageHeader } from "./AdminShell";
 import { useAdminLocale } from "./AdminLocale";
 import { Panel } from "./AdminUI";
 import { Button } from "@/components/ui/Button";
-import { OptionsEditor } from "./OptionsEditor";
+import { VariantWorkbench } from "./VariantWorkbench";
+import { StockRulesEditor } from "./StockRulesEditor";
+import { editableAxes, splitAxes } from "@/lib/variant-matrix";
 import type {
   Category,
   Product,
+  ProductAttribute,
   ProductColor,
   ProductDesign,
   ProductImage,
@@ -233,25 +236,52 @@ export function ProductEditor({
    * anybody can read, let alone keep correct.
    */
   const [designs, setDesigns] = useState<ProductDesign[]>(product?.designs ?? []);
+
+  /*
+   * Axes beyond colour and size.
+   *
+   * Seeded from the category when a product has none of its own, then owned by
+   * the product — so editing a category's attributes later cannot rewrite the
+   * table of everything already filed under it.
+   */
+  const [attributes, setAttributes] = useState<ProductAttribute[]>(
+    () => product?.attributes ?? [],
+  );
   const [stockRules, setStockRules] = useState<StockPriceRule[]>(
     product?.stockPriceRules ?? [],
   );
-  const [gridDesignId, setGridDesignId] = useState<string>(product?.designs?.[0]?.id ?? "");
-  const [designBusy, setDesignBusy] = useState(false);
+  /*
+   * What the variant table shows as columns.
+   *
+   * Colour, size and design are derived from the product's own arrays rather
+   * than duplicated, so the swatch row and the artwork panel stay the single
+   * place each is defined and the table cannot drift from them.
+   */
+  const categoryAttributes = useMemo(
+    () => categories.find((category) => category.id === draft.categoryId)?.attributes ?? [],
+    [categories, draft.categoryId],
+  );
 
-  const variantAt = (colorId: string, sizeId: string, designId: string) => {
-    const rows = variants.filter((v) => v.colorId === colorId && v.sizeId === sizeId);
-    // An unscoped row predates designs and stands for all of them, exactly as
-    // `variantFor` resolves it on the storefront.
-    return rows.find((v) => (v.designId ?? "") === designId) ?? rows.find((v) => !v.designId);
-  };
+  const axes = useMemo(
+    () =>
+      editableAxes(
+        { colors, sizes, designs },
+        // The category's list seeds a product that has none of its own; once
+        // it has, the product's own list wins. A category edited next month
+        // must not rewrite the columns these rows are keyed on.
+        attributes.length > 0 ? attributes : categoryAttributes,
+      ),
+    [colors, sizes, designs, attributes, categoryAttributes],
+  );
 
-  function setVariantStock(colorId: string, sizeId: string, designId: string, stock: number) {
-    const safe = Math.max(0, Math.floor(Number.isFinite(stock) ? stock : 0));
-    const target = variantAt(colorId, sizeId, designId);
-    if (!target) return;
-    setVariants((current) => current.map((v) => (v.sku === target.sku ? { ...v, stock: safe } : v)));
+  function setAxes(next: ProductAttribute[]) {
+    const split = splitAxes(next, { colors, sizes });
+    setColors(split.colors);
+    setSizes(split.sizes);
+    setAttributes(split.custom);
   }
+
+  const [designBusy, setDesignBusy] = useState(false);
 
   function patchDesign(id: string, patch: Partial<ProductDesign>) {
     setDesigns((current) => current.map((d) => (d.id === id ? { ...d, ...patch } : d)));
@@ -304,7 +334,6 @@ export function ProductEditor({
         ...current,
         { id, name: { en: name, ar: nameAr }, thumbnail, available: true, position: current.length },
       ]);
-      setGridDesignId((current) => current || id);
     } catch (error) {
       setUploadError(
         error instanceof Error ? error.message : "That thumbnail could not be uploaded.",
@@ -552,8 +581,9 @@ export function ProductEditor({
 
   /** Everything the form holds, as one comparable value. */
   const snapshot = useMemo(
-    () => JSON.stringify({ draft, images, colors, sizes, variants, designs, stockRules }),
-    [draft, images, colors, sizes, variants, designs, stockRules],
+    () =>
+      JSON.stringify({ draft, images, colors, sizes, variants, designs, stockRules, attributes }),
+    [draft, images, colors, sizes, variants, designs, stockRules, attributes],
   );
 
   const [baseline] = useState(snapshot);
@@ -733,6 +763,12 @@ export function ProductEditor({
           ...(draft.type === "variable" ? { designs } : {}),
           // null clears them; an empty array would read as "leave as they are".
           stockPriceRules: stockRules.length > 0 ? stockRules : null,
+          // Same rule for the axes: null is "there are none now", and absent
+          // would leave yesterday's columns on a product that no longer uses
+          // them.
+          ...(draft.type === "variable"
+            ? { attributes: attributes.length > 0 ? attributes : null }
+            : {}),
           status: draft.status,
           tags: draft.tags.split(",").map((t) => t.trim()).filter(Boolean),
           type: draft.type,
@@ -1353,149 +1389,14 @@ export function ProductEditor({
               {designs.length > 0 && (
                 <p className="text-mist mt-3 text-[0.75rem]">
                   Withdrawn designs stay on past orders and invoices. Stock is
-                  per design below — a design with no stock rows reads as sold
-                  out on the storefront.
+                  per variant: each artwork is a column in the variant table
+                  below, and one with no rows reads as sold out on the
+                  storefront.
                 </p>
               )}
             </Panel>
           )}
 
-          {/* A simple product has no matrix to show. An empty variants table
-              under a "Stock is held per variant" heading reads as data that
-              failed to load, rather than a product type that has none. */}
-          {/*
-            Options and their units. No longer gated on `product` existing:
-            choosing colours and sizes is part of writing a product, and making
-            a merchant save an empty shell first before they can say what they
-            are selling is the wrong order.
-          */}
-          {draft.type === "variable" && (
-            <Panel title={t("pe.variants")} description={t("pe.variantsHint")}>
-              <div className="mb-6">
-                <OptionsEditor
-                  baseSku={draft.sku || draft.slug}
-                  colors={colors}
-                  sizes={sizes}
-                  designs={designs}
-                  variants={variants}
-                  onColorsChange={setColors}
-                  onSizesChange={setSizes}
-                  onVariantsChange={setVariants}
-                  stockRules={stockRules}
-                  onStockRulesChange={setStockRules}
-                />
-              </div>
-            </Panel>
-          )}
-
-          {product && draft.type === "variable" && variants.length > 0 && (
-            <Panel title={t("pe.variants")} description={t("pe.variantsHint")}>
-              {/*
-                One design's table at a time. A colour × size × design cube
-                rendered flat is forty inputs with no headings a person can
-                follow; picking the artwork first turns it back into the grid
-                the merchant already knows.
-              */}
-              {designs.length > 0 && (
-                <div
-                  className="ns-no-scrollbar mb-4 flex gap-2 overflow-x-auto"
-                  role="group"
-                  aria-label={t("pe.designBeingEdited")}
-                >
-                  {designs.map((design) => (
-                    <button
-                      key={design.id}
-                      type="button"
-                      onClick={() => setGridDesignId(design.id)}
-                      aria-pressed={gridDesignId === design.id}
-                      className={cn(
-                        "rounded-pill shrink-0 cursor-pointer border px-3 py-1.5 text-[0.75rem] transition-colors",
-                        gridDesignId === design.id
-                          ? "border-ink bg-ink text-white"
-                          : "border-line text-ink-muted hover:border-ink/40",
-                        design.available === false && "opacity-45",
-                      )}
-                    >
-                      {design.name.en || design.id}
-                      {design.available === false && " (withdrawn)"}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-[0.8125rem]">
-                  <thead>
-                    <tr className="text-mist text-[0.625rem] tracking-[0.12em] uppercase">
-                      <th className="pb-2 text-start font-medium">{t("pe.colour")}</th>
-                      {product.sizes.map((size) => (
-                        <th key={size.id} className="pb-2 text-center font-medium">
-                          {size.label}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-line divide-y">
-                    {product.colors.map((color) => (
-                      <tr key={color.id}>
-                        <td className="py-2.5">
-                          <span className="flex items-center gap-2">
-                            <span
-                              className="ring-ink/10 h-3.5 w-3.5 rounded-full ring-1"
-                              style={{ background: color.hex }}
-                            />
-                            <span className="text-ink">{color.name.en}</span>
-                          </span>
-                        </td>
-                        {product.sizes.map((size) => {
-                          const variant = variantAt(color.id, size.id, gridDesignId);
-                          return (
-                            <td key={size.id} className="py-2.5 text-center">
-                              <input
-                                type="number"
-                                min={0}
-                                value={variant?.stock ?? 0}
-                                disabled={!variant}
-                                aria-label={`Stock for ${color.name.en} ${size.label}${
-                                  gridDesignId ? ` ${gridDesignId}` : ""
-                                }`}
-                                title={variant ? variant.sku : "This permutation is not sold"}
-                                onChange={(event) =>
-                                  setVariantStock(
-                                    color.id,
-                                    size.id,
-                                    gridDesignId,
-                                    Number(event.target.value),
-                                  )
-                                }
-                                className="border-line focus:border-brand bg-paper w-14 rounded-sm border px-2 py-1 text-center text-[0.75rem] tabular-nums outline-none disabled:opacity-30"
-                              />
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <p className="text-mist mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[0.75rem]">
-                <span>
-                  {t("pe.totalAcross")}{" "}
-                  <strong className="text-ink tabular-nums">
-                    {variants.reduce((sum, v) => sum + v.stock, 0)}
-                  </strong>
-                  {/* Named explicitly: with designs on screen, an unqualified
-                      "total" reads as the total of the table being looked at,
-                      which it is not. */}
-                </span>
-                <span>
-                  {/* The product's own total is derived server-side from these
-                      rows, so the two can never disagree. */}
-                  {t("pe.savedWithProduct")}
-                </span>
-              </p>
-            </Panel>
-          )}
         </div>
 
         <div className="flex flex-col gap-4">
@@ -1698,6 +1599,35 @@ export function ProductEditor({
           )}
         </div>
       </div>
+
+
+      {/*
+        The variant table, full width.
+        
+        Out of the two-column grid on purpose: this table is as wide as the
+        product has axes, and eight columns squeezed into a 1.7fr track is a
+        spreadsheet read through a letterbox. Placed after the panels it
+        depends on, so the page reads in the order the work happens —
+        details, then category, then attributes, then the rows.
+      */}
+      {draft.type === "variable" && (
+        <div className="mt-4">
+          <Panel title={t("pe.variants")} description={t("pe.variantsHint")}>
+            <VariantWorkbench
+              attributes={axes}
+              onAttributesChange={setAxes}
+              variants={variants}
+              onVariantsChange={setVariants}
+              productPrice={draft.price}
+              baseSku={draft.sku || draft.slug}
+            />
+
+            <div className="border-line mt-6 border-t pt-5">
+              <StockRulesEditor rules={stockRules} onChange={setStockRules} />
+            </div>
+          </Panel>
+        </div>
+      )}
 
       <MediaLibrary
         open={libraryOpen}

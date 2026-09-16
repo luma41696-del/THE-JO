@@ -163,3 +163,109 @@ test("invalid barcodes and unauthorized requests still cannot save", async () =>
     assert.equal(denied.state.writes, 0);
   }
 });
+
+/* -------------------------------------------------------------------------- */
+/*  Attributes and the variant table                                          */
+/* -------------------------------------------------------------------------- */
+
+const capacityAxis = {
+  id: "capacity",
+  name: { en: "Capacity", ar: "السعة" },
+  kind: "custom",
+  values: [
+    { id: "1-5l", label: { en: "1.5 L", ar: "١٫٥ ل" } },
+    { id: "1-7l", label: { en: "1.7 L", ar: "١٫٧ ل" } },
+  ],
+};
+
+test("axes beyond colour and size are stored, and clearing them removes the old ones", async () => {
+  const f = fixture();
+  let result = await f.save({ type: "variable", attributes: [capacityAxis] });
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.equal(f.state.document.attributes[0].id, "capacity");
+  assert.equal(f.state.document.attributes[0].values.length, 2);
+  // Position is assigned by the route so the column order is the array order,
+  // rather than whatever the client happened to send.
+  assert.equal(f.state.document.attributes[0].position, 0);
+
+  result = await f.save({ type: "variable", attributes: null });
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.equal(Object.hasOwn(f.state.document, "attributes"), false);
+});
+
+test("omitting the axes leaves the stored ones alone", async () => {
+  const f = fixture({ attributes: [capacityAxis] });
+  const result = await f.save({ type: "variable" });
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.equal(f.state.document.attributes[0].id, "capacity");
+});
+
+test("two axes sharing an id are refused rather than silently merged", async () => {
+  const f = fixture();
+  const result = await f.save({
+    type: "variable",
+    attributes: [capacityAxis, { ...capacityAxis, name: { en: "Volume", ar: "الحجم" } }],
+  });
+  assert.equal(result.status, 400);
+  assert.equal(f.state.writes, 0);
+});
+
+test("a variant carries its own sale price and its attribute values", async () => {
+  const f = fixture();
+  const result = await f.save({
+    type: "variable",
+    price: 30,
+    attributes: [capacityAxis],
+    variants: [
+      { sku: "KET-15", colorId: "", sizeId: "", stock: 4, priceOverride: 30, salePrice: 24.5, attributes: { capacity: "1-5l" } },
+    ],
+  });
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  const row = f.state.document.variants[0];
+  assert.equal(row.salePrice, 24.5);
+  assert.deepEqual(row.attributes, { capacity: "1-5l" });
+});
+
+/*
+ * The rule the whole table is built around: a price is the only thing a row
+ * needs. A kettle sold in one capacity has no colour and no size, and a route
+ * that insisted on them would make the row unsaveable.
+ */
+test("a row with a price and nothing else is saved", async () => {
+  const f = fixture();
+  const result = await f.save({
+    type: "variable",
+    variants: [{ sku: "", colorId: "", sizeId: "", stock: 0, priceOverride: 12 }],
+  });
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.equal(f.state.document.variants[0].priceOverride, 12);
+});
+
+test("a blank sale price is left off the row rather than written as zero", async () => {
+  const f = fixture();
+  const result = await f.save({
+    type: "variable",
+    variants: [{ sku: "A", colorId: "", sizeId: "", stock: 1, salePrice: null }],
+  });
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.equal(Object.hasOwn(f.state.document.variants[0], "salePrice"), false);
+});
+
+test("a row saved without a code is stored under one built from its values", async () => {
+  const f = fixture();
+  const result = await f.save({
+    type: "variable",
+    sku: "KET",
+    attributes: [capacityAxis],
+    variants: [
+      { sku: "", colorId: "", sizeId: "", stock: 2, attributes: { capacity: "1-5l" } },
+      { sku: "", colorId: "", sizeId: "", stock: 5, attributes: { capacity: "1-7l" } },
+    ],
+  });
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.deepEqual(
+    f.state.document.variants.map((v) => v.sku),
+    ["KET-1-5L", "KET-1-7L"],
+  );
+  assert.equal(f.state.document.totalStock, 7);
+});

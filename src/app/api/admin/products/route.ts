@@ -15,9 +15,11 @@ import {
   tierProblems,
   type PriceTier,
 } from "@/lib/product-options";
+import { attributesFor, fillSkus } from "@/lib/variant-matrix";
 import type {
   Localized,
   Product,
+  ProductAttribute,
   ProductColor,
   ProductDesign,
   ProductImage,
@@ -68,6 +70,7 @@ interface Body {
   designs?: ProductDesign[];
   priceTiers?: PriceTier[] | null;
   stockPriceRules?: StockPriceRule[] | null;
+  attributes?: ProductAttribute[] | null;
   /** The `updatedAt` the editor loaded, for conflict detection. */
   expectedUpdatedAt?: number;
   type?: ProductType;
@@ -308,6 +311,55 @@ export async function POST(request: Request) {
     if (problems.length > 0) return bad(problems[0]!);
   }
 
+  /**
+   * The product's own axes. `null` clears them.
+   *
+   * Stored on the product rather than read from its category at render time:
+   * a category whose attributes are edited must not silently rewrite the
+   * variant table of everything filed under it, and a product moved between
+   * categories must not lose the columns its rows are keyed on.
+   */
+  const attributes =
+    body.attributes === null
+      ? null
+      : Array.isArray(body.attributes)
+        ? body.attributes
+            .filter((attribute) => attribute && typeof attribute.id === "string")
+            .map((attribute, index) => ({
+              id: String(attribute.id).trim().slice(0, 60),
+              name: {
+                en: String(attribute.name?.en ?? attribute.id).slice(0, 80),
+                ar: String(attribute.name?.ar ?? attribute.name?.en ?? attribute.id).slice(0, 80),
+              },
+              kind: (["color", "size", "design", "custom"] as const).includes(attribute.kind)
+                ? attribute.kind
+                : ("custom" as const),
+              values: (Array.isArray(attribute.values) ? attribute.values : [])
+                .filter((value) => value && typeof value.id === "string" && value.id.trim())
+                .map((value) => ({
+                  id: String(value.id).trim().slice(0, 60),
+                  label: {
+                    en: String(value.label?.en ?? value.id).slice(0, 80),
+                    ar: String(value.label?.ar ?? value.label?.en ?? value.id).slice(0, 80),
+                  },
+                  ...(value.hex && isHex(String(value.hex)) ? { hex: String(value.hex) } : {}),
+                }))
+                .slice(0, 200),
+              position: index,
+            }))
+            .filter((attribute) => attribute.id)
+            .slice(0, 8)
+        : undefined;
+
+  if (attributes) {
+    // Two axes sharing an id would key every combination wrongly — the second
+    // would overwrite the first in the map the duplicate check is built on.
+    const ids = attributes.map((attribute) => attribute.id);
+    if (new Set(ids).size !== ids.length) {
+      return bad("Two attributes share an id. Give each one its own.");
+    }
+  }
+
   /*
    * Variant stock, when the editor sends it.
    *
@@ -315,11 +367,16 @@ export async function POST(request: Request) {
    * two numbers that must agree will eventually not, and the variant rows are
    * the ones the checkout decrements.
    */
-  const variants = Array.isArray(body.variants)
+  const sentVariants = Array.isArray(body.variants)
     ? body.variants
-        .filter((v): v is ProductVariant => Boolean(v) && typeof v.sku === "string")
+        /*
+         * A missing code is no longer a reason to drop a row — it is filled in
+         * below. Dropping it here would lose a row the merchant typed a price
+         * and a stock count into, with a 200 and no mention of it.
+         */
+        .filter((v): v is ProductVariant => Boolean(v) && typeof v === "object")
         .map((v) => ({
-          sku: String(v.sku),
+          sku: String(v.sku ?? ""),
           colorId: String(v.colorId ?? ""),
           sizeId: String(v.sizeId ?? ""),
           ...(v.designId ? { designId: String(v.designId) } : {}),
@@ -339,6 +396,34 @@ export async function POST(request: Request) {
            * more expensively, on four hundred rows.
            */
           ...(v.available === false ? { available: false } : {}),
+          /*
+           * A sale price for this permutation alone.
+           *
+           * Stored only when it is a real number: `undefined` and `null` both
+           * mean "not on sale", and writing null would leave a field the
+           * storefront has to special-case forever.
+           */
+          ...(v.salePrice === undefined ||
+          v.salePrice === null ||
+          !Number.isFinite(Number(v.salePrice))
+            ? {}
+            : { salePrice: money(Number(v.salePrice), "JOD") }),
+          /*
+           * Axes beyond colour and size. Kept as a plain string map with empty
+           * values dropped — an empty string is a value that matches nothing,
+           * and it would make two identical rows look like different
+           * permutations to the duplicate check.
+           */
+          ...(v.attributes && typeof v.attributes === "object"
+            ? {
+                attributes: Object.fromEntries(
+                  Object.entries(v.attributes as Record<string, unknown>)
+                    .map(([key, value]) => [String(key), String(value ?? "").trim()])
+                    .filter(([, value]) => value !== "")
+                    .slice(0, 12),
+                ),
+              }
+            : {}),
         }))
         .slice(0, 400)
     : undefined;
@@ -402,6 +487,24 @@ export async function POST(request: Request) {
   }
 
   /*
+   * Codes for the rows that have none.
+   *
+   * The table asks for a price and nothing else, so a row can legitimately
+   * arrive without a code. It cannot be *stored* without one — the code goes
+   * on the order line, the picking list and the invoice — so it is derived
+   * from the parent code and the row's own values, which is the same shape the
+   * generator produces. Done here rather than in the parse above because it
+   * needs the artwork list, which is parsed after the rows.
+   */
+  const variants = sentVariants
+    ? fillSkus(
+        sentVariants,
+        attributesFor({ colors, sizes, designs }, attributes ?? []),
+        (typeof body.sku === "string" && body.sku.trim()) || slug.toUpperCase(),
+      )
+    : undefined;
+
+  /*
    * A variant may only name a design that exists on this product.
    *
    * Without this, renaming or re-adding a design leaves orphan rows: stock
@@ -429,7 +532,11 @@ export async function POST(request: Request) {
     }
 
     const noSku = variants.find((v) => !normaliseSku(v.sku));
-    if (noSku) return bad("Every variant needs a code.");
+    if (noSku) {
+      return bad(
+        "A variant has no code, and none could be built for it. Give the product a SKU, or give this row a value on at least one attribute.",
+      );
+    }
   }
 
   if (variants) {
@@ -503,6 +610,9 @@ export async function POST(request: Request) {
           stockPriceRules:
             stockPriceRules === null ? FieldValue.delete() : stockPriceRules,
         }),
+    ...(attributes === undefined
+      ? {}
+      : { attributes: attributes === null ? FieldValue.delete() : attributes }),
     ...(variants ? { variants } : {}),
     ...(designs ? { designs } : {}),
     totalStock: derivedStock ?? totalStock,
