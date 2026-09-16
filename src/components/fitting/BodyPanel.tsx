@@ -5,6 +5,8 @@ import Image from "next/image";
 
 import { cn } from "@/lib/utils";
 import { getIdToken } from "@/lib/firebase/auth";
+import { storagePathFromUrl } from "@/lib/media";
+import { TryOnPanel } from "./TryOnPanel";
 import { errorMessage, readJson } from "@/lib/errors";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { useConsent } from "@/lib/analytics/consent";
@@ -41,6 +43,8 @@ export interface BodyPanelProps {
   /** True when a try-on provider is configured server-side. */
   providerConfigured?: boolean;
   providerMissing?: string[];
+  /** The piece currently in focus, for the try-on control below. */
+  tryOnProductId?: string | null;
 }
 
 const FIELDS = [
@@ -62,6 +66,7 @@ export function BodyPanel({
   locale = "en",
   providerConfigured = false,
   providerMissing = [],
+  tryOnProductId = null,
 }: BodyPanelProps) {
   const rtl = locale === "ar";
   const uid = useAuth().user?.uid ?? null;
@@ -203,6 +208,37 @@ export function BodyPanel({
       );
     } finally {
       setUploading(false);
+    }
+  }
+
+  /**
+   * Tell the server what was agreed to.
+   *
+   * The checkbox alone lives in this browser, and a flag the server cannot see
+   * is one that cannot gate anything: the try-on costs money per call and runs
+   * server-side, so the consent it checks has to be recorded where that check
+   * happens. Withdrawal is sent too — see the route, which records "no"
+   * rather than deleting the field, because a missing record cannot tell
+   * somebody who declined from somebody never asked.
+   *
+   * Best effort on purpose. The local flag is what this panel renders from,
+   * and a failed write here must not leave the checkbox disagreeing with
+   * itself; the server simply keeps refusing until a later write lands.
+   */
+  async function recordConsent(granted: boolean) {
+    if (!uid) return;
+    try {
+      const token = await getIdToken().catch(() => null);
+      await fetch("/api/fitting/profile", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ tryOnConsent: granted }),
+      });
+    } catch {
+      /* Left for the next toggle or the next save. */
     }
   }
 
@@ -378,7 +414,10 @@ export function BodyPanel({
           <input
             type="checkbox"
             checked={fittingConsent}
-            onChange={(e) => setConsent({ fittingRoom: e.target.checked })}
+            onChange={(e) => {
+              setConsent({ fittingRoom: e.target.checked });
+              void recordConsent(e.target.checked);
+            }}
             className="accent-brand mt-0.5"
           />
           <span className="text-ink text-[0.8125rem]">
@@ -496,6 +535,18 @@ export function BodyPanel({
           </>
         )}
       </section>
+
+      {/*
+        The try-on sits under the photo it needs, not on a screen of its own.
+        The object path is derived from the stored download URL: the route
+        checks the path against the account before reading it, and a URL is
+        not a path.
+      */}
+      <TryOnPanel
+        productId={tryOnProductId}
+        personImagePath={storedPhoto ? storagePathFromUrl(storedPhoto) || null : null}
+        locale={locale}
+      />
 
       {error && (
         <p role="alert" className="text-alert text-[0.8125rem]">

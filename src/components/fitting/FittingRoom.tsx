@@ -855,6 +855,11 @@ export function FittingRoom({
               locale={locale}
               providerConfigured={providerConfigured}
               providerMissing={providerMissing}
+              // Whatever is on the figure right now — the top if there is
+              // one, since that is the piece a try-on is usually about.
+              tryOnProductId={
+                (outfit.top ?? outfit.outerwear ?? outfit.bottom ?? outfit.shoes)?.id ?? null
+              }
             />
           </div>
 

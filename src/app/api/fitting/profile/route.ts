@@ -61,7 +61,7 @@ function sanitise(input: unknown): FitProfile {
 }
 
 export async function POST(request: Request) {
-  let body: { fitProfile?: unknown; outfit?: unknown };
+  let body: { fitProfile?: unknown; outfit?: unknown; tryOnConsent?: unknown };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -78,6 +78,34 @@ export async function POST(request: Request) {
   try {
     const { getAdminDb } = await import("@/lib/firebase/admin");
     const db = getAdminDb();
+
+    /*
+     * Consent to send a photograph to a third party.
+     *
+     * Its own field and its own request, not folded into saving measurements:
+     * they are different asks about different things, and a checkbox that
+     * rides along with something else is not consent in any sense that
+     * matters.
+     *
+     * Stored with the moment it was given, because "did this customer agree,
+     * and when" is a question that gets asked months later and has to have an
+     * answer. Withdrawal is recorded the same way rather than by deleting the
+     * field — a missing record cannot tell the difference between somebody who
+     * said no and somebody who was never asked.
+     */
+    if (typeof body.tryOnConsent === "boolean") {
+      await db
+        .collection("users")
+        .doc(caller.uid)
+        .set(
+          {
+            tryOnConsent: body.tryOnConsent,
+            tryOnConsentAt: Date.now(),
+          },
+          { merge: true },
+        );
+      return NextResponse.json({ ok: true, persisted: true, tryOnConsent: body.tryOnConsent });
+    }
 
     if (body.fitProfile) {
       const profile = sanitise(body.fitProfile);

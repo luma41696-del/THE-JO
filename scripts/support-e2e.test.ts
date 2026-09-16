@@ -171,6 +171,8 @@ let loyalty: typeof import("../src/app/api/loyalty/route");
 let offersLib: typeof import("../src/lib/offers");
 let alerts: typeof import("../src/app/api/alerts/route");
 let adminAlerts: typeof import("../src/app/api/admin/alerts/route");
+let tryOn: typeof import("../src/app/api/fitting/try-on/route");
+let fittingProfile: typeof import("../src/app/api/fitting/profile/route");
 let adminSdk: typeof import("../src/lib/firebase/admin");
 
 before(async () => {
@@ -190,6 +192,8 @@ before(async () => {
   offersLib = await import("../src/lib/offers");
   alerts = await import("../src/app/api/alerts/route");
   adminAlerts = await import("../src/app/api/admin/alerts/route");
+  tryOn = await import("../src/app/api/fitting/try-on/route");
+  fittingProfile = await import("../src/app/api/fitting/profile/route");
   adminSdk = await import("../src/lib/firebase/admin");
 
   customer = await signUp("customer@example.test");
@@ -204,7 +208,7 @@ before(async () => {
 
 after(async () => {
   const db = adminSdk.getAdminDb();
-  for (const name of ["tickets", "auditLog", "giftCampaigns", "products", "media", "categories", "importJobs", "offers", "loyalty", "stockAlerts"]) {
+  for (const name of ["tickets", "auditLog", "giftCampaigns", "products", "media", "categories", "importJobs", "offers", "loyalty", "stockAlerts", "tryOnJobs", "users"]) {
     const snap = await db.collection(name).get();
     await Promise.all(snap.docs.map((doc) => doc.ref.delete()));
   }
@@ -2492,5 +2496,321 @@ describe("stock alerts", () => {
     const result = await sweep();
     assert.equal(result.ok, true);
     assert.equal(result.mailConfigured, false);
+  });
+});
+/* -------------------------------------------------------------------------- */
+/*  The fitting room: photo to result                                         */
+/* -------------------------------------------------------------------------- */
+
+describe("try-on jobs", () => {
+  const db = () => adminSdk.getAdminDb();
+
+  const create = async (body: Record<string, unknown>, token = customer.token) =>
+    json<{
+      ok: boolean;
+      error?: string;
+      errorAr?: string;
+      reason?: string;
+      jobId?: string;
+      state?: string;
+      remainingToday?: number;
+    }>(
+      await tryOn.POST(
+        request("/api/fitting/try-on", { method: "POST", token, body: JSON.stringify(body) }),
+      ),
+    );
+
+  const runJob = async (jobId: string, token = customer.token) =>
+    json<{ ok: boolean; error?: string; job?: { state: string; error?: string; attempts: number } }>(
+      await tryOn.POST(
+        request("/api/fitting/try-on", {
+          method: "POST",
+          token,
+          body: JSON.stringify({ action: "run", jobId }),
+        }),
+      ),
+    );
+
+  const status = async (token = customer.token) =>
+    json<{
+      ok: boolean;
+      canStart?: boolean;
+      reason?: string | null;
+      remainingToday?: number;
+      providerConfigured?: boolean;
+      jobs?: { id: string; state: string }[];
+    }>(await tryOn.GET(request("/api/fitting/try-on", { token })));
+
+  const consent = async (granted: boolean, token = customer.token) =>
+    json<{ ok: boolean }>(
+      await fittingProfile.POST(
+        request("/api/fitting/profile", {
+          method: "POST",
+          token,
+          body: JSON.stringify({ tryOnConsent: granted }),
+        }),
+      ),
+    );
+
+  /** A path inside the caller's own fitting folder. */
+  const ownPath = (uid: string) => `users/${uid}/fitting/photo-1.jpg`;
+
+  before(async () => {
+    await products.POST(
+      request("/api/admin/products", {
+        method: "POST",
+        token: owner.token,
+        body: JSON.stringify({
+          id: "e2e-tryon-coat",
+          slug: "e2e-tryon-coat",
+          title: { en: "Try-on coat", ar: "معطف القياس" },
+          categoryId: "tees",
+          type: "simple",
+          price: 120,
+          status: "active",
+          images: [{ url: "https://cdn.test/coat.jpg", alt: "a coat", width: 800, height: 1000 }],
+        }),
+      }),
+    );
+  });
+
+  /* ---- permission --------------------------------------------------------- */
+
+  test("an anonymous visitor cannot start one", async () => {
+    const anonymous = await json<{ ok: boolean }>(
+      await tryOn.POST(
+        request("/api/fitting/try-on", {
+          method: "POST",
+          body: JSON.stringify({ productId: "e2e-tryon-coat", personImagePath: "x" }),
+        }),
+      ),
+    );
+    assert.equal(anonymous.httpStatus, 401);
+  });
+
+  test("a photo path outside the caller's own folder is refused", async () => {
+    /*
+     * The single most important check here. The Admin SDK reading that path
+     * bypasses the storage rules, so without it a request could have the
+     * server fetch another customer's body photograph and run it through a
+     * paid model.
+     */
+    for (const path of [
+      ownPath(stranger.uid),
+      "users/../../etc/passwd",
+      `users/${customer.uid}/fitting/nested/deep.jpg`,
+      "products/p1/photo.jpg",
+    ]) {
+      const refused = await create({ productId: "e2e-tryon-coat", personImagePath: path });
+      assert.equal(refused.httpStatus, 403, path);
+    }
+  });
+
+  /* ---- consent ------------------------------------------------------------ */
+
+  test("without consent nothing starts, whatever the quota says", async () => {
+    // No amount of remaining allowance makes it acceptable to send a picture
+    // of somebody's body to a model they did not agree to.
+    const refused = await create({
+      productId: "e2e-tryon-coat",
+      personImagePath: ownPath(customer.uid),
+    });
+    assert.equal(refused.httpStatus, 409);
+    assert.equal(refused.reason, "no-consent");
+    assert.equal((refused.errorAr ?? "").length > 0, true);
+
+    // And no job was written, so a refusal leaves nothing to explain later.
+    const seen = await status();
+    assert.equal(seen.jobs!.length, 0);
+  });
+
+  test("consent is recorded with the moment it was given", async () => {
+    const result = await consent(true);
+    assert.equal(result.ok, true);
+
+    const stored = (await db().collection("users").doc(customer.uid).get()).data()!;
+    assert.equal(stored.tryOnConsent, true);
+    // "Did this customer agree, and when" gets asked months later.
+    assert.equal(typeof stored.tryOnConsentAt, "number");
+  });
+
+  test("withdrawing is recorded too, not deleted", async () => {
+    /*
+     * A missing record cannot tell the difference between somebody who said no
+     * and somebody who was never asked.
+     */
+    await consent(false);
+    const stored = (await db().collection("users").doc(customer.uid).get()).data()!;
+    assert.equal(stored.tryOnConsent, false);
+    assert.equal(typeof stored.tryOnConsentAt, "number");
+
+    const refused = await create({
+      productId: "e2e-tryon-coat",
+      personImagePath: ownPath(customer.uid),
+    });
+    assert.equal(refused.reason, "no-consent");
+
+    await consent(true);
+  });
+
+  /* ---- the provider being off --------------------------------------------- */
+
+  test("with the provider off, the refusal comes before the job", async () => {
+    /*
+     * Letting somebody upload a photograph of themselves to find out the
+     * feature is not switched on is the worst possible order to do it in.
+     */
+    const refused = await create({
+      productId: "e2e-tryon-coat",
+      personImagePath: ownPath(customer.uid),
+    });
+    assert.equal(refused.httpStatus, 409);
+    assert.equal(refused.reason, "not-configured");
+
+    const seen = await status();
+    assert.equal(seen.providerConfigured, false);
+    assert.equal(seen.canStart, false);
+    // Nothing was created, so nothing was spent and nothing is pending.
+    assert.equal(seen.jobs!.length, 0);
+  });
+
+  test("a job forced into the queue runs to `not-configured`, never to a picture", async () => {
+    /*
+     * The rule that matters most in this whole feature: no placeholder is ever
+     * presented as a try-on. The customer would believe it, and it would be a
+     * picture of somebody else.
+     *
+     * The job is written directly here because the route correctly refuses to
+     * create one while the provider is off — this is the run path being
+     * checked on its own.
+     */
+    const ref = db().collection("tryOnJobs").doc();
+    await ref.set({
+      uid: customer.uid,
+      productId: "e2e-tryon-coat",
+      state: "queued",
+      attempts: 0,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+      personImagePath: ownPath(customer.uid),
+      productImageUrl: "https://cdn.test/coat.jpg",
+    });
+
+    const result = await runJob(ref.id);
+    assert.equal(result.ok, true, result.error);
+    assert.equal(result.job!.state, "not-configured");
+
+    const stored = (await ref.get()).data()!;
+    assert.equal(stored.state, "not-configured");
+    assert.equal(stored.resultPath, undefined);
+  });
+
+  test("an attempt that never reached the provider does not spend the allowance", async () => {
+    /*
+     * Fifty refused attempts against an unconfigured provider leave the
+     * customer's allowance untouched, because the shop spent nothing on any of
+     * them. Charging for work nobody did is the small unfairness that makes a
+     * feature feel broken.
+     */
+    const seen = await status();
+    assert.equal(seen.remainingToday, 5);
+  });
+
+  test("one account cannot run or read another's job", async () => {
+    const ref = db().collection("tryOnJobs").doc();
+    await ref.set({
+      uid: customer.uid,
+      productId: "e2e-tryon-coat",
+      state: "queued",
+      attempts: 0,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      expiresAt: Date.now() + 1000,
+      personImagePath: ownPath(customer.uid),
+      productImageUrl: "https://cdn.test/coat.jpg",
+    });
+
+    const ran = await runJob(ref.id, stranger.token);
+    assert.equal(ran.httpStatus, 403);
+
+    const read = await json<{ ok: boolean }>(
+      await tryOn.GET(request(`/api/fitting/try-on?jobId=${ref.id}`, { token: stranger.token })),
+    );
+    assert.equal(read.httpStatus, 403);
+
+    // Untouched by the attempt.
+    assert.equal((await ref.get()).data()!.state, "queued");
+  });
+
+  test("a settled job is returned rather than run again", async () => {
+    // A client that retries must not pay a second time for an answer it has.
+    const ref = db().collection("tryOnJobs").doc();
+    await ref.set({
+      uid: customer.uid,
+      productId: "e2e-tryon-coat",
+      state: "done",
+      resultPath: `users/${customer.uid}/fitting/try-on-abc.jpg`,
+      attempts: 1,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      expiresAt: Date.now() + 1000,
+    });
+
+    const again = await runJob(ref.id);
+    assert.equal(again.job!.state, "done");
+    assert.equal((await ref.get()).data()!.attempts, 1);
+  });
+
+  /* ---- deletion ----------------------------------------------------------- */
+
+  test("a customer can delete their own try-on, and only their own", async () => {
+    const ref = db().collection("tryOnJobs").doc();
+    await ref.set({
+      uid: customer.uid,
+      productId: "e2e-tryon-coat",
+      state: "done",
+      attempts: 1,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      expiresAt: Date.now() + 1000,
+    });
+
+    const byStranger = await json<{ ok: boolean }>(
+      await tryOn.DELETE(
+        request("/api/fitting/try-on", {
+          method: "DELETE",
+          token: stranger.token,
+          body: JSON.stringify({ jobId: ref.id }),
+        }),
+      ),
+    );
+    assert.equal(byStranger.httpStatus, 403);
+    assert.equal((await ref.get()).exists, true);
+
+    const byOwner = await json<{ ok: boolean }>(
+      await tryOn.DELETE(
+        request("/api/fitting/try-on", {
+          method: "DELETE",
+          token: customer.token,
+          body: JSON.stringify({ jobId: ref.id }),
+        }),
+      ),
+    );
+    assert.equal(byOwner.ok, true);
+    assert.equal((await ref.get()).exists, false);
+  });
+
+  test("deleting one that is already gone is a satisfied request", async () => {
+    const result = await json<{ ok: boolean }>(
+      await tryOn.DELETE(
+        request("/api/fitting/try-on", {
+          method: "DELETE",
+          token: customer.token,
+          body: JSON.stringify({ jobId: "never-existed" }),
+        }),
+      ),
+    );
+    assert.equal(result.ok, true);
   });
 });
