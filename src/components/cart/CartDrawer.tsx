@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/Button";
 import { BrandWave } from "@/components/brand/BrandWave";
 import { demoShippingMethods } from "@/data/demo";
 import type { Locale } from "@/types";
+import { lineOptions } from "@/lib/product";
 
 /**
  * Mini cart.
@@ -204,17 +205,9 @@ export function CartDrawer({ locale = "en" }: { locale?: Locale }) {
                                 {/* Simple products carry no colour or size.
                                     Printing " · " around two empty strings
                                     leaves a stray separator under the title. */}
-                                {(item.sizeLabel ||
-                                  item.designName ||
-                                  t(item.colorName, locale)) && (
+                                {lineOptions(item, locale).length > 0 && (
                                   <p className="text-smoke mt-1 truncate text-[0.75rem]">
-                                    {[
-                                      item.designName && t(item.designName, locale),
-                                      t(item.colorName, locale),
-                                      item.sizeLabel,
-                                    ]
-                                      .filter(Boolean)
-                                      .join(" · ")}
+                                    {lineOptions(item, locale).join(" · ")}
                                   </p>
                                 )}
                               </div>

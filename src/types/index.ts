@@ -804,6 +804,19 @@ export interface CartItem {
    */
   designId?: string;
   designName?: Localized;
+  /**
+   * Axes beyond colour, size and artwork — capacity, width, length.
+   *
+   * Names and labels are copied onto the line, not referenced. The bag, the
+   * invoice and the packing slip outlive the product: relabelling "1.5 L" as
+   * "1.5 litres" next month must not rewrite what somebody already bought.
+   */
+  attributes?: {
+    id: string;
+    name: Localized;
+    valueId: string;
+    valueLabel: Localized;
+  }[];
   unitPrice: number;
   compareAtPrice?: number;
   currency: CurrencyCode;

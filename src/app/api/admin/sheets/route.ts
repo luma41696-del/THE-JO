@@ -92,10 +92,27 @@ export async function POST(request: Request) {
     });
 
     if (!response.ok) {
+      /*
+       * These three answers mean three different things to the merchant, and
+       * only one of them is their fault. A bare status number sends somebody
+       * to search for "google sheets 410" instead of at the link they pasted.
+       *
+       * 410 is in here because a real one came back during testing: a
+       * spreadsheet id that has been deleted answers Gone, not Not Found, and
+       * "Google refused the request (410)" is not an instruction anyone can
+       * act on.
+       */
+      if (response.status === 404 || response.status === 410) {
+        return bad("That sheet no longer exists, or the link has a typo in it.", 502);
+      }
+      if (response.status === 401 || response.status === 403) {
+        return bad(
+          "That sheet is not shared. Open it, choose Share → Anyone with the link → Viewer, then try again.",
+          403,
+        );
+      }
       return bad(
-        response.status === 404
-          ? "That sheet could not be found."
-          : `Google refused the request (${response.status}).`,
+        `Google would not return that sheet (${response.status}). Try again in a moment.`,
         502,
       );
     }

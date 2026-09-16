@@ -43,9 +43,33 @@ export function cn(...inputs: ClassValue[]) {
  * everyone would orphan every line already in a customer's bag, and the
  * quantity stepper and remove button both address a line by its key.
  */
-export function cartKey(productId: string, colorId: string, sizeId: string, designId = "") {
+export function cartKey(
+  productId: string,
+  colorId: string,
+  sizeId: string,
+  designId = "",
+  attributes: Record<string, string> = {},
+) {
   const base = `${productId}:${colorId}:${sizeId}`;
-  return designId ? `${base}:${designId}` : base;
+  const withDesign = designId ? `${base}:${designId}` : base;
+
+  /*
+   * Axes beyond colour and size join the key, sorted so the same selection
+   * always spells the same string whatever order the pickers were touched in.
+   * Without this, a 1.5 L and a 1.7 L kettle are one bag line: the second
+   * "add" finds the first line's key, bumps its quantity, and the customer is
+   * charged twice for a capacity they did not choose.
+   *
+   * Appended rather than woven in, so every key written before attributes
+   * existed is still spelled exactly as it was.
+   */
+  const extra = Object.entries(attributes)
+    .filter(([, value]) => value)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([key, value]) => `${key}=${value}`)
+    .join(",");
+
+  return extra ? `${withDesign}:${extra}` : withDesign;
 }
 
 /** Clamp with no surprises when min > max. */

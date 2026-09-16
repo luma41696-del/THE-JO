@@ -11,7 +11,14 @@ import { priceCart } from "@/lib/pricing";
 import { notifyOrder } from "@/lib/notify/queue";
 import { DEFAULT_PAYMENT_METHOD, isPaymentMethodEnabled } from "@/lib/payments";
 import { getStoreSettings } from "@/lib/settings";
-import { designFor, hasDesigns, hasOptions, imagesFor, resolveSelection } from "@/lib/product";
+import {
+  designFor,
+  hasDesigns,
+  hasOptions,
+  imagesFor,
+  requiredAxes,
+  resolveSelection,
+} from "@/lib/product";
 import { classesInCart, zoneFor } from "@/lib/shipping";
 import { categoryPathsFor, evaluateOffer, redemptionId } from "@/lib/offers";
 import {
@@ -24,7 +31,15 @@ import {
 import { isPurchasable, unavailableReason } from "@/lib/visibility";
 import { cartKey, orderReference } from "@/lib/utils";
 import { isAdminConfigured, verifyRequest } from "@/lib/firebase/admin";
-import type { CartItem, Locale, Offer, Order, OrderEvent, ProductVariant } from "@/types";
+import type {
+  CartItem,
+  Locale,
+  Localized,
+  Offer,
+  Order,
+  OrderEvent,
+  ProductVariant,
+} from "@/types";
 
 /**
  * Order creation.
@@ -52,6 +67,13 @@ interface CheckoutLine {
   sizeId: string;
   /** The chosen artwork, on products that sell several. */
   designId?: string;
+  /**
+   * Axes beyond colour, size and artwork, as the bag recorded them.
+   *
+   * Only `id` and `valueId` are read; the labels the browser sends are
+   * rebuilt from the catalogue, exactly like the price.
+   */
+  attributes?: { id?: unknown; valueId?: unknown }[];
   quantity: number;
 }
 
@@ -166,6 +188,56 @@ export async function POST(request: Request) {
     const sizeId = variable ? String(line.sizeId ?? "") : "";
     const designId = String(line.designId ?? "");
 
+    /*
+     * Axes beyond colour, size and artwork, taken as ids only.
+     *
+     * The browser also sends the labels it rendered; those are ignored the
+     * same way its price is, and rebuilt below from the catalogue. A line
+     * claiming "1.5 L" while pointing at the 1.7 L row would otherwise put one
+     * thing on the invoice and another in the box.
+     */
+    const chosenValues: Record<string, string> = {};
+    if (variable && Array.isArray(line.attributes)) {
+      for (const entry of line.attributes) {
+        if (!entry || typeof entry !== "object") continue;
+        const id = String((entry as { id?: unknown }).id ?? "").trim();
+        const valueId = String((entry as { valueId?: unknown }).valueId ?? "").trim();
+        if (id && valueId) chosenValues[id] = valueId;
+      }
+    }
+
+    /*
+     * Every axis the product declares has to be answered, or the line is
+     * refused rather than resolved to whichever row sorts first. "Which
+     * capacity" is not a question the warehouse should be left guessing.
+     */
+    const unanswered = requiredAxes(product).find((id) => !chosenValues[id]);
+    if (unanswered) {
+      const axis = product.attributes?.find((a) => a.id === unanswered);
+      return bad(`Choose ${axis?.name.en ?? unanswered} for ${product.title.en}.`);
+    }
+
+    const chosenAttributes: {
+      id: string;
+      name: Localized;
+      valueId: string;
+      valueLabel: Localized;
+    }[] = [];
+
+    for (const attribute of product.attributes ?? []) {
+      const wanted = chosenValues[attribute.id];
+      if (!wanted) continue;
+      const value = attribute.values.find((v) => v.id === wanted);
+      // A value the catalogue does not have is a tampered line, not a typo.
+      if (!value) return bad(`That option of ${product.title.en} is not available.`);
+      chosenAttributes.push({
+        id: attribute.id,
+        name: attribute.name,
+        valueId: value.id,
+        valueLabel: value.label,
+      });
+    }
+
     if (variable) {
       const color = product.colors.find((c) => c.id === colorId);
       const size = product.sizes.find((sz) => sz.id === sizeId);
@@ -197,7 +269,7 @@ export async function POST(request: Request) {
      * says, and the order is rejected rather than silently trimmed, because
      * quietly shipping fewer than someone paid for is the worse failure.
      */
-    const selection = resolveSelection(product, colorId, sizeId, designId);
+    const selection = resolveSelection(product, colorId, sizeId, designId, chosenValues);
     if (!selection.buyable || selection.cap.max < 1) {
       return bad(`${product.title.en} has sold out.`);
     }
@@ -213,7 +285,7 @@ export async function POST(request: Request) {
     }
 
     priced.push({
-      key: cartKey(product.id, colorId, sizeId, designId),
+      key: cartKey(product.id, colorId, sizeId, designId, chosenValues),
       productId: product.id,
       sku: selection.sku,
       ...(selection.gtin === undefined ? {} : { gtin: selection.gtin }),
@@ -225,6 +297,7 @@ export async function POST(request: Request) {
       sizeId,
       sizeLabel: product.sizes.find((sz) => sz.id === sizeId)?.label ?? "",
       ...(design ? { designId, designName: design.name } : {}),
+      ...(chosenAttributes.length > 0 ? { attributes: chosenAttributes } : {}),
       // Authoritative price. The browser's number never reaches this object.
       unitPrice: selection.price,
       ...(product.compareAtPrice === undefined ? {} : { compareAtPrice: product.compareAtPrice }),

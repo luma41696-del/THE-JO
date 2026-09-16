@@ -119,11 +119,29 @@ test("an empty sheet is reported as empty", async () => {
   assert.match(result.body.error, /empty/i);
 });
 
-test("a 404 from Google is not passed on as a generic failure", async () => {
-  const h = harness({ reply: () => new Response("", { status: 404 }) });
-  const result = await h.read();
-  assert.equal(result.status, 502);
-  assert.match(result.body.error, /could not be found/i);
+/*
+ * 410 is here because a real one turned up while testing against live Google:
+ * a deleted spreadsheet id answers Gone, not Not Found, and the route used to
+ * pass that through as "Google refused the request (410)" — a number nobody
+ * can act on.
+ */
+test("a missing sheet is named as missing, whichever way Google says so", async () => {
+  for (const status of [404, 410]) {
+    const h = harness({ reply: () => new Response("", { status }) });
+    const result = await h.read();
+    assert.equal(result.status, 502, `status ${status}`);
+    assert.match(result.body.error, /no longer exists|typo/i);
+    assert.equal(result.body.error.includes(String(status)), false, "no bare status code");
+  }
+});
+
+test("a refusal by permission is a sharing instruction, not a status code", async () => {
+  for (const status of [401, 403]) {
+    const h = harness({ reply: () => new Response("", { status }) });
+    const result = await h.read();
+    assert.equal(result.status, 403, `status ${status}`);
+    assert.match(result.body.error, /Anyone with the link/i);
+  }
 });
 
 test("a timeout says so, so the merchant retries instead of re-sharing", async () => {

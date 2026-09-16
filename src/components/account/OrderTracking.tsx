@@ -19,6 +19,7 @@ import { StatusChip } from "./AccountPanel";
 import { Button } from "@/components/ui/Button";
 import { BrandWave } from "@/components/brand/BrandWave";
 import type { Locale, Order } from "@/types";
+import { lineOptions } from "@/lib/product";
 
 /**
  * Order tracking.
@@ -254,13 +255,7 @@ export function OrderTracking({
                     {t(item.title, locale)}
                   </p>
                   <p className="text-smoke mt-0.5 text-[0.75rem]">
-                    {[
-                      t(item.colorName, locale),
-                      item.sizeLabel,
-                      item.designName && t(item.designName, locale),
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}{" "}
+                    {lineOptions(item, locale).join(" · ")}{" "}
                     · ×{item.quantity}
                   </p>
                   <p className="text-ink mt-1 text-[0.8125rem] tabular-nums">

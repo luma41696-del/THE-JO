@@ -27,6 +27,7 @@ import type {
   ShippingClass,
   ShippingMethod,
 } from "@/types";
+import { lineOptions } from "@/lib/product";
 
 /**
  * Full cart page.
@@ -357,14 +358,18 @@ export function CartPageClient({
                           </Link>
                           {/* A simple product has neither, and an empty
                               " · Size " reads as a rendering bug. */}
-                          {(item.sizeLabel || item.designName || t(item.colorName, locale)) && (
+                          {lineOptions(item, locale).length > 0 && (
                             <p className="text-smoke mt-1 text-[0.8125rem]">
-                              {[
-                                item.designName && t(item.designName, locale),
-                                t(item.colorName, locale),
-                                item.sizeLabel && `${rtl ? "مقاس" : "Size"} ${item.sizeLabel}`,
-                              ]
-                                .filter(Boolean)
+                              {lineOptions(item, locale)
+                                .map((part: string) =>
+                                  // The bag page labels the size, because it
+                                  // is the one option a customer comes back to
+                                  // change and "M" alone is ambiguous next to
+                                  // a capacity.
+                                  part === item.sizeLabel && item.sizeLabel
+                                    ? `${rtl ? "مقاس" : "Size"} ${part}`
+                                    : part,
+                                )
                                 .join(" · ")}
                             </p>
                           )}

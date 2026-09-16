@@ -1,6 +1,7 @@
 import { TAX_RATE, money } from "@/lib/pricing";
 import { t } from "@/lib/format";
 import type { CartItem, Invoice, Locale, Localized, Order } from "@/types";
+import { lineOptions } from "@/lib/product";
 
 /**
  * Invoices, built from orders.
@@ -43,14 +44,7 @@ export function formatInvoiceNumber(year: number, sequence: number): string {
  */
 export function describeLine(item: CartItem): Localized {
   const compose = (locale: Locale) =>
-    [
-      t(item.title, locale),
-      item.designName ? t(item.designName, locale) : "",
-      t(item.colorName, locale),
-      item.sizeLabel,
-    ]
-      .filter(Boolean)
-      .join(" · ");
+    [t(item.title, locale), ...lineOptions(item, locale)].join(" · ");
 
   return { en: compose("en"), ar: compose("ar") };
 }

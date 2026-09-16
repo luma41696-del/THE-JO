@@ -13,7 +13,8 @@
 
 import { isVariantAvailable, priceForStock } from "@/lib/product-options";
 import { cartKey } from "@/lib/utils";
-import type { CartItem, Product, ProductDesign, ProductVariant } from "@/types";
+import { t as tr } from "@/lib/format";
+import type { CartItem, Locale, Product, ProductDesign, ProductVariant } from "@/types";
 
 /* -------------------------------------------------------------------------- */
 /*  Type                                                                      */
@@ -94,10 +95,38 @@ export function variantFor(
   colorId: string,
   sizeId: string,
   designId = "",
+  attributes: Record<string, string> = {},
 ): ProductVariant | undefined {
-  const rows = product.variants?.filter((v) => v.colorId === colorId && v.sizeId === sizeId);
+  const rows = product.variants?.filter(
+    (v) => v.colorId === colorId && v.sizeId === sizeId && matchesAttributes(v, attributes),
+  );
   if (!rows || rows.length === 0) return undefined;
   return rows.find((v) => (v.designId ?? "") === designId) ?? rows.find((v) => !v.designId);
+}
+
+/**
+ * Does this row answer to the axes beyond colour, size and design?
+ *
+ * Loose in the same direction as `matchesDesign`, and for the same reason: a
+ * row written before an attribute existed has nothing stored for it, and
+ * refusing to match those would make a whole product unbuyable the instant a
+ * merchant added a Capacity column. An absent value means "this row is that
+ * axis's answer, whatever it is"; once the grid is rebuilt the exact rows take
+ * over.
+ *
+ * A *selected* value of "" means the customer has not chosen yet, which every
+ * row satisfies — the Add button is held back elsewhere, by `buyable`.
+ */
+function matchesAttributes(
+  variant: ProductVariant,
+  attributes: Record<string, string>,
+): boolean {
+  for (const [id, value] of Object.entries(attributes)) {
+    if (!value) continue;
+    const stored = variant.attributes?.[id];
+    if (stored && stored !== value) return false;
+  }
+  return true;
 }
 
 /**
@@ -113,10 +142,11 @@ export function stockFor(
   colorId: string,
   sizeId: string,
   designId = "",
+  attributes: Record<string, string> = {},
 ): number {
   if (!isVariable(product)) return product.totalStock;
   if (!product.variants) return 0;
-  return variantFor(product, colorId, sizeId, designId)?.stock ?? 0;
+  return variantFor(product, colorId, sizeId, designId, attributes)?.stock ?? 0;
 }
 
 /** Colours that have at least one in-stock size. */
@@ -150,7 +180,12 @@ export function availableDesignIds(product: Product): string[] {
 }
 
 /** Sizes in stock for one colour — what greys out the size grid. */
-export function availableSizeIds(product: Product, colorId: string, designId = ""): string[] {
+export function availableSizeIds(
+  product: Product,
+  colorId: string,
+  designId = "",
+  attributes: Record<string, string> = {},
+): string[] {
   if (!isVariable(product) || !product.variants) return [];
   const seen = new Set<string>();
   for (const v of product.variants) {
@@ -160,12 +195,56 @@ export function availableSizeIds(product: Product, colorId: string, designId = "
       v.colorId === colorId &&
       v.stock > 0 &&
       isVariantAvailable(v) &&
-      matchesDesign(v, designId)
+      matchesDesign(v, designId) &&
+      matchesAttributes(v, attributes)
     ) {
       seen.add(v.sizeId);
     }
   }
   return product.sizes.filter((s) => seen.has(s.id)).map((s) => s.id);
+}
+
+/**
+ * Values of one axis that can still be bought, given everything else chosen.
+ *
+ * What greys out a capacity the way a sold-out size already greys out. The
+ * axis being asked about is excluded from the filter — otherwise every value
+ * except the selected one would report itself unavailable, which is true and
+ * useless.
+ */
+export function availableValueIds(
+  product: Product,
+  attributeId: string,
+  colorId = "",
+  designId = "",
+  attributes: Record<string, string> = {},
+): string[] {
+  const declared = valuesOfAttribute(product, attributeId);
+  if (!isVariable(product) || !product.variants) return [];
+
+  const others = { ...attributes };
+  delete others[attributeId];
+
+  const seen = new Set<string>();
+  for (const v of product.variants) {
+    if (v.stock <= 0 || !isVariantAvailable(v)) continue;
+    if (colorId && v.colorId !== colorId) continue;
+    if (!matchesDesign(v, designId) || !matchesAttributes(v, others)) continue;
+
+    const value = v.attributes?.[attributeId];
+    // A row with nothing stored for this axis predates it and stands for every
+    // value of it, so nothing greys out on its account.
+    if (value) seen.add(value);
+    else return declared;
+  }
+
+  return declared.filter((id) => seen.has(id));
+}
+
+/** Declared values of one axis, in the merchant's own order. */
+function valuesOfAttribute(product: Product, attributeId: string): string[] {
+  const attribute = product.attributes?.find((a) => a.id === attributeId);
+  return attribute ? attribute.values.map((value) => value.id) : [];
 }
 
 /* -------------------------------------------------------------------------- */
@@ -197,9 +276,10 @@ export function quantityCap(
   colorId = "",
   sizeId = "",
   designId = "",
+  attributes: Record<string, string> = {},
 ): QuantityCap {
   const stock = isVariable(product)
-    ? stockFor(product, colorId, sizeId, designId)
+    ? stockFor(product, colorId, sizeId, designId, attributes)
     : product.totalStock;
 
   const limit = product.maxPerOrder;
@@ -245,6 +325,7 @@ export function resolveSelection(
   colorId = "",
   sizeId = "",
   designId = "",
+  attributes: Record<string, string> = {},
 ): Selection {
   if (!isVariable(product)) {
     const cap = quantityCap(product);
@@ -259,9 +340,9 @@ export function resolveSelection(
     };
   }
 
-  const variant = variantFor(product, colorId, sizeId, designId);
+  const variant = variantFor(product, colorId, sizeId, designId, attributes);
   const stock = variant?.stock ?? 0;
-  const cap = quantityCap(product, colorId, sizeId, designId);
+  const cap = quantityCap(product, colorId, sizeId, designId, attributes);
   const design = designId ? designFor(product, designId) : undefined;
 
   /*
@@ -310,8 +391,22 @@ export function resolveSelection(
       Boolean(variant) &&
       available &&
       stock > 0 &&
-      (!hasDesigns(product) || Boolean(design)),
+      (!hasDesigns(product) || Boolean(design)) &&
+      /*
+       * Every declared axis has to be answered before this is a trade item.
+       * Without it, a kettle sold in two capacities would add to the bag on
+       * page load with whichever row happened to be first — and the customer
+       * would find out which at the door.
+       */
+      requiredAxes(product).every((id) => Boolean(attributes[id])),
   };
+}
+
+/** Axes the customer must answer: the ones with values to choose between. */
+export function requiredAxes(product: Product): string[] {
+  return (product.attributes ?? [])
+    .filter((attribute) => attribute.kind === "custom" && attribute.values.length > 0)
+    .map((attribute) => attribute.id);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -386,6 +481,7 @@ export function buildCartItem(
   sizeId: string,
   quantity: number,
   designId = "",
+  attributes: Record<string, string> = {},
 ): CartItem {
   const color = product.colors.find((c) => c.id === colorId);
   const size = product.sizes.find((s) => s.id === sizeId);
@@ -403,8 +499,27 @@ export function buildCartItem(
       height: 520,
     };
 
+  /*
+   * The chosen values, spelled out.
+   *
+   * Stored on the line rather than looked up later, because the bag, the
+   * invoice and the packing slip all outlive the product: renaming "1.5 L" to
+   * "1.5 litres" next month must not rewrite what somebody already bought.
+   */
+  const chosen = (product.attributes ?? [])
+    .filter((attribute) => attributes[attribute.id])
+    .map((attribute) => {
+      const value = attribute.values.find((v) => v.id === attributes[attribute.id]);
+      return {
+        id: attribute.id,
+        name: attribute.name,
+        valueId: attributes[attribute.id]!,
+        valueLabel: value?.label ?? { en: attributes[attribute.id]!, ar: attributes[attribute.id]! },
+      };
+    });
+
   return {
-    key: cartKey(product.id, colorId, sizeId, designId),
+    key: cartKey(product.id, colorId, sizeId, designId, attributes),
     productId: product.id,
     sku: selection.sku,
     gtin: selection.gtin,
@@ -418,6 +533,7 @@ export function buildCartItem(
     ...(designId
       ? { designId, designName: selection.design?.name ?? { en: "", ar: "" } }
       : {}),
+    ...(chosen.length > 0 ? { attributes: chosen } : {}),
     unitPrice: selection.price,
     compareAtPrice: selection.compareAtPrice,
     currency: product.currency,
@@ -427,4 +543,25 @@ export function buildCartItem(
     shippingClassId: product.shippingClassId,
     addedAt: Date.now(),
   };
+}
+
+/**
+ * What a bag line is, in words: artwork, colour, size, and any other axis.
+ *
+ * Extracted because five screens were each composing this list by hand — the
+ * drawer, the bag page, checkout, order tracking and the invoice — in two
+ * different orders, and a new axis had to be remembered in all five or it
+ * would reach the customer on one screen and not on the packing slip. Now
+ * there is one place to forget, and it is tested.
+ *
+ * Empty strings are dropped by the caller's `join`, so a simple product with
+ * no options produces nothing rather than a line of separators.
+ */
+export function lineOptions(item: CartItem, locale: Locale): string[] {
+  return [
+    item.designName ? tr(item.designName, locale) : "",
+    tr(item.colorName, locale),
+    item.sizeLabel,
+    ...(item.attributes ?? []).map((attribute) => tr(attribute.valueLabel, locale)),
+  ].filter(Boolean);
 }

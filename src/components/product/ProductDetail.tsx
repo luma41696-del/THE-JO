@@ -18,11 +18,13 @@ import { Price } from "@/components/ui/Price";
 import {
   availableDesignIds,
   availableSizeIds,
+  availableValueIds,
   imagesFor,
   sellableDesigns,
   gtinKind,
   hasOptions,
   isSoldIndividually,
+  requiredAxes,
   resolveSelection,
 } from "@/lib/product";
 import { storeSettings, type StoreSettings } from "@/data/site-content";
@@ -113,20 +115,45 @@ export function ProductDetail({
   const [designId, setDesignId] = useState(firstBuyable.designId);
   const [quantity, setQuantity] = useState(1);
   const [sizeError, setSizeError] = useState(false);
-  const [adding, setAdding] = useState(false);
+
+  /*
+   * Axes beyond colour, size and artwork — capacity, width, length.
+   *
+   * Opened on the first value of each rather than left blank: a kettle sold in
+   * one capacity should not make the customer confirm the only answer, and
+   * `firstBuyable` above already picks a colour the same way. `buyable` still
+   * refuses until every axis is answered, so a product with two genuine
+   * choices cannot be added by accident.
+   */
+  const axes = useMemo(
+    () => (product.attributes ?? []).filter((a) => a.kind === "custom" && a.values.length > 0),
+    [product.attributes],
+  );
+
+  const [attributeValues, setAttributeValues] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      (product.attributes ?? [])
+        .filter((a) => a.kind === "custom" && a.values.length === 1)
+        .map((a) => [a.id, a.values[0]!.id]),
+    ),
+  );
+  const [axisError, setAxisError] = useState(false);
   const [added, setAdded] = useState(false);
   const [activeImage, setActiveImage] = useState(0);
 
   /** The trade item currently selected: SKU, GTIN, price, stock and cap. */
   const selection = useMemo(
-    () => resolveSelection(product, colorId, sizeId ?? "", designId),
-    [product, colorId, sizeId, designId],
+    () => resolveSelection(product, colorId, sizeId ?? "", designId, attributeValues),
+    [product, colorId, sizeId, designId, attributeValues],
   );
 
   /** Sizes with stock in the chosen colour — everything else greys out. */
   const inStockSizes = useMemo(
-    () => (variable ? new Set(availableSizeIds(product, colorId, designId)) : new Set<string>()),
-    [product, colorId, variable, designId],
+    () =>
+      variable
+        ? new Set(availableSizeIds(product, colorId, designId, attributeValues))
+        : new Set<string>(),
+    [product, colorId, variable, designId, attributeValues],
   );
 
   /** Artworks with stock somewhere — the rest render dimmed, not hidden. */
@@ -155,7 +182,17 @@ export function ProductDetail({
   const size = product.sizes.find((s) => s.id === sizeId);
   const image = gallery[Math.min(activeImage, gallery.length - 1)];
 
-  async function handleAdd() {
+  function handleAdd() {
+    // An unanswered axis is the same failure as an unchosen size, so it is
+    // reported the same way rather than silently doing nothing.
+    const missingAxis = requiredAxes(product).find((id) => !attributeValues[id]);
+    if (missingAxis) {
+      setAxisError(true);
+      document
+        .getElementById(`axis-${missingAxis}`)
+        ?.scrollIntoView({ block: "center", behavior: "smooth" });
+      return;
+    }
     if (variable && !sizeId) {
       setSizeError(true);
       document.getElementById("size-rail")?.scrollIntoView({ block: "center", behavior: "smooth" });
@@ -163,17 +200,25 @@ export function ProductDetail({
     }
     if (!selection.buyable) return;
 
-    setAdding(true);
-    // A beat of deliberate latency: an instant state flip reads as a glitch,
-    // and this is where a real stock check would happen.
-    await new Promise((resolve) => setTimeout(resolve, 420));
-    add({ product, colorId, sizeId: sizeId ?? "", designId, quantity });
-    setAdding(false);
+    /*
+     * Added straight away.
+     *
+     * There used to be 420ms of deliberate latency here, on the theory that an
+     * instant state flip reads as a glitch. It does not — it reads as a fast
+     * shop; what read as a glitch was the flip happening with no confirmation,
+     * and the tick below is that confirmation. The delay was pure cost: a
+     * fifth of a second added to the one button the whole page exists for, on
+     * every single add, to simulate work that is entirely local.
+     */
+    add({ product, colorId, sizeId: sizeId ?? "", designId, attributes: attributeValues, quantity });
     setAdded(true);
+
+    // Long enough for the tick to register as an answer, short enough that the
+    // bag feels opened by the click rather than by a timer.
     setTimeout(() => {
       setAdded(false);
       openCart();
-    }, 900);
+    }, 420);
   }
 
   // Never leave the stepper above a cap that just moved under it.
@@ -308,6 +353,118 @@ export function ProductDetail({
               </a>
             )}
           </div>
+
+          {/*
+            The product's own axes — capacity, width, length.
+
+            Directly under the price because that is where they belong in the
+            reading order: on a kettle sold in two capacities, "which one" is
+            the question the price is *about*, and answering it can change the
+            price shown above. Colour and size follow, since a shop that sells
+            clothing asks those on almost every page and these on a few.
+          */}
+          {axes.map((axis) => {
+            const buyable = new Set(
+              availableValueIds(product, axis.id, colorId, designId, attributeValues),
+            );
+            const chosen = attributeValues[axis.id];
+            const label = axis.values.find((value) => value.id === chosen);
+
+            return (
+              <fieldset key={axis.id} id={`axis-${axis.id}`} className="mt-8 scroll-mt-32">
+                <legend className="text-eyebrow text-mist mb-3 uppercase">
+                  {t(axis.name, locale)}
+                  <span className="text-ink ms-2 normal-case tracking-normal">
+                    {label ? t(label.label, locale) : ""}
+                  </span>
+                </legend>
+
+                <div className="flex flex-wrap gap-2">
+                  {axis.values.map((value) => {
+                    const soldOut = !buyable.has(value.id);
+                    const selected = chosen === value.id;
+                    return (
+                      /*
+                       * Selectable while sold out, exactly like a size: it is
+                       * how the customer says what they wanted, and how the
+                       * page gets to say "not this one" instead of pretending
+                       * the option does not exist.
+                       */
+                      <button
+                        key={value.id}
+                        type="button"
+                        onClick={() => {
+                          setAttributeValues((current) => {
+                            const next = { ...current, [axis.id]: value.id };
+                            /*
+                             * The chosen size may not be made in the new
+                             * value. Cleared rather than carried, so the page
+                             * never shows a selected size with no stock behind
+                             * it — the same rule the colour row follows.
+                             */
+                            if (
+                              sizeId &&
+                              !availableSizeIds(product, colorId, designId, next).includes(sizeId)
+                            ) {
+                              setSizeId(null);
+                            }
+                            return next;
+                          });
+                          setAxisError(false);
+                          setQuantity(1);
+                        }}
+                        aria-pressed={selected}
+                        aria-label={
+                          soldOut
+                            ? `${t(value.label, locale)} — ${rtl ? "نفدت الكمية" : "sold out"}`
+                            : t(value.label, locale)
+                        }
+                        className={cn(
+                          "min-w-13 rounded-sm border px-4 py-2.5 text-[0.875rem] transition-all duration-200",
+                          selected
+                            ? "border-ink bg-ink text-white"
+                            : "border-line text-ink hover:border-ink/45",
+                          axisError && !chosen && "border-alert",
+                          soldOut && !selected &&
+                            "text-mist border-line/60 line-through hover:border-ink/45",
+                          soldOut && selected && "line-through",
+                        )}
+                        data-cursor="hover"
+                      >
+                        {/* A swatch when the axis is a colour of some kind —
+                            a merchant who gave the value a fill meant it to be
+                            seen, whatever the axis is called. */}
+                        {value.hex && (
+                          <span
+                            aria-hidden="true"
+                            className="ring-ink/15 me-2 inline-block h-3 w-3 rounded-full align-[-1px] ring-1"
+                            style={{ background: value.hex }}
+                          />
+                        )}
+                        {t(value.label, locale)}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <AnimatePresence>
+                  {axisError && !chosen && (
+                    <motion.p
+                      role="alert"
+                      className="text-alert mt-3 text-[0.8125rem]"
+                      initial={{ opacity: 0, y: -6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                    >
+                      {rtl
+                        ? `اختر ${t(axis.name, locale)} للمتابعة.`
+                        : `Choose a ${t(axis.name, locale).toLowerCase()} to continue.`}
+                    </motion.p>
+                  )}
+                </AnimatePresence>
+              </fieldset>
+            );
+          })}
 
           {/*
             Design — thumbnails, above colour.
@@ -674,7 +831,6 @@ export function ProductDetail({
               size="lg"
               fullWidth
               magnetic
-              loading={adding}
               success={added}
               successLabel={rtl ? "أُضيفت" : "Added"}
               disabled={(!variable || Boolean(sizeId)) && !selection.buyable}

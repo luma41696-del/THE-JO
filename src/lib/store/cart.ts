@@ -30,6 +30,8 @@ type AddArgs = {
   sizeId?: string;
   /** The chosen artwork, on products that offer several. */
   designId?: string;
+  /** Axes beyond colour, size and artwork, keyed by attribute id. */
+  attributes?: Record<string, string>;
   quantity?: number;
 };
 
@@ -91,7 +93,14 @@ export const useCart = create<CartState>()(
       lastAddedKey: null,
       lastRejection: null,
 
-      add: ({ product, colorId = "", sizeId = "", designId = "", quantity = 1 }) => {
+      add: ({
+        product,
+        colorId = "",
+        sizeId = "",
+        designId = "",
+        attributes = {},
+        quantity = 1,
+      }) => {
         // A variable product is not purchasable until the choice resolves to a
         // real variant; a simple one has nothing to resolve, so both ids stay
         // empty and the line key is simply `id::`.
@@ -107,8 +116,8 @@ export const useCart = create<CartState>()(
           return null;
         }
 
-        const selection = resolveSelection(product, colorId, sizeId, designId);
-        const key = cartKey(product.id, colorId, sizeId, designId);
+        const selection = resolveSelection(product, colorId, sizeId, designId, attributes);
+        const key = cartKey(product.id, colorId, sizeId, designId, attributes);
 
         if (!selection.buyable || selection.cap.max < 1) {
           set({
@@ -136,7 +145,7 @@ export const useCart = create<CartState>()(
               maxQuantity: selection.cap.max,
               maxReason: selection.cap.reason,
             }
-          : buildCartItem(product, selection, colorId, sizeId, granted, designId);
+          : buildCartItem(product, selection, colorId, sizeId, granted, designId, attributes);
 
         // Recorded here rather than at each button: every path into the bag
         // — product page, cross-sell shelf, fitting room — comes through this
