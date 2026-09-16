@@ -59,6 +59,63 @@ export function SearchOverlay({ locale = "en" }: { locale?: Locale }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  /* --- searching by a picture -------------------------------------------- */
+
+  const [palette, setPalette] = useState<{ hex: string; weight: number }[]>([]);
+  const [reading, setReading] = useState(false);
+  const [pictureError, setPictureError] = useState<string | null>(null);
+
+  /**
+   * Read the picture's colours here, send only those.
+   *
+   * The typed term is cleared when a picture is used: they are two different
+   * questions, and running both would silently intersect them — a customer who
+   * had typed "coat" and then uploads a green photograph gets an empty page
+   * and no way to tell which half emptied it.
+   */
+  async function searchByPicture(file: File) {
+    setReading(true);
+    setPictureError(null);
+    setTerm("");
+
+    try {
+      const { paletteFromFile, PaletteError } = await import("@/lib/read-palette");
+      let read: { hex: string; weight: number }[];
+      try {
+        read = await paletteFromFile(file);
+      } catch (error) {
+        throw error instanceof PaletteError
+          ? error
+          : new Error(rtl ? "تعذّرت قراءة الصورة." : "That picture could not be read.");
+      }
+
+      setPalette(read);
+
+      const response = await fetch("/api/search/visual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ palette: read }),
+      });
+      const body = (await response.json()) as { ok?: boolean; error?: string; results?: SearchHit[] };
+      if (!response.ok || !body.ok) throw new Error(body.error ?? "");
+
+      setResults(body.results ?? []);
+      setCursor(0);
+    } catch (error) {
+      setPalette([]);
+      setResults([]);
+      setPictureError(
+        error instanceof Error && error.message
+          ? error.message
+          : rtl
+            ? "تعذّر البحث بهذه الصورة."
+            : "That picture could not be searched with.",
+      );
+    } finally {
+      setReading(false);
+    }
+  }
+
   /* --- open/close --------------------------------------------------------- */
 
   useEffect(() => {
@@ -227,6 +284,38 @@ export function SearchOverlay({ locale = "en" }: { locale?: Locale }) {
                   aria-activedescendant={results[cursor] ? `search-hit-${results[cursor].id}` : undefined}
                   aria-autocomplete="list"
                 />
+                {/*
+                  Search by a picture.
+
+                  The file never leaves the device: its colours are read here
+                  with a canvas and only the hex values are sent. A photograph
+                  somebody searches with is a photograph of their room or their
+                  wardrobe, and a shop that receives one has taken on storing
+                  it, securing it and deleting it.
+                */}
+                <label
+                  className={cn(
+                    "text-mist hover:text-ink shrink-0 transition-colors",
+                    reading ? "cursor-wait opacity-60" : "cursor-pointer",
+                  )}
+                  title={rtl ? "ابحث بصورة" : "Search with a picture"}
+                >
+                  <span className="sr-only">{rtl ? "ابحث بصورة" : "Search with a picture"}</span>
+                  <CameraIcon />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    disabled={reading}
+                    className="sr-only"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) void searchByPicture(file);
+                      // Cleared so choosing the same picture again still fires.
+                      event.target.value = "";
+                    }}
+                  />
+                </label>
+
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
@@ -237,9 +326,62 @@ export function SearchOverlay({ locale = "en" }: { locale?: Locale }) {
                 </button>
               </div>
 
+              {/*
+                What the picture was read as, and what that means.
+
+                The swatches are shown because a result that is the right
+                shade and the wrong shape is only confusing if the customer
+                does not know it matched on colour. Shown the swatches, the
+                same result reads as the shop answering the question it was
+                actually asked.
+              */}
+              {palette.length > 0 && (
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <span className="flex items-center gap-1.5">
+                    {palette.map((entry) => (
+                      <span
+                        key={entry.hex}
+                        className="border-line/60 h-5 w-5 rounded-full border"
+                        style={{ backgroundColor: entry.hex }}
+                        title={entry.hex}
+                      />
+                    ))}
+                  </span>
+                  <span className="text-smoke text-[0.8125rem]">
+                    {rtl ? "مطابقة بالألوان في صورتك" : "Matched on the colours in your picture"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPalette([]);
+                      setResults([]);
+                    }}
+                    className="text-mist hover:text-ink cursor-pointer text-[0.75rem]"
+                    data-cursor="hover"
+                  >
+                    {rtl ? "مسح" : "Clear"}
+                  </button>
+                </div>
+              )}
+
+              {pictureError && (
+                <p role="alert" className="text-alert mt-3 text-[0.8125rem]">
+                  {pictureError}
+                </p>
+              )}
+
               {/* Body */}
               <div className="max-h-[60vh] overflow-y-auto pt-5">
-                {term.trim().length < 2 ? (
+                {/*
+                  Two ways in, one results area.
+
+                  This used to ask only whether enough had been *typed*, so a
+                  picture search set its results and the panel went on showing
+                  the suggestion chips — the request ran, the answer arrived,
+                  and the customer saw nothing change. A picture is a query
+                  too, and the condition now says so.
+                */}
+                {term.trim().length < 2 && palette.length === 0 ? (
                   <div>
                     <p className="text-eyebrow text-mist mb-3 uppercase">
                       {rtl ? "اقتراحات" : "Try"}
@@ -270,9 +412,17 @@ export function SearchOverlay({ locale = "en" }: { locale?: Locale }) {
                 ) : results.length === 0 ? (
                   <div className="py-10">
                     <p className="text-smoke text-[0.9375rem]">
-                      {rtl
-                        ? `لا نتائج لـ "${term}". جرّب اسم قطعة أو لوناً.`
-                        : `Nothing matches "${term}". Try a piece name, a colour, or a category.`}
+                      {/*
+                        A picture search has no typed term to quote back, and
+                        quoting an empty one produces `Nothing matches ""`.
+                      */}
+                      {palette.length > 0
+                        ? rtl
+                          ? "لا قطع بألوان قريبة من هذه الصورة."
+                          : "Nothing in the shop is close to these colours."
+                        : rtl
+                          ? `لا نتائج لـ "${term}". جرّب اسم قطعة أو لوناً.`
+                          : `Nothing matches "${term}". Try a piece name, a colour, or a category.`}
                     </p>
                     {/* The preview is capped at eight and matches on fewer
                         fields than the results page; sending them there is a
@@ -356,6 +506,23 @@ function SearchIcon() {
     <svg width="22" height="22" viewBox="0 0 20 20" fill="none" aria-hidden="true" className="text-mist shrink-0">
       <circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.5" />
       <path d="m13.5 13.5 3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** A camera, for searching with a picture. */
+function CameraIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      aria-hidden="true"
+    >
+      <path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h2.2l1-2h8.6l1 2h2.2A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5v-9Z" />
+      <circle cx="12" cy="13" r="3.4" />
     </svg>
   );
 }

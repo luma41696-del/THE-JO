@@ -291,6 +291,30 @@ export function CartDrawer({ locale = "en" }: { locale?: Locale }) {
                   {rtl ? "إتمام الشراء" : "Checkout"}
                 </Button>
 
+                {/*
+                  The bag page, which the drawer had no way of reaching.
+
+                  They are not the same thing: the drawer is a summary meant to
+                  be glanced at and dismissed, while the page is where a line is
+                  actually worked on — quantities, removals, a coupon, and the
+                  shelf of things that go with what is already in it. Sending
+                  somebody from a quick check straight to checkout is fine when
+                  they are ready and a dead end when they are not, and "keep
+                  shopping" closes the only view they had of the order.
+                */}
+                <Button
+                  variant="ghost"
+                  size="md"
+                  fullWidth
+                  className="mt-2"
+                  onClick={() => {
+                    closeCart();
+                    router.push("/cart");
+                  }}
+                >
+                  {rtl ? "عرض الحقيبة" : "View bag"}
+                </Button>
+
                 <button
                   type="button"
                   onClick={closeCart}

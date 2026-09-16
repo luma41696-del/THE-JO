@@ -14,6 +14,7 @@ import {
 import { getStoreSettings } from "@/lib/settings";
 import { absoluteUrl } from "@/lib/site";
 import { breadcrumbList, productCrumbs } from "@/lib/seo";
+import { similarTo } from "@/lib/visual-search";
 import { categoryTrail } from "@/lib/categories";
 import { ProductDetail } from "@/components/product/ProductDetail";
 import { ProductRail } from "@/components/product/ProductRail";
@@ -98,6 +99,16 @@ export default async function ProductPage({
       getReviewSummary(product.id),
       getStoreSettings(),
     ]);
+
+  /*
+   * Matched on colour, from the catalogue already loaded — no second read,
+   * and nothing shown that the bought-with rail is already showing.
+   */
+  const allProducts = await getShopProducts();
+  const shownAlready = new Set([product.id, ...related.map((p) => p.id)]);
+  const similar = similarTo(product, allProducts, 8).filter(
+    (candidate) => !shownAlready.has(candidate.id),
+  );
 
   const trail = categoryTrail(categories, product.categoryId);
   const shippingClass =
@@ -224,6 +235,29 @@ export default async function ProductPage({
             action={{ label: t.common.shopAll, href: "/shop" }}
           />
           <ProductRail products={related} locale={locale} />
+        </section>
+      )}
+
+      {/*
+        Pieces in the same colours.
+
+        A different question from the rail above it, which answers "what was
+        bought with this". This one answers "what else looks like this", and
+        the two disagree often enough to both be worth showing — a customer who
+        liked the shade and not the shape is not served by what other people
+        put in the same basket.
+
+        Deduplicated against that rail rather than shown regardless: two rails
+        listing the same four pieces reads as the page having run out of ideas.
+      */}
+      {similar.length > 0 && (
+        <section className="ns-container pb-20 md:pb-28">
+          <SectionHeading
+            locale={locale}
+            eyebrow={locale === "ar" ? "بالألوان نفسها" : "In these colours"}
+            title={locale === "ar" ? "قطع مشابهة" : "Similar pieces"}
+          />
+          <ProductRail products={similar} locale={locale} />
         </section>
       )}
     </>
