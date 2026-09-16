@@ -197,6 +197,7 @@ export const ADMIN_STRINGS = {
   "order.noAction": { en: "No further action", ar: "لا إجراء إضافي" },
   "order.cancel": { en: "Cancel order", ar: "إلغاء الطلب" },
   "order.backToOrder": { en: "Back to order", ar: "رجوع إلى الطلب" },
+  "orders.printAll": { en: "Print all", ar: "اطبع الكل" },
   "order.receipt": { en: "Print receipt", ar: "طباعة إيصال" },
   "order.markAs": { en: "Mark", ar: "اجعله" },
   "order.items": { en: "Items", ar: "القطع" },

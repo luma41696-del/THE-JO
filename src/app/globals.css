@@ -713,3 +713,44 @@
   unicode-bidi: isolate;
   direction: ltr;
 }
+
+/* ---------------------------------------------------------------------------
+   A batch of receipts — one print job, one page each.
+   ------------------------------------------------------------------------ */
+
+.ns-receipt-batch {
+  display: grid;
+  gap: 1.5rem;
+  justify-items: center;
+}
+
+@media print {
+  .ns-receipt-batch {
+    display: block;
+    gap: 0;
+  }
+
+  /*
+   * The break is what makes this a batch rather than one very long receipt.
+   * `after` on every page and `avoid` inside it: a receipt torn across two
+   * pages is two useless halves, and on a roll the operator cuts at the page
+   * boundary.
+   *
+   * `:last-child` is excluded, or the job ends with a blank page — which on a
+   * roll is a hand's length of wasted paper every single time.
+   */
+  .ns-receipt-page {
+    break-after: page;
+    break-inside: avoid;
+  }
+
+  .ns-receipt-page:last-child {
+    break-after: auto;
+  }
+
+  /* On A4 the strip is centred on the page; on a roll the page *is* the
+     strip's width, so centring is a no-op rather than a special case. */
+  .ns-receipt-batch .ns-receipt {
+    margin-inline: auto;
+  }
+}

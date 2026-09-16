@@ -3,12 +3,14 @@
 import { useMemo, useState } from "react";
 
 import { Link, useLocalizedRouter } from "@/components/ui/Link";
-import { formatDate, formatPrice, t as pick } from "@/lib/format";
+import { formatDate, formatPrice } from "@/lib/format";
 import { AdminPageHeader } from "./AdminShell";
 import { DataTable, FilterChips, OrderStatusPill, orderLabel, type Column } from "./AdminUI";
 import { useAdminLocale } from "./AdminLocale";
 import { paymentLabel } from "@/lib/payments";
 import { ExportMenu } from "./ExportMenu";
+import { Button } from "@/components/ui/Button";
+import { filterOrders } from "@/lib/admin/orders-filter";
 import type { Order, OrderStatus } from "@/types";
 
 /**
@@ -52,34 +54,13 @@ export function OrdersBoard({
     return base;
   }, [orders]);
 
-  const rows = useMemo(() => {
-    let list = orders;
-
-    if (filter === "needs-action") {
-      list = list.filter((o) => ["pending", "paid", "processing"].includes(o.status));
-    } else if (filter !== "all") {
-      list = list.filter((o) => o.status === filter);
-    }
-
-    const needle = search.trim().toLowerCase();
-    if (needle) {
-      list = list.filter((order) =>
-        [
-          order.reference,
-          order.email,
-          order.shippingAddress.fullName,
-          order.shippingAddress.city,
-          order.trackingNumber ?? "",
-          ...order.items.map((i) => pick(i.title, "en")),
-        ]
-          .join(" ")
-          .toLowerCase()
-          .includes(needle),
-      );
-    }
-
-    return list;
-  }, [orders, filter, search]);
+  /*
+   * Shared with the batch print route, which re-applies the same filter on the
+   * server. Two implementations of "these orders" would eventually disagree,
+   * and the day they did the warehouse would print a different set from the
+   * one on screen.
+   */
+  const rows = useMemo(() => filterOrders(orders, { status: filter, search }), [orders, filter, search]);
 
   const columns: Column<Order>[] = [
     {
@@ -158,6 +139,21 @@ export function OrdersBoard({
         title={t("orders.title")}
         description={t("orders.subtitle")}
         actions={
+          <>
+          {/*
+            One press for the whole board. The link carries the filter, not the
+            list of references — the URL stays short at two hundred orders, and
+            a stale tab cannot print yesterday's queue.
+          */}
+          <Link
+            href={`/admin/orders/print?status=${encodeURIComponent(filter)}${
+              search.trim() ? `&q=${encodeURIComponent(search.trim())}` : ""
+            }`}
+          >
+            <Button variant="secondary" size="sm" disabled={rows.length === 0}>
+              {t("orders.printAll")} ({rows.length})
+            </Button>
+          </Link>
           <ExportMenu
             rows={rows}
             columns={[
@@ -178,6 +174,7 @@ export function OrdersBoard({
             filename="net-sale-orders"
             title={t("orders.export")}
           />
+          </>
         }
       />
 
