@@ -143,6 +143,87 @@ export function withRolledUpCounts(categories: Category[], products: Product[]):
 /* -------------------------------------------------------------------------- */
 
 /** "Outerwear / Coats" — for admin tables and search results. */
+/**
+ * Give every category a picture, borrowing one where it has none of its own.
+ *
+ * The nav menu shows each category as a photograph, and a shop that has not
+ * uploaded forty of them gets forty identical placeholder glyphs — a picture
+ * menu with no pictures, which is worse than the text list it replaced.
+ *
+ * So a category without an image borrows the first image of a product filed
+ * under it. That is not a stand-in for the real thing: it is a real photograph
+ * of something actually in that category, which is what the tile is promising.
+ * An uploaded image always wins, so the merchant's own choice is never
+ * overridden.
+ *
+ * **Every borrowed picture is different.** A product is claimed by one
+ * category only, walking deepest-first — otherwise a department and its four
+ * subcategories all borrow the same bestseller and the menu shows one garment
+ * five times, which reads as broken rather than sparse.
+ */
+export function withBorrowedImages(
+  categories: Category[],
+  products: Pick<Product, "id" | "images" | "categoryId" | "categoryPath" | "status">[],
+): Category[] {
+  const live = products.filter(
+    (product) => product.status === "active" && (product.images?.length ?? 0) > 0,
+  );
+
+  const claimed = new Set<string>();
+  const byCategory = new Map<string, string>();
+
+  /*
+   * Deepest first. A specific subcategory has fewer products to choose from
+   * than the department above it, so letting the department pick first can
+   * leave a subcategory with nothing left to borrow.
+   */
+  const deepestFirst = [...categories].sort(
+    (a, b) => (b.path?.length ?? 0) - (a.path?.length ?? 0),
+  );
+
+  for (const category of deepestFirst) {
+    if (category.image) continue;
+
+    const candidate =
+      live.find(
+        (product) =>
+          !claimed.has(product.id) &&
+          (product.categoryId === category.id || product.categoryPath?.includes(category.id)),
+      ) ??
+      // Nothing unclaimed left: reuse rather than show a placeholder. A
+      // repeated photograph is a smaller failure than a blank tile beside
+      // eleven filled ones.
+      live.find(
+        (product) =>
+          product.categoryId === category.id || product.categoryPath?.includes(category.id),
+      );
+
+    if (!candidate?.images?.[0]) continue;
+    claimed.add(candidate.id);
+    byCategory.set(category.id, candidate.images[0].url);
+  }
+
+  return categories.map((category) => {
+    const borrowed = byCategory.get(category.id);
+    if (category.image || !borrowed) return category;
+    return {
+      ...category,
+      image: {
+        url: borrowed,
+        /*
+         * Empty alt, deliberately. The tile's own label is the link text
+         * directly beneath it, so describing the picture as well makes a
+         * screen reader announce every category twice — and this photograph is
+         * decoration standing in for the category, not a thing being shown.
+         */
+        alt: "",
+        width: 400,
+        height: 520,
+      },
+    };
+  });
+}
+
 export function categoryLabel(
   categories: Category[],
   categoryId: string,

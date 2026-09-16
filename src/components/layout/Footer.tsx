@@ -163,8 +163,25 @@ export function Footer({
           <p>
             © {year} net sale — نت سيل. {rtl ? "جميع الحقوق محفوظة." : "All rights reserved."}
           </p>
+          {/*
+            The credit, as a real link.
+
+            `rel="noopener"` because it opens in a new tab and a target without
+            it hands the opened page a reference back to this one. `noreferrer`
+            is deliberately not added: this is a credit, and the referrer is
+            the part that makes it worth anything to whoever built the shop.
+          */}
           <p className="tracking-[0.1em] uppercase">
-            {rtl ? "صُمّم ونُفّذ بعناية" : "Designed and built with care"}
+            {rtl ? "برمجة وتطوير " : "Built and developed by "}
+            <a
+              href="https://www.luma-jo.com/"
+              target="_blank"
+              rel="noopener"
+              className="text-ink hover:text-brand underline underline-offset-2 transition-colors"
+              data-cursor="hover"
+            >
+              LUMA AGENCY
+            </a>
           </p>
         </div>
       </div>

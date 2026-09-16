@@ -41,7 +41,12 @@ import {
   demoShippingMethods,
   demoTestimonials,
 } from "@/data/demo";
-import { buildCategoryTree, descendantIds, withRolledUpCounts } from "@/lib/categories";
+import {
+  buildCategoryTree,
+  descendantIds,
+  withBorrowedImages,
+  withRolledUpCounts,
+} from "@/lib/categories";
 import { visibleProducts } from "@/lib/visibility";
 import { summarise, summariseAll } from "@/lib/reviews";
 import type {
@@ -581,9 +586,18 @@ export const getCategoryTree = cache(async (): Promise<CategoryNode[]> => {
    * all twelve are in the seasonal warehouse — is a dead end the customer
    * walks into.
    */
+  /*
+   * Images are borrowed last, after the counts and the hidden filter, so a
+   * category only ever borrows from products that are actually on sale in
+   * it — and a hidden category never claims a photograph a visible one
+   * could have used.
+   */
   return buildCategoryTree(
-    withRolledUpCounts(
-      categories.filter((c) => !c.hidden),
+    withBorrowedImages(
+      withRolledUpCounts(
+        categories.filter((c) => !c.hidden),
+        products,
+      ),
       products,
     ),
   );

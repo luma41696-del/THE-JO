@@ -86,7 +86,45 @@ export function CategoriesBoard({ categories }: { categories: Category[] }) {
   const [uploading, setUploading] = useState(false);
 
   const tree = useMemo(() => buildCategoryTree(categories), [categories]);
-  const departments = useMemo(() => categories.filter((c) => !c.parentId), [categories]);
+  /**
+   * Everything that may legally be this category's parent.
+   *
+   * Itself and its own descendants are excluded: filing a department under
+   * its own child makes a loop, and the loop does not announce itself — the
+   * server stops walking it, so the department simply disappears from the
+   * nav with nothing to explain why.
+   *
+   * Listed in tree order and indented, because a flat alphabetical list of
+   * forty categories is one nobody can pick the right parent out of.
+   */
+  const parentOptions = useMemo(() => {
+    const banned = new Set<string>();
+    if (draft?.id) {
+      banned.add(draft.id);
+      let added = true;
+      while (added) {
+        added = false;
+        for (const category of categories) {
+          if (category.parentId && banned.has(category.parentId) && !banned.has(category.id)) {
+            banned.add(category.id);
+            added = true;
+          }
+        }
+      }
+    }
+
+    const flatten = (parentId: string | null, depth: number): Category[] =>
+      categories
+        .filter((category) => (category.parentId ?? null) === parentId)
+        .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))
+        .flatMap((category) =>
+          banned.has(category.id)
+            ? []
+            : [{ ...category, depth }, ...flatten(category.id, depth + 1)],
+        );
+
+    return flatten(null, 0);
+  }, [categories, draft?.id]);
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((d) => (d ? { ...d, [key]: value } : d));
@@ -340,13 +378,27 @@ export function CategoriesBoard({ categories }: { categories: Category[] }) {
                   className={inputClass}
                 >
                   <option value="">— {t("cat.topLevel")} —</option>
-                  {departments
-                    .filter((d) => d.id !== draft.id)
-                    .map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name.en}
-                      </option>
-                    ))}
+                  {/*
+                    Any category may be a parent, not only a department.
+                    
+                    This listed departments alone, so a third level could not be
+                    created here at all — and the nav menu's own layout is built
+                    on one: a subcategory becomes a heading and *its* children
+                    become the circles beneath it. The shop could not produce
+                    the shape its own menu is designed to render.
+                    
+                    A category cannot be filed under itself or under anything
+                    beneath it. The server guards the resulting cycle too, but
+                    it guards by giving up on the walk — the tree would survive
+                    and the merchant would be left with a department that had
+                    silently vanished from the nav.
+                  */}
+                  {parentOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {"— ".repeat(option.depth)}
+                      {option.name.en}
+                    </option>
+                  ))}
                 </select>
                 <span className="text-mist mt-1 block text-[0.6875rem]">
                   {/* This is the expensive edit, and it is worth saying so. */}
