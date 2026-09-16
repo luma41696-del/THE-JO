@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { Link } from "@/components/ui/Link";
 import { cn } from "@/lib/utils";
 
@@ -190,6 +191,32 @@ export function Footer({
             )}
           >
             <span>{rtl ? "برمجة وتطوير" : "Built and developed by"}</span>
+
+            {/*
+              The mark, sized by height so it keeps its own proportions.
+
+              The light variant, because this footer is `bg-ink`: the dark one
+              would repeat the mistake the link colour just fixed. Given an
+              explicit height and an auto width so it keeps its own 216×604
+              proportions — a mark squeezed to fit a box is worse than no mark.
+
+              It is a tall mark — 216×604 — and the agency renders it 20px
+              wide beside its own wordmark. Constrained by height here
+              instead: a credit line is 12px of text, and 56px of logo
+              beside it stops being a credit and becomes a second brand on
+              somebody else's footer.
+
+              Decorative: the words either side of it already name the
+              agency, so alt text would have a screen reader say it twice.
+            */}
+            <Image
+              src="/brand/luma-agency.png"
+              alt=""
+              width={216}
+              height={604}
+              className="h-7 w-auto opacity-80 transition-opacity hover:opacity-100"
+              aria-hidden="true"
+            />
             <a
               href="https://www.luma-jo.com/"
               target="_blank"
