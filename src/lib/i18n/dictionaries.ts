@@ -188,6 +188,8 @@ const en = {
     price: "Price",
     under: "Under",
     over: "Over",
+    results: "results",
+    searchEmptyBody: "Nothing in the shop matches that word. These are close:",
     emptyTitle: "Nothing matches that",
     emptyBody:
       "Try removing a filter — colour and size together narrow things quickly on a twelve-piece collection.",
@@ -643,6 +645,8 @@ const ar: Dictionary = {
     price: "السعر",
     under: "أقل من",
     over: "أكثر من",
+    results: "نتيجة",
+    searchEmptyBody: "لا شيء في المتجر يطابق هذه الكلمة. هذه قريبة منها:",
     emptyTitle: "لا توجد نتائج مطابقة",
     emptyBody: "جرّب إزالة أحد الفلاتر — اللون والمقاس معاً يضيّقان النتائج بسرعة في مجموعة من اثنتي عشرة قطعة.",
     sortFeatured: "المميّزة",

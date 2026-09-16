@@ -13,6 +13,7 @@ import {
 } from "@/lib/catalog";
 import { getStoreSettings } from "@/lib/settings";
 import { absoluteUrl } from "@/lib/site";
+import { breadcrumbList, productCrumbs } from "@/lib/seo";
 import { categoryTrail } from "@/lib/categories";
 import { ProductDetail } from "@/components/product/ProductDetail";
 import { ProductRail } from "@/components/product/ProductRail";
@@ -181,7 +182,12 @@ export default async function ProductPage({
       <script
         type="application/ld+json"
         // Serialised from our own catalogue data, never from user input.
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify([
+            jsonLd,
+            breadcrumbList(productCrumbs(product, trail, locale, "net sale"), locale),
+          ]),
+        }}
       />
 
       <ProductDetail

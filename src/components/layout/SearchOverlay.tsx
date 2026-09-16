@@ -148,7 +148,35 @@ export function SearchOverlay({ locale = "en" }: { locale?: Locale }) {
 
   /* --- keyboard ----------------------------------------------------------- */
 
+  /** The full results page for whatever is typed. */
+  function goToResults() {
+    if (!term.trim()) return;
+    setOpen(false);
+    router.push(`/shop?q=${encodeURIComponent(term.trim())}`);
+  }
+
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    /*
+     * Enter always does something.
+     *
+     * It used to return early whenever the dropdown was empty, so a shopper
+     * who typed a word the preview did not match and pressed Enter — the most
+     * ordinary thing to do — got nothing at all, with no indication that the
+     * key had been read. With no results, or none highlighted, it now opens
+     * the full results page, which can also say "close matches were these".
+     */
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const hit = results[cursor];
+      if (hit && results.length > 0) {
+        setOpen(false);
+        router.push(`/product/${hit.slug}`);
+      } else {
+        goToResults();
+      }
+      return;
+    }
+
     if (results.length === 0) return;
 
     if (event.key === "ArrowDown") {
@@ -157,13 +185,6 @@ export function SearchOverlay({ locale = "en" }: { locale?: Locale }) {
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
       setCursor((c) => (c - 1 + results.length) % results.length);
-    } else if (event.key === "Enter") {
-      event.preventDefault();
-      const hit = results[cursor];
-      if (hit) {
-        setOpen(false);
-        router.push(`/product/${hit.slug}`);
-      }
     }
   }
 
@@ -247,11 +268,24 @@ export function SearchOverlay({ locale = "en" }: { locale?: Locale }) {
                     </span>
                   </div>
                 ) : results.length === 0 ? (
-                  <p className="text-smoke py-10 text-[0.9375rem]">
-                    {rtl
-                      ? `لا نتائج لـ "${term}". جرّب اسم قطعة أو لوناً.`
-                      : `Nothing matches "${term}". Try a piece name, a colour, or a category.`}
-                  </p>
+                  <div className="py-10">
+                    <p className="text-smoke text-[0.9375rem]">
+                      {rtl
+                        ? `لا نتائج لـ "${term}". جرّب اسم قطعة أو لوناً.`
+                        : `Nothing matches "${term}". Try a piece name, a colour, or a category.`}
+                    </p>
+                    {/* The preview is capped at eight and matches on fewer
+                        fields than the results page; sending them there is a
+                        real second chance, not a consolation link. */}
+                    <button
+                      type="button"
+                      onClick={goToResults}
+                      className="border-line hover:border-ink text-ink rounded-pill mt-4 cursor-pointer border px-4 py-2 text-[0.875rem] transition-colors"
+                      data-cursor="hover"
+                    >
+                      {rtl ? "ابحث في المتجر كله" : "Search the whole shop"}
+                    </button>
+                  </div>
                 ) : (
                   <ul id="search-results" role="listbox" className="space-y-1">
                     {results.map((hit, index) => (

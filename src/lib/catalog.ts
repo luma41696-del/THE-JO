@@ -12,6 +12,8 @@
  */
 
 import { cache } from "react";
+import { rankProducts, suggestTerms } from "@/lib/search";
+import { matchesFilters, sortProducts } from "@/lib/catalog-filters";
 import {
   collection,
   getDocs,
@@ -42,6 +44,7 @@ import { buildCategoryTree, descendantIds, withRolledUpCounts } from "@/lib/cate
 import { visibleProducts } from "@/lib/visibility";
 import { summarise, summariseAll } from "@/lib/reviews";
 import type {
+  Locale,
   Banner,
   BannerSlot,
   Category,
@@ -449,71 +452,31 @@ export const getCrossSellIndex = cache(
  */
 export async function listProducts(filters: ProductFilters = {}): Promise<Product[]> {
   const all = await getShopProducts();
-
-  let rows = all.filter((p) => {
-    // Match against the whole ancestry, not just the leaf: filtering on
-    // "Outerwear" has to return the coats and the blazers filed beneath it,
-    // and no product is ever filed against a department directly.
-    if (
-      filters.categoryIds?.length &&
-      !p.categoryPath.some((id) => filters.categoryIds!.includes(id))
-    ) {
-      return false;
-    }
-    if (filters.productTypes?.length && !filters.productTypes.includes(p.type)) return false;
-    if (
-      filters.shippingClassIds?.length &&
-      !filters.shippingClassIds.includes(p.shippingClassId ?? "")
-    ) {
-      return false;
-    }
-    if (filters.colorIds?.length && !p.colors.some((c) => filters.colorIds!.includes(c.id))) {
-      return false;
-    }
-    if (filters.sizeIds?.length && !p.sizes.some((s) => filters.sizeIds!.includes(s.id))) {
-      return false;
-    }
-    if (filters.minPrice !== undefined && p.price < filters.minPrice) return false;
-    if (filters.maxPrice !== undefined && p.price > filters.maxPrice) return false;
-    if (filters.badges?.length && !p.badges.some((b) => filters.badges!.includes(b))) return false;
-    if (filters.inStockOnly && !p.inStock) return false;
-    return true;
-  });
-
-  switch (filters.sort) {
-    case "newest":
-      rows = rows.sort((a, b) => b.publishedAt - a.publishedAt);
-      break;
-    case "price-asc":
-      rows = rows.sort((a, b) => a.price - b.price);
-      break;
-    case "price-desc":
-      rows = rows.sort((a, b) => b.price - a.price);
-      break;
-    case "rating":
-      rows = rows.sort((a, b) => (b.rating?.average ?? 0) - (a.rating?.average ?? 0));
-      break;
-    default:
-      break;
-  }
-
-  return rows;
+  return sortProducts(all.filter((product) => matchesFilters(product, filters)), filters.sort);
 }
 
-/** Server-side search across title, tags and category. */
+/**
+ * Server-side search, ranked.
+ *
+ * The matching itself lives in `lib/search`, which is pure and tested: Arabic
+ * spelling folded, synonyms across both languages, product and variant codes,
+ * and an order that puts the product *named* for the query above one that
+ * merely carries the word as a tag.
+ *
+ * Read through the same catalogue layer as the pages, so a search can never
+ * surface something the storefront is hiding.
+ */
 export async function searchProducts(term: string, max = 12): Promise<Product[]> {
-  const needle = term.trim().toLowerCase();
-  if (!needle) return [];
-  // Search must not surface what the storefront is hiding.
+  if (!term.trim()) return [];
   const all = await getShopProducts();
-  return all
-    .filter((p) =>
-      [p.title.en, p.title.ar, p.subtitle?.en ?? "", p.categoryId, ...p.tags]
-        .join(" ")
-        .toLowerCase()
-        .includes(needle),
-    )
-    .slice(0, max);
+  return rankProducts(all, term, max);
+}
+
+/** Near-misses to offer when a search finds nothing. */
+export async function searchSuggestions(term: string, locale: Locale, max = 4): Promise<string[]> {
+  if (!term.trim()) return [];
+  const all = await getShopProducts();
+  return suggestTerms(all, term, locale, max);
 }
 
 /* -------------------------------------------------------------------------- */

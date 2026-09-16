@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { websiteJsonLd } from "@/lib/seo";
 import { Instrument_Serif } from "next/font/google";
 import { notFound } from "next/navigation";
 
@@ -151,6 +152,23 @@ export default async function LocaleLayout({
       suppressHydrationWarning
     >
       <body className="bg-paper text-ink min-h-screen antialiased">
+        {/*
+          The shop itself, and how to search it.
+
+          On the layout rather than the home page so it is present on every
+          entry point — a crawler can arrive at any URL, and a site that only
+          declares itself on one page declares itself to whoever happens to
+          land there. The search template points at the real /shop?q=, which
+          the listing now serves; a SearchAction whose target 404s is worse
+          than none, because it offers a search box that leads nowhere.
+        */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(websiteJsonLd(locale, "net sale")),
+          }}
+        />
+
         {/* First focusable element on the page, by design. */}
         <a
           href="#main"
