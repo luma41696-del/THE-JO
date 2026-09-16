@@ -14,6 +14,13 @@ import { getStoreSettings } from "@/lib/settings";
 import { designFor, hasDesigns, hasOptions, imagesFor, resolveSelection } from "@/lib/product";
 import { classesInCart, zoneFor } from "@/lib/shipping";
 import { categoryPathsFor, evaluateOffer, redemptionId } from "@/lib/offers";
+import {
+  balanceOf,
+  earnEntryFor,
+  earnableAmount,
+  pointsForOrder,
+  type LedgerEntry,
+} from "@/lib/loyalty";
 import { isPurchasable, unavailableReason } from "@/lib/visibility";
 import { cartKey, orderReference } from "@/lib/utils";
 import { isAdminConfigured, verifyRequest } from "@/lib/firebase/admin";
@@ -399,6 +406,34 @@ export async function POST(request: Request) {
           : null;
       const redemptionSnap = redemptionRef ? await tx.get(redemptionRef) : null;
 
+      /*
+       * The account's points history, read here with everything else.
+       *
+       * Firestore wants every read in a transaction before any write, and the
+       * tier this order earns at is derived from the ledger — so it is read
+       * now rather than outside, where a concurrent redemption could make the
+       * balance we credit against one that no longer exists.
+       */
+      const loyaltySnap = uid
+        ? await tx.get(
+            db
+              .collection("loyalty")
+              .doc(uid)
+              .collection("entries")
+              .orderBy("at", "desc")
+              .limit(500),
+          )
+        : null;
+      const loyaltyBalance = loyaltySnap
+        ? balanceOf(
+            loyaltySnap.docs.map((doc) => ({
+              id: doc.id,
+              ...(doc.data() as Omit<LedgerEntry, "id">),
+            })),
+            now,
+          )
+        : null;
+
       /* ---- coupon: re-check against numbers read inside the tx ---------- */
 
       let freshOffer: Offer | null = null;
@@ -519,6 +554,40 @@ export async function POST(request: Request) {
           uid,
           at: new Date(now),
         });
+      }
+
+      /*
+       * Points, inside the same transaction as the order.
+       *
+       * They have to land together. An order that commits without its points
+       * is a customer who paid and was not credited — which they notice, and
+       * which nobody can reconstruct afterwards without reading the order log
+       * by hand. Points written first for an order that then fails are worse:
+       * a balance from a purchase that never happened.
+       *
+       * Guests earn nothing, because there is no account to credit. The tier
+       * is read from the ledger, so a customer crossing into silver on this
+       * order earns the new rate from the next one — the alternative is
+       * counting the order towards the tier it is itself being paid at, which
+       * pays the higher rate on the purchase that only just qualified.
+       */
+      if (uid) {
+        const spend = earnableAmount(totals);
+        const points = pointsForOrder(totals, loyaltyBalance?.lifetimeSpend ?? 0);
+        if (points > 0) {
+          const entry = earnEntryFor({
+            uid,
+            orderId: orderRef.id,
+            orderReference: reference,
+            points,
+            spend,
+            now,
+          });
+          tx.set(
+            db.collection("loyalty").doc(uid).collection("entries").doc(entry.docId),
+            entry.data,
+          );
+        }
       }
 
       return {

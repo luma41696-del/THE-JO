@@ -167,6 +167,8 @@ let products: typeof import("../src/app/api/admin/products/route");
 let media: typeof import("../src/app/api/admin/media/route");
 let bulk: typeof import("../src/app/api/admin/products/bulk/route");
 let importRoute: typeof import("../src/app/api/admin/products/import/route");
+let loyalty: typeof import("../src/app/api/loyalty/route");
+let offersLib: typeof import("../src/lib/offers");
 let adminSdk: typeof import("../src/lib/firebase/admin");
 
 before(async () => {
@@ -182,6 +184,8 @@ before(async () => {
   media = await import("../src/app/api/admin/media/route");
   bulk = await import("../src/app/api/admin/products/bulk/route");
   importRoute = await import("../src/app/api/admin/products/import/route");
+  loyalty = await import("../src/app/api/loyalty/route");
+  offersLib = await import("../src/lib/offers");
   adminSdk = await import("../src/lib/firebase/admin");
 
   customer = await signUp("customer@example.test");
@@ -196,7 +200,7 @@ before(async () => {
 
 after(async () => {
   const db = adminSdk.getAdminDb();
-  for (const name of ["tickets", "auditLog", "giftCampaigns", "products", "media", "categories", "importJobs"]) {
+  for (const name of ["tickets", "auditLog", "giftCampaigns", "products", "media", "categories", "importJobs", "offers", "loyalty"]) {
     const snap = await db.collection(name).get();
     await Promise.all(snap.docs.map((doc) => doc.ref.delete()));
   }
@@ -1952,5 +1956,271 @@ describe("product import", () => {
       rows: many,
     });
     assert.equal(result.httpStatus, 400);
+  });
+});
+/* -------------------------------------------------------------------------- */
+/*  Points, and turning them into a coupon                                    */
+/* -------------------------------------------------------------------------- */
+
+describe("loyalty", () => {
+  const db = () => adminSdk.getAdminDb();
+
+  /** One line in a bag, so a coupon has something to discount. */
+  const line = {
+    key: "p1::",
+    productId: "p1",
+    sku: "NS-TEE",
+    slug: "tee",
+    title: { en: "Tee", ar: "تي شيرت" },
+    image: { url: "/demo/tee.svg", alt: "tee", width: 8, height: 10 },
+    colorId: "",
+    colorName: { en: "", ar: "" },
+    sizeId: "",
+    sizeLabel: "",
+    unitPrice: 100,
+    currency: "JOD" as const,
+    quantity: 1,
+    maxQuantity: 5,
+  };
+  const entriesOf = (uid: string) =>
+    db().collection("loyalty").doc(uid).collection("entries");
+
+  const readBalance = async (token: string) =>
+    json<{
+      ok: boolean;
+      error?: string;
+      balance?: {
+        available: number;
+        earned: number;
+        redeemed: number;
+        expired: number;
+        lifetimeSpend: number;
+        tier: string;
+      };
+      maxRedeemable?: number;
+      entries?: { kind: string; points: number }[];
+    }>(await loyalty.GET(request("/api/loyalty", { token })));
+
+  const redeem = async (points: number, requestId: string, token = customer.token) =>
+    json<{
+      ok: boolean;
+      error?: string;
+      errorAr?: string;
+      reason?: string;
+      replayed?: boolean;
+      points?: number;
+      value?: number;
+      offerCode?: string;
+      offerId?: string;
+    }>(
+      await loyalty.POST(
+        request("/api/loyalty", {
+          method: "POST",
+          token,
+          body: JSON.stringify({ points, requestId }),
+        }),
+      ),
+    );
+
+  /** Credit the account directly, standing in for orders already placed. */
+  const credit = async (uid: string, points: number, spend: number, id: string) => {
+    await entriesOf(uid).doc(id).set({
+      uid,
+      kind: "earn",
+      points,
+      spend,
+      at: Date.now() - 1000,
+      expiresAt: Date.now() + 300 * 24 * 60 * 60 * 1000,
+      orderId: id,
+    });
+  };
+
+  before(async () => {
+    await credit(customer.uid, 1000, 800, "seed-1");
+  });
+
+  test("an account sees its balance, its tier and its history", async () => {
+    const result = await readBalance(customer.token);
+    assert.equal(result.ok, true, result.error);
+    assert.equal(result.balance!.available, 1000);
+    assert.equal(result.balance!.lifetimeSpend, 800);
+    // 800 spent puts the account in silver.
+    assert.equal(result.balance!.tier, "silver");
+    assert.equal(result.entries!.length, 1);
+  });
+
+  test("an unsigned request gets nothing", async () => {
+    const anonymous = await json<{ ok: boolean }>(await loyalty.GET(request("/api/loyalty")));
+    assert.equal(anonymous.httpStatus, 401);
+  });
+
+  test("redeeming debits the ledger and creates a coupon, together", async () => {
+    const result = await redeem(400, "req-basic-0001");
+    assert.equal(result.ok, true, result.error);
+    assert.equal(result.points, 400);
+    assert.equal(result.value, 20);
+
+    // The coupon exists, bound to this account and usable once.
+    const offer = (await db().collection("offers").doc(result.offerId!).get()).data()!;
+    assert.equal(offer.type, "fixed");
+    assert.equal(offer.value, 20);
+    assert.equal(offer.assignedUid, customer.uid);
+    assert.equal(offer.usageLimit, 1);
+    assert.equal(offer.status, "active");
+    assert.equal(offer.source, "loyalty");
+
+    // And the points are gone.
+    const after = await readBalance(customer.token);
+    assert.equal(after.balance!.available, 600);
+    assert.equal(after.balance!.redeemed, 400);
+  });
+
+  test("a retried redemption returns the first coupon rather than minting a second", async () => {
+    /*
+     * A response lost on the way back is indistinguishable, from the browser,
+     * from a request that never arrived — so the customer presses the button
+     * again. Without the attempt record that is a second coupon from one
+     * balance, which is free money.
+     */
+    const first = await redeem(200, "req-retry-0001");
+    assert.equal(first.ok, true, first.error);
+
+    const again = await redeem(200, "req-retry-0001");
+    assert.equal(again.ok, true);
+    assert.equal(again.replayed, true);
+    assert.equal(again.offerCode, first.offerCode);
+
+    // One coupon, one debit.
+    const coupons = await db()
+      .collection("offers")
+      .where("sourceUid", "==", customer.uid)
+      .get();
+    const fromThisAttempt = coupons.docs.filter(
+      (doc) => doc.data().code === first.offerCode,
+    );
+    assert.equal(fromThisAttempt.length, 1);
+
+    const after = await readBalance(customer.token);
+    assert.equal(after.balance!.available, 400);
+  });
+
+  test("redeeming more than the balance is refused, and nothing is written", async () => {
+    const before = await readBalance(customer.token);
+    const refused = await redeem(5000, "req-toomuch-001");
+
+    assert.equal(refused.httpStatus, 409);
+    assert.equal(refused.reason, "insufficient");
+    assert.equal((refused.errorAr ?? "").length > 0, true);
+
+    const after = await readBalance(customer.token);
+    assert.equal(after.balance!.available, before.balance!.available);
+
+    // No orphaned coupon from the refused attempt.
+    const coupons = await db()
+      .collection("offers")
+      .where("sourceUid", "==", customer.uid)
+      .get();
+    assert.equal(
+      coupons.docs.every((doc) => doc.data().value <= 30),
+      true,
+    );
+  });
+
+  test("an amount below the minimum or off the step is refused", async () => {
+    assert.equal((await redeem(50, "req-small-00001")).reason, "below-minimum");
+    assert.equal((await redeem(250, "req-step-000001")).reason, "not-a-step");
+  });
+
+  test("a redemption with no id is refused, so a retry can never double-spend", async () => {
+    const result = await json<{ ok: boolean; error?: string }>(
+      await loyalty.POST(
+        request("/api/loyalty", {
+          method: "POST",
+          token: customer.token,
+          body: JSON.stringify({ points: 200 }),
+        }),
+      ),
+    );
+    assert.equal(result.httpStatus, 400);
+  });
+
+  test("one account cannot redeem another's points", async () => {
+    // The uid comes from the verified token, never from the body.
+    const before = await readBalance(customer.token);
+    const other = await redeem(200, "req-stranger-01", stranger.token);
+    assert.equal(other.httpStatus, 409);
+    assert.equal(other.reason, "insufficient");
+
+    const after = await readBalance(customer.token);
+    assert.equal(after.balance!.available, before.balance!.available);
+  });
+
+  test("points past their date are not spendable", async () => {
+    /*
+     * Expiry is computed from the entries rather than swept by a job, so a
+     * balance is never wrong because a scheduled task did not run.
+     */
+    await entriesOf(stranger.uid).doc("stale").set({
+      uid: stranger.uid,
+      kind: "earn",
+      points: 900,
+      spend: 900,
+      at: Date.now() - 400 * 24 * 60 * 60 * 1000,
+      expiresAt: Date.now() - 24 * 60 * 60 * 1000,
+      orderId: "old",
+    });
+
+    const balance = await readBalance(stranger.token);
+    assert.equal(balance.balance!.available, 0);
+    assert.equal(balance.balance!.expired, 900);
+
+    const refused = await redeem(200, "req-expired-001", stranger.token);
+    assert.equal(refused.reason, "insufficient");
+  });
+
+  test("the coupon a redemption made actually works at checkout", async () => {
+    /*
+     * The whole point of the feature, end to end: points became a coupon, and
+     * the coupon has to be a real one the checkout accepts. A redemption that
+     * produces a code nothing honours is worse than no programme at all.
+     */
+    const made = await redeem(200, "req-usable-0001");
+    assert.equal(made.ok, true, made.error);
+
+    const offer = (await db().collection("offers").doc(made.offerId!).get()).data()!;
+    const verdict = offersLib.evaluateOffer(
+      { ...offer, id: made.offerId! } as never,
+      {
+        items: [line] as never,
+        subtotal: 100,
+        now: Date.now(),
+        currency: "JOD",
+        userUsage: 0,
+        uid: customer.uid,
+        categoryPaths: {},
+      },
+    );
+    assert.equal(verdict.ok, true, verdict.message?.en);
+    assert.equal(verdict.discount, 10);
+  });
+
+  test("that coupon belongs to the account that earned it", async () => {
+    // Points are not a bearer instrument: the code is useless to anyone else.
+    const made = await redeem(200, "req-bound-00001");
+    const offer = (await db().collection("offers").doc(made.offerId!).get()).data()!;
+
+    const verdict = offersLib.evaluateOffer(
+      { ...offer, id: made.offerId! } as never,
+      {
+        items: [line] as never,
+        subtotal: 100,
+        now: Date.now(),
+        currency: "JOD",
+        userUsage: 0,
+        uid: stranger.uid,
+        categoryPaths: {},
+      },
+    );
+    assert.equal(verdict.ok, false);
   });
 });

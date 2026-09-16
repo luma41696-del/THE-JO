@@ -13,6 +13,7 @@ import { updateProfileDoc } from "@/lib/firebase/profile";
 import { fetchOrders, STATUS_LABELS, statusTone } from "@/lib/firebase/orders";
 import { useWishlist } from "@/lib/store/wishlist";
 import { Button } from "@/components/ui/Button";
+import { LoyaltyPanel } from "./LoyaltyPanel";
 import type { Locale, Order } from "@/types";
 
 /**
@@ -160,6 +161,11 @@ export function AccountPanel({ locale = "en" }: { locale?: Locale }) {
 
         {/* Content */}
         <div className="space-y-8">
+          {/* Points sit above orders: a balance is the thing people come
+              back to look at, and an order they can already see in their
+              inbox. */}
+          <LoyaltyPanel locale={locale} />
+
           {/* Recent orders */}
           <section>
             <div className="mb-4 flex items-baseline justify-between">
