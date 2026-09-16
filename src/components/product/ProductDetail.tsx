@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { BackInStock } from "./BackInStock";
 import Image from "next/image";
 import { Link } from "@/components/ui/Link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
@@ -451,10 +452,22 @@ export function ProductDetail({
               {product.sizes.map((option) => {
                 const soldOut = !inStockSizes.has(option.id);
                 return (
+                  /*
+                   * A sold-out size is selectable, and not buyable.
+                   *
+                   * It used to be `disabled`, which is the obvious thing to do
+                   * and quietly removes the customer's only way of saying they
+                   * wanted it. Selecting it is what reveals "this size is sold
+                   * out" and the offer to be told when it returns — a disabled
+                   * button offers nothing and explains nothing.
+                   *
+                   * Add to bag stays disabled either way, so nothing
+                   * unbuyable can be bought; the strike-through and the label
+                   * still say what the state is.
+                   */
                   <button
                     key={option.id}
                     type="button"
-                    disabled={soldOut}
                     onClick={() => {
                       setSizeId(option.id);
                       setSizeError(false);
@@ -474,10 +487,11 @@ export function ProductDetail({
                       sizeError && !sizeId && "border-alert",
                       // Struck through rather than merely dimmed: dimming alone
                       // reads as "not selected" and gets clicked anyway.
-                      soldOut &&
-                        "text-mist border-line/60 cursor-not-allowed line-through hover:border-line/60",
+                      soldOut && sizeId !== option.id &&
+                        "text-mist border-line/60 line-through hover:border-ink/45",
+                      soldOut && sizeId === option.id && "line-through",
                     )}
-                    data-cursor={soldOut ? undefined : "hover"}
+                    data-cursor="hover"
                   >
                     {option.label}
                   </button>
@@ -607,15 +621,33 @@ export function ProductDetail({
               </p>
             ) : null}
 
+            {/*
+              The offer belongs here, beside the disappointment, not on a
+              separate page somebody would have to think to look for. This is
+              the moment the customer has decided they want the piece and
+              cannot have it — the only moment they will accept being asked
+              for anything.
+            */}
             {variable && sizeId && !selection.buyable && (
-              <p className="text-mist text-[0.8125rem]">
-                {rtl ? "هذا المقاس نفد حالياً." : "This size is sold out."}
-              </p>
+              <>
+                <p className="text-mist text-[0.8125rem]">
+                  {rtl ? "هذا المقاس نفد حالياً." : "This size is sold out."}
+                </p>
+                <BackInStock
+                  productId={product.id}
+                  colorId={colorId || undefined}
+                  sizeId={sizeId}
+                  locale={locale}
+                />
+              </>
             )}
             {!variable && !selection.buyable && (
-              <p className="text-mist text-[0.8125rem]">
-                {rtl ? "نفدت الكمية حالياً." : "Out of stock."}
-              </p>
+              <>
+                <p className="text-mist text-[0.8125rem]">
+                  {rtl ? "نفدت الكمية حالياً." : "Out of stock."}
+                </p>
+                <BackInStock productId={product.id} locale={locale} />
+              </>
             )}
           </div>
 

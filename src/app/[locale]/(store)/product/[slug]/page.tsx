@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import {
   getCategories,
   getProductBySlug,
-  getRelatedProducts,
+  getBoughtWith,
   getProductReviews,
   getReviewSummary,
   getShippingClasses,
@@ -90,7 +90,7 @@ export default async function ProductPage({
 
   const [related, upsells, categories, shippingClasses, reviews, reviewSummary, settings] =
     await Promise.all([
-      getRelatedProducts(product, 8),
+      getBoughtWith(product, 8),
       getUpsellProducts(product),
       getCategories(),
       getShippingClasses(),

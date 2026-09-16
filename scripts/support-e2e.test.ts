@@ -169,6 +169,8 @@ let bulk: typeof import("../src/app/api/admin/products/bulk/route");
 let importRoute: typeof import("../src/app/api/admin/products/import/route");
 let loyalty: typeof import("../src/app/api/loyalty/route");
 let offersLib: typeof import("../src/lib/offers");
+let alerts: typeof import("../src/app/api/alerts/route");
+let adminAlerts: typeof import("../src/app/api/admin/alerts/route");
 let adminSdk: typeof import("../src/lib/firebase/admin");
 
 before(async () => {
@@ -186,6 +188,8 @@ before(async () => {
   importRoute = await import("../src/app/api/admin/products/import/route");
   loyalty = await import("../src/app/api/loyalty/route");
   offersLib = await import("../src/lib/offers");
+  alerts = await import("../src/app/api/alerts/route");
+  adminAlerts = await import("../src/app/api/admin/alerts/route");
   adminSdk = await import("../src/lib/firebase/admin");
 
   customer = await signUp("customer@example.test");
@@ -200,7 +204,7 @@ before(async () => {
 
 after(async () => {
   const db = adminSdk.getAdminDb();
-  for (const name of ["tickets", "auditLog", "giftCampaigns", "products", "media", "categories", "importJobs", "offers", "loyalty"]) {
+  for (const name of ["tickets", "auditLog", "giftCampaigns", "products", "media", "categories", "importJobs", "offers", "loyalty", "stockAlerts"]) {
     const snap = await db.collection(name).get();
     await Promise.all(snap.docs.map((doc) => doc.ref.delete()));
   }
@@ -2222,5 +2226,271 @@ describe("loyalty", () => {
       },
     );
     assert.equal(verdict.ok, false);
+  });
+});
+/* -------------------------------------------------------------------------- */
+/*  Back-in-stock alerts                                                      */
+/* -------------------------------------------------------------------------- */
+
+describe("stock alerts", () => {
+  const db = () => adminSdk.getAdminDb();
+
+  const saveProduct = async (id: string, body: Record<string, unknown>) =>
+    json<{ ok: boolean; error?: string }>(
+      await products.POST(
+        request("/api/admin/products", {
+          method: "POST",
+          token: owner.token,
+          body: JSON.stringify({
+            id,
+            categoryId: "tees",
+            price: 35,
+            status: "active",
+            ...body,
+          }),
+        }),
+      ),
+    );
+
+  const subscribe = async (body: Record<string, unknown>, token = customer.token) =>
+    json<{ ok: boolean; error?: string; id?: string; kind?: string }>(
+      await alerts.POST(
+        request("/api/alerts", { method: "POST", token, body: JSON.stringify(body) }),
+      ),
+    );
+
+  const mine = async (token = customer.token) =>
+    json<{ ok: boolean; alerts?: { id: string; productId: string; notifiedAt?: number }[] }>(
+      await alerts.GET(request("/api/alerts", { token })),
+    );
+
+  const preview = async () =>
+    json<{
+      ok: boolean;
+      waiting?: number;
+      wouldSend?: number;
+      skipped?: Record<string, number>;
+      mailConfigured?: boolean;
+    }>(await adminAlerts.GET(request("/api/admin/alerts", { token: owner.token })));
+
+  const sweep = async (token = owner.token) =>
+    json<{
+      ok: boolean;
+      error?: string;
+      waiting?: number;
+      sent?: number;
+      cleared?: number;
+      skipped?: Record<string, number>;
+      mailConfigured?: boolean;
+    }>(await adminAlerts.POST(request("/api/admin/alerts", { method: "POST", token })));
+
+  before(async () => {
+    await saveProduct("e2e-alert-tee", {
+      slug: "e2e-alert-tee",
+      title: { en: "Alert tee", ar: "تي شيرت تنبيه" },
+      type: "variable",
+      colors: [{ id: "white", name: { en: "White", ar: "أبيض" }, hex: "#FBFAF3" }],
+      sizes: [
+        { id: "m", label: "M", system: "alpha" },
+        { id: "l", label: "L", system: "alpha" },
+      ],
+      variants: [
+        { sku: "ALERT-WHT-M", colorId: "white", sizeId: "m", stock: 0 },
+        { sku: "ALERT-WHT-L", colorId: "white", sizeId: "l", stock: 5 },
+      ],
+    });
+  });
+
+  test("a customer can ask to be told about one size", async () => {
+    const result = await subscribe({
+      productId: "e2e-alert-tee",
+      colorId: "white",
+      sizeId: "m",
+      kind: "back-in-stock",
+      locale: "ar",
+    });
+    assert.equal(result.ok, true, result.error);
+
+    const stored = (await db().collection("stockAlerts").doc(result.id!).get()).data()!;
+    assert.equal(stored.uid, customer.uid);
+    assert.equal(stored.sizeId, "m");
+    // The language they asked in, so the email is written in it months later.
+    assert.equal(stored.locale, "ar");
+    // The price comes from the catalogue, never from the request.
+    assert.equal(stored.priceAtSubscribe, 35);
+  });
+
+  test("asking twice keeps one row, not two emails", async () => {
+    // The first tap's confirmation is easy to miss, so people tap again.
+    const first = await subscribe({
+      productId: "e2e-alert-tee",
+      colorId: "white",
+      sizeId: "m",
+      kind: "back-in-stock",
+    });
+    const again = await subscribe({
+      productId: "e2e-alert-tee",
+      colorId: "white",
+      sizeId: "m",
+      kind: "back-in-stock",
+    });
+    assert.equal(first.id, again.id);
+
+    const listed = await mine();
+    assert.equal(listed.alerts!.filter((a) => a.productId === "e2e-alert-tee").length, 1);
+  });
+
+  test("the price it compares against is the catalogue's, not the browser's", async () => {
+    /*
+     * A browser that can name the price it is watching can name one already
+     * beaten, and every sweep from then on mails about a drop that never
+     * happened.
+     */
+    const result = await subscribe({
+      productId: "e2e-alert-tee",
+      kind: "price-drop",
+      priceAtSubscribe: 1,
+    });
+    const stored = (await db().collection("stockAlerts").doc(result.id!).get()).data()!;
+    assert.equal(stored.priceAtSubscribe, 35);
+  });
+
+  test("nothing is sent while the size is still gone", async () => {
+    const plan = await preview();
+    assert.equal(plan.ok, true);
+    assert.equal(plan.wouldSend, 0);
+    assert.equal((plan.skipped ?? {})["not-yet"]! >= 1, true);
+  });
+
+  test("a restock makes it due, and the preview writes nothing", async () => {
+    await saveProduct("e2e-alert-tee", {
+      slug: "e2e-alert-tee",
+      title: { en: "Alert tee", ar: "تي شيرت تنبيه" },
+      type: "variable",
+      colors: [{ id: "white", name: { en: "White", ar: "أبيض" }, hex: "#FBFAF3" }],
+      sizes: [
+        { id: "m", label: "M", system: "alpha" },
+        { id: "l", label: "L", system: "alpha" },
+      ],
+      variants: [
+        { sku: "ALERT-WHT-M", colorId: "white", sizeId: "m", stock: 4 },
+        { sku: "ALERT-WHT-L", colorId: "white", sizeId: "l", stock: 5 },
+      ],
+    });
+
+    const plan = await preview();
+    assert.equal(plan.wouldSend! >= 1, true);
+
+    // Still unsent: a preview is for looking at.
+    const listed = await mine();
+    assert.equal(listed.alerts!.every((a) => !a.notifiedAt), true);
+  });
+
+  test("the sweep marks what it sends, and a second run sends nothing", async () => {
+    /*
+     * The guarantee that matters. A sweep that forgets what it sent mails the
+     * same person on every run, which is the failure customers punish.
+     */
+    const first = await sweep();
+    assert.equal(first.ok, true, first.error);
+    assert.equal(first.waiting! >= 1, true);
+
+    const listed = await mine();
+    const forThisProduct = listed.alerts!.filter((a) => a.productId === "e2e-alert-tee");
+    assert.equal(forThisProduct.some((a) => Boolean(a.notifiedAt)), true);
+
+    /*
+     * Nothing left *to send* — not nothing left waiting. A price-drop alert
+     * on the same product is still queued and correctly not due, and
+     * asserting the queue is empty would be asserting that an alert which
+     * has not come true yet was thrown away.
+     */
+    const after = await preview();
+    assert.equal(after.wouldSend, 0);
+
+    const second = await sweep();
+    assert.equal(second.sent, 0);
+  });
+
+  test("a restock of something nobody can buy is not announced", async () => {
+    /*
+     * A draft, an archived piece, or one stopped by hand is not "back".
+     * Mailing about it sends the customer to a page that refuses them.
+     */
+    await saveProduct("e2e-alert-draft", {
+      slug: "e2e-alert-draft",
+      title: { en: "Hidden tee", ar: "تي شيرت مخفي" },
+      status: "draft",
+      type: "simple",
+      totalStock: 10,
+    });
+    await subscribe({ productId: "e2e-alert-draft", kind: "back-in-stock" });
+
+    const plan = await preview();
+    assert.equal(plan.wouldSend, 0);
+    assert.equal((plan.skipped ?? {})["not-buyable"]! >= 1, true);
+  });
+
+  test("an alert can be cancelled, and only by its owner", async () => {
+    const made = await subscribe({
+      productId: "e2e-alert-tee",
+      colorId: "white",
+      sizeId: "l",
+      kind: "back-in-stock",
+    });
+
+    const byStranger = await json<{ ok: boolean }>(
+      await alerts.DELETE(
+        request("/api/alerts", {
+          method: "DELETE",
+          token: stranger.token,
+          body: JSON.stringify({ id: made.id }),
+        }),
+      ),
+    );
+    assert.equal(byStranger.httpStatus, 403);
+    assert.equal((await db().collection("stockAlerts").doc(made.id!).get()).exists, true);
+
+    const byOwner = await json<{ ok: boolean }>(
+      await alerts.DELETE(
+        request("/api/alerts", {
+          method: "DELETE",
+          token: customer.token,
+          body: JSON.stringify({ id: made.id }),
+        }),
+      ),
+    );
+    assert.equal(byOwner.ok, true);
+    assert.equal((await db().collection("stockAlerts").doc(made.id!).get()).exists, false);
+  });
+
+  test("an anonymous visitor cannot subscribe anybody", async () => {
+    // An email box alone would let anyone sign a stranger up for this shop's
+    // mail, and a shop whose mail arrives unasked is one whose mail stops
+    // arriving at all.
+    const anonymous = await json<{ ok: boolean }>(
+      await alerts.POST(
+        request("/api/alerts", {
+          method: "POST",
+          body: JSON.stringify({ productId: "e2e-alert-tee" }),
+        }),
+      ),
+    );
+    assert.equal(anonymous.httpStatus, 401);
+  });
+
+  test("a customer cannot run the sweep", async () => {
+    const result = await sweep(customer.token);
+    assert.equal(result.httpStatus, 403);
+  });
+
+  test("with no mail provider the run says so rather than reporting success", async () => {
+    /*
+     * `sent: 0` with no explanation is how an unconfigured provider hides for
+     * a month. The run states it plainly.
+     */
+    const result = await sweep();
+    assert.equal(result.ok, true);
+    assert.equal(result.mailConfigured, false);
   });
 });

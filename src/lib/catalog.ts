@@ -14,6 +14,7 @@
 import { cache } from "react";
 import { rankProducts, suggestTerms } from "@/lib/search";
 import { matchesFilters, sortProducts } from "@/lib/catalog-filters";
+import { recommendationsFor, type OrderBasket } from "@/lib/recommend";
 import {
   collection,
   getDocs,
@@ -227,6 +228,69 @@ export const getRelatedProducts = cache(
       .map(([p]) => p);
   },
 );
+
+/**
+ * What was actually bought alongside this one.
+ *
+ * Reads recent orders and asks `lib/recommend` — which scores by lift rather
+ * than raw count, so the shop's bestseller does not end up recommended on
+ * every page, which is the same as recommending nothing.
+ *
+ * Falls back to the merchant's own cross-sell list where there is no evidence,
+ * and to `getRelatedProducts` where there is neither: a new piece has no
+ * history, and an empty rail is worse than a reasonable guess.
+ *
+ * The order read is capped and cached for the request. This is a small shop —
+ * past a few thousand orders the counting belongs in a nightly job writing a
+ * table, not in a page render.
+ */
+export const getBoughtWith = cache(
+  async (product: Product, count = 4): Promise<Product[]> => {
+    const all = await getShopProducts();
+    const catalogue = new Map(all.map((candidate) => [candidate.id, candidate]));
+
+    const baskets = await readBaskets();
+    const fromOrders = recommendationsFor(product, baskets, catalogue, count);
+    if (fromOrders.length >= count) return fromOrders;
+
+    /*
+     * Topped up rather than replaced. A product with two real companions
+     * should show those two first and fill the rest, not discard them because
+     * the rail wanted four.
+     */
+    const seen = new Set([product.id, ...fromOrders.map((p) => p.id)]);
+    const filler = (await getRelatedProducts(product, count * 2)).filter(
+      (candidate) => !seen.has(candidate.id),
+    );
+    return [...fromOrders, ...filler].slice(0, count);
+  },
+);
+
+/** Recent orders, reduced to the product ids in each. */
+const readBaskets = cache(async (): Promise<OrderBasket[]> => {
+  try {
+    const snap = await getDocs(
+      query(collection(getDb(), "orders"), orderBy("createdAt", "desc"), fsLimit(500)),
+    );
+    return snap.docs.map((doc) => {
+      const data = doc.data() as { items?: { productId?: string }[] };
+      return {
+        id: doc.id,
+        productIds: (data.items ?? [])
+          .map((item) => String(item.productId ?? ""))
+          .filter(Boolean),
+      };
+    });
+  } catch {
+    /*
+     * Orders are staff-readable, so this fails for an anonymous visitor
+     * whenever the rules are enforced. That is the expected case, not an
+     * error: the rail falls back to the curated and similarity lists, which
+     * need no order history.
+     */
+    return [];
+  }
+});
 
 /**
  * Upsells for a product: the pieces it explicitly points at, in the order the
