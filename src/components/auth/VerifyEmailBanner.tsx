@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/providers/AuthProvider";
-import { refreshVerification, requestEmailVerification } from "@/lib/firebase/auth";
+import { AuthError, refreshVerification, resendEmailVerification } from "@/lib/firebase/auth";
 import type { Locale } from "@/types";
 
 /**
@@ -31,9 +31,16 @@ export function VerifyEmailBanner({ locale }: { locale: Locale }) {
   const [verified, setVerified] = useState(false);
 
   const signedIn = status === "authenticated" && user;
-  // A phone account has no address to confirm; an already-confirmed one has
-  // nothing to do.
-  const needsConfirming = Boolean(signedIn && user?.email && !user.emailVerified && !verified);
+
+  /*
+   * A phone account has no address to confirm, an already-confirmed one has
+   * nothing to do — and a Google account is confirmed by Google, so offering
+   * to send it a confirmation would be offering something that cannot work.
+   */
+  const federated = Boolean(user?.providerData.some((entry) => entry.providerId !== "password"));
+  const needsConfirming = Boolean(
+    signedIn && user?.email && !user.emailVerified && !verified && !federated,
+  );
 
   useEffect(() => {
     if (!needsConfirming) return;
@@ -59,16 +66,28 @@ export function VerifyEmailBanner({ locale }: { locale: Locale }) {
     setBusy(true);
     setError(null);
     try {
-      await requestEmailVerification(user, locale);
-      setSent(true);
+      /*
+       * Re-reads the account first. If the customer clicked the link in their
+       * mail app and came back to this tab, the banner is stale and a second
+       * email would be sent for an address that is already confirmed — which
+       * reads as the first one not having worked.
+       */
+      const result = await resendEmailVerification(locale);
+      if (result.alreadyVerified) setVerified(true);
+      else setSent(true);
     } catch (sendError) {
-      setError(
-        sendError instanceof Error
-          ? sendError.message
-          : rtl
-            ? "تعذّر الإرسال. حاول بعد قليل."
-            : "That could not be sent. Try again shortly.",
-      );
+      // The real Firebase code, both on screen and in the log. A resend that
+      // fails silently is what hid this problem in the first place.
+      const message =
+        sendError instanceof AuthError
+          ? `${sendError.message} (${sendError.code})`
+          : sendError instanceof Error
+            ? sendError.message
+            : rtl
+              ? "تعذّر الإرسال. حاول بعد قليل."
+              : "That could not be sent. Try again shortly.";
+      console.error("[net sale] Resending the verification email failed.", sendError);
+      setError(message);
     } finally {
       setBusy(false);
     }

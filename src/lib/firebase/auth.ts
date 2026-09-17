@@ -51,9 +51,6 @@ const MESSAGES: Record<string, { message: string; field?: "email" | "password" |
   },
   "auth/wrong-password": { message: "Incorrect password.", field: "password" },
   "auth/user-not-found": { message: "No account found for that email.", field: "email" },
-  "auth/too-many-requests": {
-    message: "Too many attempts. Wait a minute, then try again.",
-  },
   "auth/popup-closed-by-user": { message: "Sign-in window was closed before finishing." },
   "auth/operation-not-allowed": {
     message: "That sign-in method is not switched on for this shop yet.",
@@ -73,19 +70,69 @@ const MESSAGES: Record<string, { message: string; field?: "email" | "password" |
     message: "That is already linked to another account.",
   },
   "auth/network-request-failed": { message: "Network problem. Check your connection." },
+  /*
+   * These three are the ones a verification email dies on, and each needs a
+   * different action from whoever reads it — so none of them is allowed to
+   * collapse into "something went wrong".
+   */
+  "auth/too-many-requests": {
+    message: "Too many requests for this account. Wait a few minutes, then try again.",
+  },
+  "auth/unauthorized-domain": {
+    message:
+      "This site's domain is not on the Firebase authorized-domains list, so no email can be sent.",
+  },
+  "auth/invalid-continue-uri": {
+    message: "The return link for the email is not valid.",
+  },
+  "auth/user-token-expired": {
+    message: "Your session expired. Sign in again and retry.",
+  },
 };
 
+/** The Firebase code as it came, before it is turned into a sentence. */
+function rawCode(error: unknown): string {
+  return typeof error === "object" && error && "code" in error
+    ? String((error as { code: unknown }).code)
+    : "auth/unknown";
+}
+
 function toAuthError(error: unknown): AuthError {
-  const code =
-    typeof error === "object" && error && "code" in error
-      ? String((error as { code: unknown }).code)
-      : "auth/unknown";
+  const code = rawCode(error);
   const known = MESSAGES[code];
   return new AuthError(
-    known?.message ?? "Something went wrong. Please try again.",
+    // The code rides along in the message when there is no written one for it,
+    // because "Something went wrong" in a bug report is worth nothing.
+    known?.message ?? `Something went wrong (${code}). Please try again.`,
     code,
     known?.field,
   );
+}
+
+/**
+ * Who is signed in and what is confirmed — development only.
+ *
+ * Deliberately never in production: `providerData` carries the customer's
+ * email and provider ids, and a shop that prints those into a browser console
+ * has put them into every screen recording and support screenshot of that
+ * session. No tokens, no password, and nothing here that is not already on
+ * the customer's own account page.
+ */
+function logAuthState(where: string) {
+  if (process.env.NODE_ENV === "production") return;
+  const user = getFirebaseAuth().currentUser;
+  if (!user) {
+    console.info(`[net sale] auth (${where}): nobody signed in.`);
+    return;
+  }
+  console.info(`[net sale] auth (${where})`, {
+    email: user.email,
+    emailVerified: user.emailVerified,
+    providerData: user.providerData.map((entry) => ({
+      providerId: entry.providerId,
+      email: entry.email,
+    })),
+  });
 }
 
 /* -------------------------------------------------------------------------- */
@@ -106,30 +153,64 @@ export async function signIn(email: string, password: string) {
   }
 }
 
-export async function signUp(name: string, email: string, password: string, locale: Locale = "en") {
+/** What sign-up produced: the account, and whether the email actually went. */
+export interface SignUpResult {
+  user: User;
+  /** `true` only once Firebase has accepted the send. */
+  verificationSent: boolean;
+  /** The real Firebase code when it did not, for the UI and the log. */
+  verificationError?: AuthError;
+}
+
+export async function signUp(
+  name: string,
+  email: string,
+  password: string,
+  locale: Locale = "en",
+): Promise<SignUpResult> {
   if (name.trim().length < 2) {
     throw new AuthError("Please enter your name.", "app/invalid-name", "name");
   }
+
+  let credential;
   try {
-    const credential = await createUserWithEmailAndPassword(getFirebaseAuth(), email, password);
+    credential = await createUserWithEmailAndPassword(getFirebaseAuth(), email, password);
     await updateProfile(credential.user, { displayName: name.trim() });
     const { ensureProfile } = await import("./profile");
     await ensureProfile(credential.user, locale);
-
-    /*
-     * Sent at sign-up, and deliberately not awaited into the failure path.
-     *
-     * A verification email that will not send — a quota, a bounce, a provider
-     * having a bad minute — must not turn a successful registration into an
-     * error that leaves the customer with an account they were told was not
-     * created. They can ask for another from the banner in their account.
-     */
-    void requestEmailVerification(credential.user, locale).catch(() => {});
-
-    return credential.user;
   } catch (error) {
     throw toAuthError(error);
   }
+
+  /*
+   * Awaited, and its outcome returned.
+   *
+   * This used to be `void requestEmailVerification(...).catch(() => {})`, on
+   * the reasoning that a failed send must not turn a successful registration
+   * into an error. The first half of that is right and the second half was
+   * the bug: discarding the rejection meant that when the send failed, the
+   * customer was told nothing, the console showed nothing, and there was no
+   * way — from the outside or the inside — to find out why no email arrived.
+   *
+   * The account still stands whatever happens here. What changes is that the
+   * caller now knows, and can say so.
+   */
+  let verificationSent = false;
+  let verificationError: AuthError | undefined;
+  try {
+    await requestEmailVerification(credential.user, locale);
+    verificationSent = true;
+  } catch (error) {
+    verificationError = error instanceof AuthError ? error : toAuthError(error);
+    console.error(
+      "[net sale] Verification email was not sent.",
+      verificationError.code,
+      verificationError.message,
+    );
+  }
+
+  logAuthState("after sign-up");
+  return { user: credential.user, verificationSent, verificationError };
 }
 
 export async function signInWithGoogle(locale: Locale = "en") {
@@ -146,20 +227,59 @@ export async function signInWithGoogle(locale: Locale = "en") {
   }
 }
 
+/** Did this account come from Google (or any other federated provider)? */
+export function isFederatedUser(user: User): boolean {
+  return user.providerData.some((entry) => entry.providerId !== "password");
+}
+
 /**
  * Send (or re-send) the address confirmation.
  *
- * `continueUrl` brings them back to their account rather than to Firebase's
- * own bare "email verified" page, which carries none of the shop's branding
- * and leaves the customer on a dead end wondering whether it worked.
+ * ## Never for a Google account
+ *
+ * Google has already proved the address — that is the whole point of signing
+ * in with it — and such accounts arrive with `emailVerified` already true.
+ * Asking Firebase to verify them is at best a wasted call and at worst an
+ * email telling a customer to confirm something they never typed.
+ *
+ * ## Why the continue URL has a fallback
+ *
+ * `ActionCodeSettings.url` must be on the project's authorized-domains list,
+ * and if it is not, Firebase rejects the whole call and **sends nothing**.
+ * That failure mode is invisible from the code and costs a customer their
+ * sign-up, so a rejected URL falls back to a bare send: the plain Firebase
+ * landing page is a far better outcome than no email. `netsale.shop` is on the
+ * list today; this is here so that a new domain, or a project restored from a
+ * backup, degrades instead of breaking.
  */
 export async function requestEmailVerification(user: User, locale: Locale = "en") {
+  if (isFederatedUser(user)) {
+    throw new AuthError(
+      "This account signs in with Google, so its address is already confirmed.",
+      "app/federated-account",
+    );
+  }
+
+  const settings = {
+    url: `${window.location.origin}/${locale}/account?verified=1`,
+    handleCodeInApp: false,
+  };
+
   try {
-    await sendEmailVerification(user, {
-      url: `${window.location.origin}/${locale}/account?verified=1`,
-      handleCodeInApp: false,
-    });
+    await sendEmailVerification(user, settings);
   } catch (error) {
+    const code = rawCode(error);
+    if (code === "auth/unauthorized-domain" || code === "auth/invalid-continue-uri") {
+      console.warn(
+        `[net sale] ${settings.url} is not an authorized domain — sending without a return link.`,
+      );
+      try {
+        await sendEmailVerification(user);
+        return;
+      } catch (bare) {
+        throw toAuthError(bare);
+      }
+    }
     throw toAuthError(error);
   }
 }
@@ -172,6 +292,34 @@ export async function requestEmailVerification(user: User, locale: Locale = "en"
  * the "please confirm" banner to somebody who already has — which reads as the
  * confirmation not having worked, and gets it clicked again.
  */
+/**
+ * Re-send, unless the address turns out to be confirmed already.
+ *
+ * The reload is not politeness. `emailVerified` is a property of the token
+ * this tab is holding, so a customer who clicked the link in their mail app
+ * and came back to a stale tab would otherwise be sent a second email for an
+ * address that is already confirmed — and would reasonably read that as the
+ * first one not having worked.
+ */
+export async function resendEmailVerification(
+  locale: Locale = "en",
+): Promise<{ sent: boolean; alreadyVerified: boolean }> {
+  const auth = getFirebaseAuth();
+  const user = auth.currentUser;
+  if (!user) throw new AuthError("Sign in first.", "app/not-signed-in");
+
+  await user.reload();
+  const current = auth.currentUser;
+  if (!current) throw new AuthError("Sign in first.", "app/not-signed-in");
+
+  logAuthState("before resend");
+
+  if (current.emailVerified) return { sent: false, alreadyVerified: true };
+
+  await requestEmailVerification(current, locale);
+  return { sent: true, alreadyVerified: false };
+}
+
 export async function refreshVerification(): Promise<boolean> {
   const user = getFirebaseAuth().currentUser;
   if (!user) return false;

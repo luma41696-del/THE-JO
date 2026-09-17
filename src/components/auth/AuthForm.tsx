@@ -82,10 +82,27 @@ export function AuthForm({ mode, locale = "en" }: { mode: "signin" | "signup"; l
     setLoading(true);
 
     try {
-      const user = isSignup
-        ? await signUp(name, email, password, locale)
-        : await signIn(email, password);
-      await finishSignIn(user);
+      if (isSignup) {
+        const result = await signUp(name, email, password, locale);
+
+        /*
+         * The account exists either way, so the customer is signed in either
+         * way — but they are only told an email is on its way when Firebase
+         * has actually accepted it. Saying "check your inbox" for a send that
+         * failed is how a broken verification flow stays invisible for weeks.
+         */
+        if (!result.verificationSent && result.verificationError) {
+          setErrors({
+            form: rtl
+              ? `أُنشئ حسابك، لكن تعذّر إرسال رسالة التأكيد: ${result.verificationError.message} يمكنك إعادة المحاولة من صفحة حسابك.`
+              : `Your account was created, but the confirmation email could not be sent: ${result.verificationError.message} You can try again from your account page.`,
+          });
+        }
+
+        await finishSignIn(result.user);
+      } else {
+        await finishSignIn(await signIn(email, password));
+      }
     } catch (error) {
       handleError(error);
     } finally {
