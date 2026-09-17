@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sender logo at avatar sizes</title>
+<style>
+  body { margin:0; padding:40px; background:#f5f1e6; font:14px/1.5 'Segoe UI',Tahoma,Arial,sans-serif; color:#14110f; }
+  h1 { font-size:16px; margin:0 0 4px; }
+  p  { color:#6f6862; margin:0 0 28px; font-size:13px; }
+  .row { display:flex; align-items:flex-end; gap:28px; margin-bottom:34px; }
+  .item { text-align:center; }
+  .avatar { border-radius:50%; overflow:hidden; display:block; background:#fff; }
+  .avatar img { width:100%; height:100%; display:block; }
+  .cap { margin-top:8px; font-size:11px; color:#6f6862; }
+  .gmail { background:#fff; border:1px solid #e6e0d2; border-radius:10px; padding:16px 18px; max-width:560px; display:flex; gap:14px; align-items:flex-start; }
+  .gmail .avatar { width:40px; height:40px; flex:0 0 40px; }
+  .gmail b { font-size:14px; }
+  .gmail .sub { color:#6f6862; font-size:12px; }
+  .square { border-radius:8px; overflow:hidden; }
+</style>
+</head>
+<body>
+
+<h1>Sender logo, cropped to a circle</h1>
+<p>The sizes clients actually draw it at. If the mark stops reading at 32px, it is too detailed.</p>
+
+<div class="row">
+  <div class="item"><span class="avatar" style="width:128px;height:128px"><img src="/brand/bimi-logo.svg" alt=""></span><div class="cap">128</div></div>
+  <div class="item"><span class="avatar" style="width:64px;height:64px"><img src="/brand/bimi-logo.svg" alt=""></span><div class="cap">64</div></div>
+  <div class="item"><span class="avatar" style="width:40px;height:40px"><img src="/brand/bimi-logo.svg" alt=""></span><div class="cap">40 — Gmail</div></div>
+  <div class="item"><span class="avatar" style="width:32px;height:32px"><img src="/brand/bimi-logo.svg" alt=""></span><div class="cap">32</div></div>
+  <div class="item"><span class="avatar" style="width:24px;height:24px"><img src="/brand/bimi-logo.svg" alt=""></span><div class="cap">24</div></div>
+</div>
+
+<h1>Square, for the clients that do not crop</h1>
+<p>Same file. The corners are opaque, so nothing shows through on either theme.</p>
+<div class="row">
+  <div class="item"><span class="avatar square" style="width:64px;height:64px"><img src="/brand/bimi-logo.svg" alt=""></span><div class="cap">64</div></div>
+  <div class="item"><span class="avatar square" style="width:40px;height:40px"><img src="/brand/bimi-logo.svg" alt=""></span><div class="cap">40</div></div>
+</div>
+
+<h1>In place</h1>
+<p>Roughly how the row looks once a provider accepts the record.</p>
+<div class="gmail">
+  <span class="avatar"><img src="/brand/bimi-logo.svg" alt=""></span>
+  <div>
+    <div><b>Net Sale</b> <span class="sub">&lt;no-reply@send.netsale.shop&gt;</span></div>
+    <div class="sub">We have your order NS-FX364N</div>
+  </div>
+</div>
+
+</body>
+</html>
