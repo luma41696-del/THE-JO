@@ -8,6 +8,7 @@ import {
   adminSessionCookieOptions,
   isStaffRole,
 } from "@/lib/firebase/session";
+import { RULES, callerKey, rateLimit, tooManyRequests } from "@/lib/security/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,6 +28,15 @@ function clearedResponse(body: object, status = 200) {
 
 export async function POST(request: Request) {
   if (!sameOrigin(request)) return NextResponse.json({ ok: false }, { status: 403 });
+
+  /*
+   * Credential stuffing is a volume attack, and this is where a stolen or
+   * guessed token would be spent. Counted before the token is verified, so a
+   * flood costs a transaction rather than a signature check against Google.
+   */
+  const limit = await rateLimit(`session:${callerKey(request)}`, RULES.session);
+  if (!limit.ok) return tooManyRequests(limit);
+
   if (!isAdminConfigured()) return clearedResponse({ ok: false }, 503);
   const header = request.headers.get("authorization") ?? "";
   const idToken = header.startsWith("Bearer ") ? header.slice(7) : "";

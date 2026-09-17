@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 
-import { isAdminConfigured, verifyRequest } from "@/lib/firebase/admin";
+import { isAdminConfigured, requireVerified, verifyRequest } from "@/lib/firebase/admin";
 import { MAX_ALERTS_PER_ACCOUNT, alertKey, type AlertKind, type StockAlert } from "@/lib/alerts";
 import { isLocale } from "@/lib/i18n/config";
+import { RULES, callerKey, rateLimit, tooManyRequests } from "@/lib/security/rate-limit";
 
 /**
  * "Tell me when it's back."
@@ -91,6 +92,12 @@ interface SubscribeBody {
 }
 
 export async function POST(request: Request) {
+  /*
+   * Counted before the body is read. A flood should cost this route a
+   * transaction, not a JSON parse of whatever the caller felt like sending.
+   */
+  const limit = await rateLimit(`alerts:${callerKey(request)}`, RULES.messaging);
+  if (!limit.ok) return tooManyRequests(limit);
   if (!isAdminConfigured()) return notConfigured();
 
   const caller = await verifyRequest(request);
@@ -98,6 +105,15 @@ export async function POST(request: Request) {
   if (!caller.email) {
     return bad("This account has no email address to send to.", 400);
   }
+
+  /*
+   * This queues a message the shop will later send to that address. An
+   * unconfirmed one is an address somebody typed, not one they own — and
+   * sending to it is how a shop's domain ends up used for harassment and then
+   * in a spam filter.
+   */
+  const verified = requireVerified(caller);
+  if (!verified.ok) return bad(verified.error, verified.status);
 
   let body: SubscribeBody;
   try {

@@ -8,6 +8,8 @@ import { motion, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { EASE } from "@/lib/motion";
 import { AuthError, requestPasswordReset, signIn, signInWithGoogle, signUp } from "@/lib/firebase/auth";
+import { PhoneSignIn } from "./PhoneSignIn";
+import { phoneSignInEnabled } from "@/lib/firebase/phone-auth";
 import { syncAdminSession } from "@/lib/firebase/session-client";
 import type { User } from "firebase/auth";
 import { Button } from "@/components/ui/Button";
@@ -214,6 +216,28 @@ export function AuthForm({ mode, locale = "en" }: { mode: "signin" | "signup"; l
             <span className="bg-line h-px flex-1" />
           </div>
 
+            </>
+          )}
+
+          {/*
+            Phone sign-in, when it is switched on.
+
+            Ahead of the password form on purpose: in this market a phone
+            number is the identifier people actually remember, and an email
+            address is the one they have to go and look up. `PhoneSignIn`
+            renders nothing at all when the provider is off, so no divider is
+            left stranded above an absent form.
+          */}
+          {phoneSignInEnabled() && (
+            <>
+              <PhoneSignIn locale={locale} onSignedIn={() => router.push(next)} />
+              <div className="my-7 flex items-center gap-4">
+                <span className="bg-line h-px flex-1" />
+                <span className="text-mist text-[0.75rem] tracking-wider uppercase">
+                  {rtl ? "أو" : "or"}
+                </span>
+                <span className="bg-line h-px flex-1" />
+              </div>
             </>
           )}
           <form onSubmit={handleSubmit} noValidate className="mt-7 space-y-4">

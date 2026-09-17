@@ -88,10 +88,44 @@ export async function verifyRequest(request: Request) {
       uid: decoded.uid,
       email: decoded.email ?? null,
       role: (decoded.role as "customer" | "staff" | "admin" | undefined) ?? "customer",
+      /*
+       * Whether we know this person can be reached.
+       *
+       * A phone sign-in counts. It has no email at all, and treating "no
+       * verified email" as unconfirmed would lock every phone customer out of
+       * the parts of the shop that ask for a confirmed identity — which is the
+       * opposite of what confirming an identity is for. What matters is that
+       * *some* channel was proved, not which one.
+       */
+      emailVerified: decoded.email_verified === true,
+      phoneVerified: typeof decoded.phone_number === "string" && decoded.phone_number.length > 0,
+      get verified(): boolean {
+        return this.emailVerified || this.phoneVerified;
+      },
     };
   } catch {
     return null;
   }
+}
+
+/**
+ * A caller who has proved they can be reached, or a refusal explaining how.
+ *
+ * Used by the routes that publish something other people read, or that send a
+ * message on the shop's behalf. Staff are exempt: their accounts are created
+ * by an administrator, which is a stronger check than an email round-trip.
+ */
+export function requireVerified(
+  caller: { verified: boolean; role: string } | null,
+): { ok: true } | { ok: false; status: number; error: string } {
+  if (!caller) return { ok: false, status: 401, error: "Sign in first." };
+  if (caller.role === "staff" || caller.role === "admin") return { ok: true };
+  if (caller.verified) return { ok: true };
+  return {
+    ok: false,
+    status: 403,
+    error: "Confirm your email address first — check your inbox for the link.",
+  };
 }
 
 /** Grant staff/admin. Call from a protected script or an admin-only route. */

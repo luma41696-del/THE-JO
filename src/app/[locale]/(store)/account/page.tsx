@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { AccountPanel } from "@/components/account/AccountPanel";
+import { VerifyEmailBanner } from "@/components/auth/VerifyEmailBanner";
 import { RequireAuth } from "@/components/account/RequireAuth";
 import { PageIntro } from "@/components/ui/PageIntro";
 import { isLocale } from "@/lib/i18n/config";
@@ -26,6 +27,14 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
     <>
       <PageIntro locale={locale} eyebrow={t.account.eyebrow} title={t.account.title} />
       <RequireAuth locale={locale}>
+        {/*
+          Inside the auth gate, so it is never shown to a visitor who is not
+          signed in — and above the panel, because it is the one thing on this
+          page that is asking the customer to do something.
+        */}
+        <div className="mx-auto mb-6 max-w-5xl px-6">
+          <VerifyEmailBanner locale={locale} />
+        </div>
         <AccountPanel locale={locale} />
       </RequireAuth>
     </>

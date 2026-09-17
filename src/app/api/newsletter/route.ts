@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { isAdminConfigured } from "@/lib/firebase/admin";
 import type { Locale } from "@/types";
+import { RULES, callerKey, rateLimit, tooManyRequests } from "@/lib/security/rate-limit";
 
 /**
  * Newsletter subscription.
@@ -25,6 +26,12 @@ export const dynamic = "force-dynamic";
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/;
 
 export async function POST(request: Request) {
+  /*
+   * Counted before the body is read. A flood should cost this route a
+   * transaction, not a JSON parse of whatever the caller felt like sending.
+   */
+  const limit = await rateLimit(`newsletter:${callerKey(request)}`, RULES.messaging);
+  if (!limit.ok) return tooManyRequests(limit);
   let body: { email?: string; locale?: Locale };
   try {
     body = (await request.json()) as { email?: string; locale?: Locale };

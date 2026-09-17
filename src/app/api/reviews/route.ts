@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { isAdminConfigured, verifyRequest } from "@/lib/firebase/admin";
+import { isAdminConfigured, requireVerified, verifyRequest } from "@/lib/firebase/admin";
 import { revalidateCatalogue } from "@/lib/revalidate";
 import { REVIEW_MAX_IMAGES, REVIEW_MAX_TITLE, reviewId, validateReview } from "@/lib/reviews";
 import type { ProductImage, Review } from "@/types";
+import { RULES, callerKey, rateLimit, tooManyRequests } from "@/lib/security/rate-limit";
 
 /**
  * Customer review submission.
@@ -52,6 +53,12 @@ function safeImages(value: unknown): ProductImage[] {
 }
 
 export async function POST(request: Request) {
+  /*
+   * Counted before the body is read. A flood should cost this route a
+   * transaction, not a JSON parse of whatever the caller felt like sending.
+   */
+  const limit = await rateLimit(`reviews:${callerKey(request)}`, RULES.content);
+  if (!limit.ok) return tooManyRequests(limit);
   let body: Body;
   try {
     body = (await request.json()) as Body;
@@ -77,6 +84,15 @@ export async function POST(request: Request) {
 
   const caller = await verifyRequest(request);
   if (!caller) return bad("Sign in to leave a review.", 401);
+
+  /*
+   * A review carries a name and a star rating into other customers' buying
+   * decisions, which makes an unconfirmed account worth creating in bulk.
+   * Confirming an address — or having signed in by phone — is the cheapest
+   * check that costs a bot something and a real customer nothing.
+   */
+  const verified = requireVerified(caller);
+  if (!verified.ok) return bad(verified.error, verified.status);
 
   try {
     const { getAdminDb } = await import("@/lib/firebase/admin");

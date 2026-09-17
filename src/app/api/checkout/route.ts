@@ -40,6 +40,7 @@ import type {
   OrderEvent,
   ProductVariant,
 } from "@/types";
+import { RULES, callerKey, rateLimit, tooManyRequests } from "@/lib/security/rate-limit";
 
 /**
  * Order creation.
@@ -101,6 +102,12 @@ function bad(message: string, status = 400) {
 }
 
 export async function POST(request: Request) {
+  /*
+   * Counted before the body is read. A flood should cost this route a
+   * transaction, not a JSON parse of whatever the caller felt like sending.
+   */
+  const limit = await rateLimit(`checkout:${callerKey(request)}`, RULES.checkout);
+  if (!limit.ok) return tooManyRequests(limit);
   if (process.env.NODE_ENV === "production" && !isAdminConfigured()) {
     return bad("Checkout is temporarily unavailable. Please try again later.", 503);
   }

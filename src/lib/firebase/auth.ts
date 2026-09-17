@@ -3,11 +3,13 @@
 import {
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
+  sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut as fbSignOut,
   updateProfile,
+  type User,
 } from "firebase/auth";
 
 import { getFirebaseAuth } from "./client";
@@ -53,6 +55,23 @@ const MESSAGES: Record<string, { message: string; field?: "email" | "password" |
     message: "Too many attempts. Wait a minute, then try again.",
   },
   "auth/popup-closed-by-user": { message: "Sign-in window was closed before finishing." },
+  "auth/operation-not-allowed": {
+    message: "That sign-in method is not switched on for this shop yet.",
+  },
+  "auth/invalid-phone-number": {
+    message: "That phone number does not look right.",
+  },
+  "auth/invalid-verification-code": {
+    message: "That code is not right. Check it and try again.",
+  },
+  "auth/code-expired": { message: "That code has expired. Ask for a new one." },
+  "auth/missing-phone-number": { message: "Enter your phone number." },
+  "auth/quota-exceeded": {
+    message: "Too many codes requested. Try again later.",
+  },
+  "auth/credential-already-in-use": {
+    message: "That is already linked to another account.",
+  },
   "auth/network-request-failed": { message: "Network problem. Check your connection." },
 };
 
@@ -96,6 +115,17 @@ export async function signUp(name: string, email: string, password: string, loca
     await updateProfile(credential.user, { displayName: name.trim() });
     const { ensureProfile } = await import("./profile");
     await ensureProfile(credential.user, locale);
+
+    /*
+     * Sent at sign-up, and deliberately not awaited into the failure path.
+     *
+     * A verification email that will not send — a quota, a bounce, a provider
+     * having a bad minute — must not turn a successful registration into an
+     * error that leaves the customer with an account they were told was not
+     * created. They can ask for another from the banner in their account.
+     */
+    void requestEmailVerification(credential.user, locale).catch(() => {});
+
     return credential.user;
   } catch (error) {
     throw toAuthError(error);
@@ -114,6 +144,42 @@ export async function signInWithGoogle(locale: Locale = "en") {
   } catch (error) {
     throw toAuthError(error);
   }
+}
+
+/**
+ * Send (or re-send) the address confirmation.
+ *
+ * `continueUrl` brings them back to their account rather than to Firebase's
+ * own bare "email verified" page, which carries none of the shop's branding
+ * and leaves the customer on a dead end wondering whether it worked.
+ */
+export async function requestEmailVerification(user: User, locale: Locale = "en") {
+  try {
+    await sendEmailVerification(user, {
+      url: `${window.location.origin}/${locale}/account?verified=1`,
+      handleCodeInApp: false,
+    });
+  } catch (error) {
+    throw toAuthError(error);
+  }
+}
+
+/**
+ * Re-read the user from Firebase, so a just-clicked link is reflected here.
+ *
+ * `user.emailVerified` is a property of the *cached* token. Clicking the link
+ * in another tab does not change this one, so a page that never reloads shows
+ * the "please confirm" banner to somebody who already has — which reads as the
+ * confirmation not having worked, and gets it clicked again.
+ */
+export async function refreshVerification(): Promise<boolean> {
+  const user = getFirebaseAuth().currentUser;
+  if (!user) return false;
+  await user.reload();
+  // The claim rides in the token, so a forced refresh is what lets the server
+  // see it too.
+  await user.getIdToken(true);
+  return getFirebaseAuth().currentUser?.emailVerified ?? false;
 }
 
 export async function requestPasswordReset(email: string) {

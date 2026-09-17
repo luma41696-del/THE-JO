@@ -13,6 +13,7 @@ import {
   ticketReference,
 } from "@/lib/support";
 import type { Locale, SupportTicket, TicketMessage, TicketTopic } from "@/types";
+import { RULES, callerKey, rateLimit, tooManyRequests } from "@/lib/security/rate-limit";
 
 /**
  * The customer's side of a support conversation.
@@ -121,6 +122,12 @@ export async function GET(request: Request) {
 /* -------------------------------------------------------------------------- */
 
 export async function POST(request: Request) {
+  /*
+   * Counted before the body is read. A flood should cost this route a
+   * transaction, not a JSON parse of whatever the caller felt like sending.
+   */
+  const limit = await rateLimit(`support:${callerKey(request)}`, RULES.messaging);
+  if (!limit.ok) return tooManyRequests(limit);
   let body: Body;
   try {
     body = (await request.json()) as Body;
