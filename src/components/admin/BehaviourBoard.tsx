@@ -20,6 +20,7 @@ import {
 import { AdminPageHeader } from "./AdminShell";
 import { useAdminLocale } from "./AdminLocale";
 import { Panel, StatTile } from "./AdminUI";
+import { Link } from "@/components/ui/Link";
 import type { AnalyticsEvent, Product } from "@/types";
 
 /**
@@ -39,6 +40,7 @@ export function BehaviourBoard({
   products,
   truncated,
   live,
+  uid,
 }: {
   events: AnalyticsEvent[];
   products: Product[];
@@ -46,10 +48,48 @@ export function BehaviourBoard({
   truncated: boolean;
   /** False when reading fell back to demo data. */
   live: boolean;
+  /** Narrow the whole board to one signed-in customer. */
+  uid?: string;
 }) {
-  const { t } = useAdminLocale();
+  const { t, rtl } = useAdminLocale();
   const [period, setPeriod] = useState<Period>("30d");
-  const scoped = useMemo(() => inPeriod(events, period), [events, period]);
+
+  /*
+   * One customer, when the customers board sent us here.
+   *
+   * Only signed-in activity carries a uid, and only with analytics consent —
+   * so this shows what is known, not everything that happened. A board that
+   * quietly reported "no activity" for a customer who simply declined
+   * analytics would be an accusation dressed as a fact, which is why the
+   * banner below says which it is.
+   */
+  const forCustomer = useMemo(
+    () => (uid ? events.filter((event) => event.uid === uid) : events),
+    [events, uid],
+  );
+
+  const scoped = useMemo(() => inPeriod(forCustomer, period), [forCustomer, period]);
+
+  const customerBanner = uid ? (
+    <div className="border-line bg-paper-raised mb-5 flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 text-[0.8125rem]">
+      <span className="text-ink">
+        {rtl ? "نشاط حساب واحد" : "One account's activity"}
+        <span className="text-mist ms-2 font-mono text-[0.75rem]">{uid}</span>
+      </span>
+      <span className="text-mist">
+        {forCustomer.length === 0
+          ? rtl
+            ? "لا نشاط مسجّل — قد يكون الزبون رفض التتبّع."
+            : "Nothing recorded — this customer may have declined analytics."
+          : rtl
+            ? `${forCustomer.length} حدثاً`
+            : `${forCustomer.length} events`}
+      </span>
+      <Link href="/admin/customers" className="text-mist hover:text-ink ms-auto transition-colors">
+        ← {rtl ? "كل الزبائن" : "All customers"}
+      </Link>
+    </div>
+  ) : null;
 
   const steps = useMemo(() => funnel(scoped), [scoped]);
   const exits = useMemo(() => exitPoints(scoped), [scoped]);
@@ -78,6 +118,8 @@ export function BehaviourBoard({
         title={t("beh.title")}
         description={t("beh.subtitle")}
       />
+
+      {customerBanner}
 
       {/* Honesty about the data before any number is read. */}
       {!live && (

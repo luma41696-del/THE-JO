@@ -281,6 +281,59 @@ export const getAdminCustomers = cache(async (): Promise<CustomerSummary[]> => {
     }
   }
 
+  /*
+   * Everyone with an account, not only everyone with an order.
+   *
+   * The summaries above are built from orders, which is the right basis for
+   * revenue — but it means a registered customer who has not bought anything
+   * is invisible. That is precisely the account somebody needs to block: the
+   * one signing up to abuse reviews or burn the SMS budget, which has no
+   * orders by definition.
+   */
+  try {
+    const { getAdminAuth } = await import("@/lib/firebase/admin");
+    const auth = getAdminAuth();
+
+    // One page of a thousand. A shop that outgrows this needs paging in the
+    // board too, so it fails visibly rather than silently listing a subset.
+    const { users } = await auth.listUsers(1000);
+
+    for (const user of users) {
+      // Staff belong to the Access screen, which knows about roles.
+      const role = user.customClaims?.role;
+      if (role === "staff" || role === "admin") continue;
+
+      const existing = acc.get(user.uid);
+      const account = {
+        disabled: user.disabled,
+        createdAt: Date.parse(user.metadata.creationTime) || undefined,
+        lastSignInAt: user.metadata.lastSignInTime
+          ? Date.parse(user.metadata.lastSignInTime) || undefined
+          : undefined,
+        providers: user.providerData.map((entry) => entry.providerId),
+      };
+
+      if (existing) Object.assign(existing, account);
+      else
+        acc.set(user.uid, {
+          uid: user.uid,
+          name: user.displayName ?? user.email ?? user.phoneNumber ?? user.uid,
+          email: user.email ?? "",
+          city: "",
+          orders: 0,
+          revenue: 0,
+          firstOrderAt: 0,
+          lastOrderAt: 0,
+          neverOrdered: true,
+          ...account,
+        });
+    }
+  } catch (error) {
+    // The order-derived list is still worth showing; what is lost is the
+    // blocked flag and the accounts that have never ordered.
+    console.warn("[net sale] Could not list sign-in accounts.", error);
+  }
+
   return [...acc.values()].sort((a, b) => b.revenue - a.revenue);
 });
 

@@ -75,6 +75,18 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
 
   const campaignCards = [...promoBanners, ...spotlight];
 
+  /*
+   * A section with nothing in it is not rendered at all.
+   *
+   * The heading, the description and the "All offers" link used to print
+   * whether or not there was anything under them, so switching every campaign
+   * off left a screenful of empty page announcing "Campaigns & offers —
+   * everything currently live, in one place" above a gap. That reads as a
+   * shop whose page failed to load, not as a shop with no campaigns running.
+   *
+   * `offers` already worked this way; the rest did not.
+   */
+
   return (
     <>
       {/*
@@ -92,54 +104,66 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       />
 
       {/* --- Campaigns / advertising rail --------------------------------- */}
-      <section className="ns-container py-16 md:py-24">
-        <SectionHeading
-          eyebrow={t.home.campaignsEyebrow}
-          title={t.home.campaignsTitle}
-          description={t.home.campaignsBody}
-          action={{ label: t.home.allOffers, href: "/shop?onSale=true" }}
-          locale={locale}
-        />
-        <PromoRail banners={campaignCards} locale={locale} />
-      </section>
+      {campaignCards.length > 0 && (
+        <section className="ns-container py-16 md:py-24">
+          <SectionHeading
+            eyebrow={t.home.campaignsEyebrow}
+            title={t.home.campaignsTitle}
+            description={t.home.campaignsBody}
+            action={{ label: t.home.allOffers, href: "/shop?onSale=true" }}
+            locale={locale}
+          />
+          <PromoRail banners={campaignCards} locale={locale} />
+        </section>
+      )}
 
       {/* --- New arrivals -------------------------------------------------- */}
-      <section className="ns-container py-16 md:py-24">
-        <SectionHeading
-          eyebrow={t.home.newArrivalsEyebrow}
-          title={t.home.newArrivalsTitle}
-          action={{ label: t.common.viewAll, href: "/shop?sort=newest" }}
-          locale={locale}
-        />
-        <ProductRail products={newArrivals} locale={locale} />
-      </section>
+      {newArrivals.length > 0 && (
+        <section className="ns-container py-16 md:py-24">
+          <SectionHeading
+            eyebrow={t.home.newArrivalsEyebrow}
+            title={t.home.newArrivalsTitle}
+            action={{ label: t.common.viewAll, href: "/shop?sort=newest" }}
+            locale={locale}
+          />
+          <ProductRail products={newArrivals} locale={locale} />
+        </section>
+      )}
 
       {/* --- Categories ---------------------------------------------------- */}
-      <section className="ns-container py-16 md:py-24">
-        <SectionHeading
-          eyebrow={t.home.categoriesEyebrow}
-          title={t.home.categoriesTitle}
-          description={t.home.categoriesBody}
-          locale={locale}
-        />
-        <CategoryGrid categories={categories} locale={locale} />
-      </section>
+      {categories.length > 0 && (
+        <section className="ns-container py-16 md:py-24">
+          <SectionHeading
+            eyebrow={t.home.categoriesEyebrow}
+            title={t.home.categoriesTitle}
+            description={t.home.categoriesBody}
+            locale={locale}
+          />
+          <CategoryGrid categories={categories} locale={locale} />
+        </section>
+      )}
 
       {/* --- Featured ------------------------------------------------------ */}
-      <section className="ns-container py-16 md:py-24">
-        <SectionHeading
-          eyebrow={t.home.featuredEyebrow}
-          title={t.home.featuredTitle}
-          action={{ label: t.common.shopAll, href: "/shop" }}
-          locale={locale}
-        />
-        <ProductGrid products={featured} locale={locale} columns={4} />
-      </section>
+      {featured.length > 0 && (
+        <section className="ns-container py-16 md:py-24">
+          <SectionHeading
+            eyebrow={t.home.featuredEyebrow}
+            title={t.home.featuredTitle}
+            action={{ label: t.common.shopAll, href: "/shop" }}
+            locale={locale}
+          />
+          <ProductGrid products={featured} locale={locale} columns={4} />
+        </section>
+      )}
 
       {/* --- AI fitting room ----------------------------------------------- */}
-      <section className="ns-container py-16 md:py-24">
-        <FittingRoomTeaser products={featured} locale={locale} />
-      </section>
+      {/* The teaser builds a look out of these, so with no products it is an
+          invitation to try on nothing. */}
+      {featured.length > 0 && (
+        <section className="ns-container py-16 md:py-24">
+          <FittingRoomTeaser products={featured} locale={locale} />
+        </section>
+      )}
 
       {/* --- Offers -------------------------------------------------------- */}
       {offers.length > 0 && (
@@ -156,15 +180,17 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       )}
 
       {/* --- Trending ------------------------------------------------------ */}
-      <section className="ns-container py-16 md:py-24">
-        <SectionHeading
-          eyebrow={t.home.trendingEyebrow}
-          title={t.home.trendingTitle}
-          action={{ label: t.common.viewAll, href: "/shop?sort=rating" }}
-          locale={locale}
-        />
-        <ProductRail products={trending} locale={locale} />
-      </section>
+      {trending.length > 0 && (
+        <section className="ns-container py-16 md:py-24">
+          <SectionHeading
+            eyebrow={t.home.trendingEyebrow}
+            title={t.home.trendingTitle}
+            action={{ label: t.common.viewAll, href: "/shop?sort=rating" }}
+            locale={locale}
+          />
+          <ProductRail products={trending} locale={locale} />
+        </section>
+      )}
 
       {/* --- Brand story --------------------------------------------------- */}
       <section className="ns-container py-16 md:py-28">
@@ -172,15 +198,17 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       </section>
 
       {/* --- Reviews ------------------------------------------------------- */}
-      <section className="ns-container py-16 md:py-24">
-        <SectionHeading
-          eyebrow={t.home.reviewsEyebrow}
-          title={t.home.reviewsTitle}
-          align="center"
-          locale={locale}
-        />
-        <Testimonials testimonials={testimonials} locale={locale} />
-      </section>
+      {testimonials.length > 0 && (
+        <section className="ns-container py-16 md:py-24">
+          <SectionHeading
+            eyebrow={t.home.reviewsEyebrow}
+            title={t.home.reviewsTitle}
+            align="center"
+            locale={locale}
+          />
+          <Testimonials testimonials={testimonials} locale={locale} />
+        </section>
+      )}
 
       {/* --- Newsletter ---------------------------------------------------- */}
       <section className="ns-container py-8 md:py-16">

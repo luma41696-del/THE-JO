@@ -476,6 +476,18 @@ export interface CustomerSummary {
   revenue: number;
   firstOrderAt: number;
   lastOrderAt: number;
+  /**
+   * Blocked from signing in. Absent on a customer derived from orders alone,
+   * which is every customer until the account list is read.
+   */
+  disabled?: boolean;
+  /** From the sign-in account, not from an order. */
+  createdAt?: number;
+  lastSignInAt?: number;
+  /** `password`, `google.com`, `phone` — how they get in. */
+  providers?: string[];
+  /** True when the account exists but has never ordered. */
+  neverOrdered?: boolean;
 }
 
 /**

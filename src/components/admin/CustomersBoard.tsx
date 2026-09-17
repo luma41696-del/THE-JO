@@ -8,6 +8,8 @@ import { AdminPageHeader } from "./AdminShell";
 import { useAdminLocale } from "./AdminLocale";
 import { DataTable, Panel, StatTile, type Column } from "./AdminUI";
 import { ExportMenu } from "./ExportMenu";
+import { CustomerActions } from "./CustomerActions";
+import { Link } from "@/components/ui/Link";
 import type { CustomerSummary } from "@/lib/admin/data";
 
 /**
@@ -21,9 +23,12 @@ import type { CustomerSummary } from "@/lib/admin/data";
 export function CustomersBoard({
   customers,
   now,
+  canDelete,
 }: {
   customers: CustomerSummary[];
   now: number;
+  /** Deleting an account is an administrator's job; blocking is staff work. */
+  canDelete: boolean;
 }) {
   const { t } = useAdminLocale();
   const [search, setSearch] = useState("");
@@ -57,7 +62,9 @@ export function CustomersBoard({
       header: t("col.customer"),
       cell: (c) => (
         <span>
-          <span className="text-ink block font-medium">{c.name}</span>
+          <span className={cn("block font-medium", c.disabled ? "text-mist line-through" : "text-ink")}>
+            {c.name}
+          </span>
           <span className="text-mist block text-[0.6875rem]">{c.email}</span>
         </span>
       ),
@@ -116,6 +123,33 @@ export function CustomersBoard({
         );
       },
       sortValue: (c) => c.lastOrderAt,
+    },
+    {
+      key: "actions",
+      header: t("col.access"),
+      align: "end",
+      cell: (c) => (
+        <span className="flex items-center justify-end gap-3">
+          {/* Their own behaviour, not the shop's aggregate — what was looked
+              at, what was added, what was abandoned. */}
+          <Link
+            href={`/admin/behaviour?uid=${encodeURIComponent(c.uid)}`}
+            className="text-mist hover:text-ink text-[0.75rem] transition-colors"
+          >
+            {t("customers.activity")}
+          </Link>
+          <CustomerActions
+            customer={c}
+            canDelete={canDelete}
+            labels={{
+              block: t("customers.block"),
+              unblock: t("customers.unblock"),
+              delete: t("customers.delete"),
+              blocked: t("customers.blocked"),
+            }}
+          />
+        </span>
+      ),
     },
   ];
 
