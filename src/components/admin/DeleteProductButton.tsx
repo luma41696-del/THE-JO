@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { cn } from "@/lib/utils";
@@ -33,7 +33,7 @@ export function DeleteProductButton({
   slug: string;
   title: string;
 }) {
-  const { rtl } = useAdminLocale();
+  const { t, rtl } = useAdminLocale();
   const router = useRouter();
 
   const [open, setOpen] = useState(false);
@@ -61,11 +61,11 @@ export function DeleteProductButton({
         plan?: DeletionPlan;
         summary?: { en: string; ar: string };
       };
-      if (!response.ok || !data.ok) throw new Error(data.error ?? "That could not be read.");
+      if (!response.ok || !data.ok) throw new Error(data.error ?? t("del.readError"));
       setPlan(data.plan ?? null);
       setSummary(rtl ? (data.summary?.ar ?? "") : (data.summary?.en ?? ""));
     } catch (readError) {
-      setError(readError instanceof Error ? readError.message : "That could not be read.");
+      setError(readError instanceof Error ? readError.message : t("del.readError"));
     } finally {
       setLoading(false);
     }
@@ -81,16 +81,27 @@ export function DeleteProductButton({
         { method: "DELETE", headers: token ? { Authorization: `Bearer ${token}` } : {} },
       );
       const data = (await response.json()) as { ok?: boolean; error?: string };
-      if (!response.ok || !data.ok) throw new Error(data.error ?? "That did not work.");
+      if (!response.ok || !data.ok) throw new Error(data.error ?? t("del.failed"));
 
       // Back to the catalogue: the page behind this dialog no longer exists.
       router.push("/admin/products");
       router.refresh();
     } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : "That did not work.");
+      setError(deleteError instanceof Error ? deleteError.message : t("del.failed"));
       setBusy(false);
     }
   }
+
+  // Escape closes it, as it closes any dialog — and it is the way out that
+  // does not involve moving the pointer past a red button.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !busy) setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, busy]);
 
   const confirmed = typed.trim() === slug;
 
@@ -102,30 +113,30 @@ export function DeleteProductButton({
         className="text-mist hover:text-alert cursor-pointer text-[0.75rem] transition-colors"
         data-cursor="hover"
       >
-        {rtl ? "احذف المنتج" : "Delete product"}
+        {t("del.one")}
       </button>
 
       {open && (
         <div className="fixed inset-0 z-[200] grid place-items-center p-4">
           <button
             type="button"
-            aria-label={rtl ? "إغلاق" : "Close"}
+            aria-label={t("del.close")}
             onClick={() => !busy && setOpen(false)}
             className="bg-ink/40 absolute inset-0 cursor-default"
           />
           <div
             role="dialog"
             aria-modal="true"
-            aria-label={rtl ? "احذف المنتج" : "Delete product"}
+            aria-label={t("del.one")}
             className="bg-paper-raised border-line rounded-xl shadow-float relative w-full max-w-md border p-5"
           >
             <h3 className="font-display text-ink text-[0.9375rem] font-semibold">
-              {rtl ? "احذف" : "Delete"} — {title}
+              {t("del.heading")} — {title}
             </h3>
 
             {loading ? (
               <p className="text-mist mt-3 text-[0.8125rem]">
-                {rtl ? "يُحسب ما سيُحذف…" : "Working out what this removes…"}
+                {t("del.working")}
               </p>
             ) : (
               plan && (
@@ -140,27 +151,23 @@ export function DeleteProductButton({
                   */}
                   {plan.filesKept.length > 0 && (
                     <p className="text-mist mt-2 text-[0.75rem]">
-                      {rtl
-                        ? `${plan.filesKept.length} صورة تبقى لأن منتجات أخرى تستخدمها.`
-                        : plan.filesKept.length === 1
-                          ? "1 image stays, because another product uses it."
-                          : `${plan.filesKept.length} images stay, because other products use them.`}
+                      {plan.filesKept.length === 1
+                        ? t("del.keptOne")
+                        : t("del.keptMany").replace("{n}", String(plan.filesKept.length))}
                     </p>
                   )}
 
                   <p className="text-mist mt-3 text-[0.75rem] leading-relaxed">
-                    {rtl
-                      ? "الأرشفة تُخرجه من المتجر وتُبقي كل شيء، ويمكن التراجع عنها. الحذف لا يمكن التراجع عنه."
-                      : "Archiving takes it out of the shop, keeps everything, and can be undone. Deleting cannot."}
+                    {t("del.archiveInstead")}
                   </p>
 
                   <label className="mt-4 block">
                     <span className="text-ink-muted mb-1.5 block text-[0.75rem]">
-                      {rtl ? "اكتب" : "Type"}{" "}
+                      {t("del.typeSlug")}{" "}
                       <span className="text-ink font-mono" dir="ltr">
                         {slug}
                       </span>{" "}
-                      {rtl ? "للتأكيد" : "to confirm"}
+                      {t("del.toConfirm")}
                     </span>
                     <input
                       value={typed}
@@ -173,7 +180,7 @@ export function DeleteProductButton({
 
                   <div className="mt-5 flex justify-end gap-2">
                     <Button variant="ghost" size="sm" disabled={busy} onClick={() => setOpen(false)}>
-                      {rtl ? "إلغاء" : "Cancel"}
+                      {t("del.cancel")}
                     </Button>
                     <button
                       type="button"
@@ -185,13 +192,7 @@ export function DeleteProductButton({
                       )}
                       data-cursor="hover"
                     >
-                      {busy
-                        ? rtl
-                          ? "يُحذف…"
-                          : "Deleting…"
-                        : rtl
-                          ? "احذف نهائياً"
-                          : "Delete for good"}
+                      {busy ? t("del.deleting") : t("del.confirm")}
                     </button>
                   </div>
                 </>

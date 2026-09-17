@@ -1395,6 +1395,61 @@ export const ADMIN_STRINGS = {
   "opt.addRule": { en: "Add a markdown", ar: "أضف تخفيضًا" },
   "opt.imageColour": { en: "Shows for", ar: "تظهر مع" },
   "opt.allColours": { en: "Every colour", ar: "كل الألوان" },
+  /* ---- deleting for good ---- */
+  "del.one": { en: "Delete product", ar: "احذف المنتج" },
+  "del.selected": { en: "Delete {n}", ar: "احذف {n}" },
+  "del.heading": { en: "Delete for good", ar: "حذف نهائي" },
+  "del.working": {
+    en: "Working out what this removes…",
+    ar: "يُحسب ما سيُحذف…",
+  },
+  "del.keptOne": {
+    en: "1 image stays, because another product uses it.",
+    ar: "صورة واحدة تبقى لأن منتجاً آخر يستخدمها.",
+  },
+  "del.keptMany": {
+    en: "{n} images stay, because other products use them.",
+    ar: "{n} صورة تبقى لأن منتجات أخرى تستخدمها.",
+  },
+  "del.archiveInstead": {
+    en: "Archiving takes it out of the shop, keeps everything, and can be undone. Deleting cannot.",
+    ar: "الأرشفة تُخرجه من المتجر وتُبقي كل شيء، ويمكن التراجع عنها. الحذف لا يمكن التراجع عنه.",
+  },
+  "del.archiveInsteadMany": {
+    en: "Archiving takes them out of the shop, keeps everything, and can be undone. Deleting cannot.",
+    ar: "الأرشفة تُخرجها من المتجر وتُبقي كل شيء، ويمكن التراجع عنها. الحذف لا يمكن التراجع عنه.",
+  },
+  "del.typeSlug": { en: "Type", ar: "اكتب" },
+  "del.typeCount": {
+    en: "Type the number of products to confirm",
+    ar: "اكتب عدد المنتجات للتأكيد",
+  },
+  "del.toConfirm": { en: "to confirm", ar: "للتأكيد" },
+  "del.confirm": { en: "Delete for good", ar: "احذف نهائياً" },
+  "del.deleting": { en: "Deleting…", ar: "يُحذف…" },
+  "del.progress": { en: "{done} of {total} deleted…", ar: "حُذف {done} من {total}…" },
+  "del.allDone": {
+    en: "{n} products deleted. The storefront is updated.",
+    ar: "حُذف {n} منتجاً. تم تحديث المتجر.",
+  },
+  "del.partial": {
+    en: "{ok} deleted, {bad} could not be. The rest were left alone.",
+    ar: "حُذف {ok}، وتعذّر حذف {bad}. الباقي لم يُمَس.",
+  },
+  "del.missing": {
+    en: "{n} were already gone.",
+    ar: "{n} منها كانت محذوفة مسبقاً.",
+  },
+  "del.readError": {
+    en: "That could not be read.",
+    ar: "تعذّر قراءة ذلك.",
+  },
+  "del.failed": {
+    en: "That did not work.",
+    ar: "لم ينجح ذلك.",
+  },
+  "del.close": { en: "Close", ar: "إغلاق" },
+  "del.cancel": { en: "Cancel", ar: "إلغاء" },
 } satisfies AdminDict;
 
 export type AdminKey = keyof typeof ADMIN_STRINGS;

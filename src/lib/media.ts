@@ -108,18 +108,25 @@ export function urlsUsedBy(product: Partial<Product>): string[] {
 /**
  * Count usage of each file across a set of products.
  *
- * `ignoreProductId` excludes the product being saved, because its *incoming*
- * imagery is what the caller is about to write — counting the stored version
- * would report the file it is removing as still in use by itself.
+ * `ignore` excludes products whose stored imagery is not the truth the caller
+ * is asking about. That is one product when it is being saved — its *incoming*
+ * imagery is what is about to be written, so counting the stored version would
+ * report the file it is removing as still in use by itself — and it is the
+ * whole selection when several are being deleted together.
+ *
+ * Ignoring only one of a batch is a quiet bug worth naming: each product being
+ * deleted sees the others still holding the shared photograph, so every one of
+ * them keeps it, and the file survives with nothing left pointing at it.
  */
 export function usageAcross(
   products: { id: string; images?: ProductImage[]; designs?: Product["designs"] }[],
-  ignoreProductId?: string,
+  ignore?: string | Iterable<string>,
 ): Map<string, MediaUsage> {
+  const skip = typeof ignore === "string" ? new Set([ignore]) : new Set(ignore ?? []);
   const usage = new Map<string, MediaUsage>();
 
   for (const product of products) {
-    if (ignoreProductId && product.id === ignoreProductId) continue;
+    if (skip.has(product.id)) continue;
     for (const url of urlsUsedBy(product)) {
       const key = storagePathFromUrl(url) || url;
       const entry = usage.get(key) ?? { url, productIds: [], count: 0 };

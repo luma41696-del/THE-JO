@@ -9,6 +9,7 @@ import { formatPrice, t as pick } from "@/lib/format";
 import { discountPercent } from "@/lib/utils";
 import { AdminPageHeader } from "./AdminShell";
 import { useAdminLocale } from "./AdminLocale";
+import { BulkDeleteProducts } from "./BulkDeleteProducts";
 import { getIdToken } from "@/lib/firebase/auth";
 import { storefrontState, type StorefrontState } from "@/lib/visibility";
 import { ACTION_LABELS, type ProductAction } from "@/lib/product-state";
@@ -75,9 +76,12 @@ const BULK_ACTIONS: ProductAction[] = [
 export function ProductsBoard({
   products,
   categories,
+  canDelete = false,
 }: {
   products: Product[];
   categories: Category[];
+  /** Deleting is an administrator's; archiving, above, is everyone's. */
+  canDelete?: boolean;
 }) {
   const { t, locale } = useAdminLocale();
   const router = useLocalizedRouter();
@@ -579,6 +583,24 @@ export function ProductsBoard({
                 {ACTION_LABELS[action][locale]}
               </button>
             ))}
+
+            {/*
+              Last, after a rule and in the alert colour. Every control before
+              it is reversible; this one is not, and it should not sit in the
+              same row of identical pills as "stop selling".
+            */}
+            {canDelete && (
+              <>
+                <span className="border-line mx-1 h-6 border-s" />
+                <BulkDeleteProducts
+                  ids={selected}
+                  size="sm"
+                  onDeleted={(gone) =>
+                    setSelected((current) => current.filter((id) => !gone.includes(id)))
+                  }
+                />
+              </>
+            )}
           </div>
 
           {bulkOpen && (

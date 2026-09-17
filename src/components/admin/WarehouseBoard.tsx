@@ -16,6 +16,7 @@ import {
 } from "@/lib/visibility";
 import { AdminPageHeader } from "./AdminShell";
 import { useAdminLocale } from "./AdminLocale";
+import { BulkDeleteProducts } from "./BulkDeleteProducts";
 import { ACTION_LABELS, type ProductAction } from "@/lib/product-state";
 import type { AdminKey } from "@/lib/i18n/admin";
 import { Panel, StatTile } from "./AdminUI";
@@ -83,10 +84,13 @@ export function WarehouseBoard({
   products,
   categories,
   now,
+  canDelete = false,
 }: {
   products: Product[];
   categories: Category[];
   now: number;
+  /** Deleting is an administrator's; archiving, above, is everyone's. */
+  canDelete?: boolean;
 }) {
   const { t, locale } = useAdminLocale();
   const router = useRouter();
@@ -316,7 +320,7 @@ export function WarehouseBoard({
       {/* ---- Bulk actions --------------------------------------------- */}
       {selected.size > 0 && (
         <Panel
-          title={`${selected.size} selected`}
+          title={t("qe.selected").replace("{n}", String(selected.size))}
           description={t("wh.publicationHint")}
         >
           {/*
@@ -341,6 +345,27 @@ export function WarehouseBoard({
                   {ACTION_LABELS[action][locale]}
                 </Button>
               ),
+            )}
+
+            {/*
+              Deliberately at the end of the publication row and nowhere near
+              "archive", which is the control most people reaching for this one
+              actually want. Everything else on this row can be undone.
+            */}
+            {canDelete && (
+              <>
+                <span className="border-line mx-1 h-8 border-s" />
+                <BulkDeleteProducts
+                  ids={[...selected]}
+                  onDeleted={(gone) =>
+                    setSelected((current) => {
+                      const next = new Set(current);
+                      for (const id of gone) next.delete(id);
+                      return next;
+                    })
+                  }
+                />
+              </>
             )}
           </div>
 
