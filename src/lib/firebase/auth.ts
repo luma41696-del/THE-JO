@@ -327,6 +327,59 @@ export async function requestEmailVerification(user: User, locale: Locale = "en"
   }
 }
 
+/**
+ * Ask the server to send the branded email.
+ *
+ * Returns `false` when the server says it cannot — no mail provider, no Admin
+ * credentials, a provider outage — which is the signal to fall back to
+ * Firebase's own plain email rather than leave the customer with nothing. That
+ * fallback is the whole reason the branded flow can be rolled out without a
+ * window where sign-up sends no email at all.
+ *
+ * Throws only for a refusal the customer needs to hear about, like being
+ * rate-limited.
+ */
+async function sendBranded(locale: Locale): Promise<boolean> {
+  let response: Response;
+  try {
+    const token = await getIdToken();
+    if (!token) return false;
+    response = await fetch("/api/auth/verify-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ locale }),
+    });
+  } catch {
+    // The shop's own endpoint is unreachable. Firebase may still be.
+    return false;
+  }
+
+  const data = (await response.json().catch(() => ({}))) as {
+    ok?: boolean;
+    sent?: boolean;
+    fallback?: boolean;
+    error?: string;
+  };
+
+  if (response.ok && data.ok) return data.sent !== false;
+
+  // Too many requests is the customer's answer, not something to route around
+  // by asking Firebase for the same email.
+  if (response.status === 429) {
+    throw new AuthError(
+      "A link was just sent. Check your inbox, then try again shortly.",
+      "app/verification-cooldown",
+    );
+  }
+
+  if (data.fallback) {
+    console.warn("[net sale] branded verification unavailable, using Firebase:", data.error);
+    return false;
+  }
+
+  throw new AuthError(data.error ?? "That could not be sent.", "app/verification-failed");
+}
+
 /** The actual call, with one log line per attempt. */
 async function send(user: User, locale: Locale) {
   const id = requestId();
@@ -344,6 +397,21 @@ async function send(user: User, locale: Locale) {
    * and no personal data — just which account, when, and which attempt.
    */
   console.info(`[net sale] verification send ${id} at ${at} for ${user.uid}`);
+
+  /*
+   * The branded email first, Firebase's plain one only if it cannot go.
+   *
+   * Both end at the same place — a Firebase `oobCode` link — so a customer who
+   * gets one and a customer who gets the other end up equally verified. The
+   * difference is which one looks like the shop.
+   */
+  // A cooldown or an outright refusal throws and is the customer's answer;
+  // only "cannot send" returns false and falls through to Firebase.
+  if (await sendBranded(locale)) {
+    markVerificationSent(user.uid);
+    console.info(`[net sale] verification send ${id}: sent by the shop's own mail provider.`);
+    return;
+  }
 
   try {
     await sendEmailVerification(user, settings);

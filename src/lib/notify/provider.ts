@@ -60,7 +60,17 @@ export function notifyStatus(): {
 export interface SendInput {
   to: string;
   subject: string;
+  /** The plain-text part. Always sent — see `html`. */
   body: string;
+  /**
+   * An optional HTML part.
+   *
+   * When present the message goes out as multipart: the text above is the
+   * alternative, not a replacement. A message with no text part scores worse
+   * with every spam filter there is, so `body` stays required even when this
+   * is set.
+   */
+  html?: string;
   locale: Locale;
 }
 
@@ -108,6 +118,7 @@ export async function send(input: SendInput): Promise<SendResult> {
         to: [input.to],
         subject: input.subject,
         text: input.body,
+        ...(input.html ? { html: input.html } : {}),
       }),
     });
 
