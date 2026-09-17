@@ -53,6 +53,7 @@ const NAV: { group: AdminKey; items: { href: string; label: AdminKey; icon: Reac
     group: "nav.people",
     items: [
       { href: "/admin/customers", label: "nav.customers", icon: <UsersIcon /> },
+      { href: "/admin/campaigns", label: "nav.campaigns", icon: <ChatIcon /> },
       { href: "/admin/support", label: "nav.support", icon: <ChatIcon /> },
       { href: "/admin/team", label: "nav.team", icon: <KeyIcon /> },
     ],

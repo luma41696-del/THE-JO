@@ -100,6 +100,8 @@ export async function notifyOrder(
       to: order.email,
       subject: message.subject,
       body: message.body,
+      // Multipart: the text above stays the alternative, not a replacement.
+      ...(message.html ? { html: message.html } : {}),
       locale,
     });
 
