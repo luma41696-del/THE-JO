@@ -13,6 +13,12 @@ import {
 } from "firebase/auth";
 
 import { getFirebaseAuth } from "./client";
+import {
+  RESEND_COOLDOWN_MS,
+  cooldownRemaining,
+  markVerificationSent,
+  requestId,
+} from "@/lib/verification-throttle";
 import { syncAdminSession } from "./session-client";
 import type { Locale } from "@/types";
 
@@ -162,6 +168,9 @@ export interface SignUpResult {
   verificationError?: AuthError;
 }
 
+/** How long the UI should wait before offering to send another. */
+export { RESEND_COOLDOWN_MS };
+
 export async function signUp(
   name: string,
   email: string,
@@ -176,10 +185,29 @@ export async function signUp(
   try {
     credential = await createUserWithEmailAndPassword(getFirebaseAuth(), email, password);
     await updateProfile(credential.user, { displayName: name.trim() });
+  } catch (error) {
+    // Only a failure to create the account itself is a failed sign-up.
+    throw toAuthError(error);
+  }
+
+  /*
+   * The profile document is a follow-up, not a precondition.
+   *
+   * It used to be awaited in the same try as account creation, above the
+   * verification send — so a Firestore hiccup, an App Check blip or a rules
+   * change meant the customer got an account, no verification email, and
+   * "Something went wrong". The account is real by this point and `ensureProfile`
+   * is idempotent and runs again on every sign-in, so a failure here heals
+   * itself. A missing verification email does not.
+   */
+  try {
     const { ensureProfile } = await import("./profile");
     await ensureProfile(credential.user, locale);
   } catch (error) {
-    throw toAuthError(error);
+    console.error(
+      "[net sale] Profile document was not written at sign-up; it will be retried on next sign-in.",
+      rawCode(error),
+    );
   }
 
   /*
@@ -252,6 +280,16 @@ export function isFederatedUser(user: User): boolean {
  * list today; this is here so that a new domain, or a project restored from a
  * backup, degrades instead of breaking.
  */
+/**
+ * The one send in flight, if any.
+ *
+ * Two callers asking at the same moment — a double-clicked button, a component
+ * that mounted twice — get the *same* promise rather than two emails. Firebase
+ * counts the second one, and the customer who clicked once is the one told
+ * they have tried too many times.
+ */
+let inFlight: { uid: string; promise: Promise<void> } | null = null;
+
 export async function requestEmailVerification(user: User, locale: Locale = "en") {
   if (isFederatedUser(user)) {
     throw new AuthError(
@@ -260,26 +298,78 @@ export async function requestEmailVerification(user: User, locale: Locale = "en"
     );
   }
 
+  // Collapse concurrent asks for the same account into the one already going.
+  if (inFlight && inFlight.uid === user.uid) {
+    console.info("[net sale] verification: joining the send already in flight.");
+    return inFlight.promise;
+  }
+
+  /*
+   * Refuse inside the cooldown rather than letting Firebase refuse.
+   *
+   * Firebase's answer to a too-soon second send is `auth/too-many-requests`,
+   * which reads to the customer as an accusation. Ours names the wait.
+   */
+  const waitMs = cooldownRemaining(user.uid);
+  if (waitMs > 0) {
+    throw new AuthError(
+      `A link was just sent. Check your inbox, or ask again in ${Math.ceil(waitMs / 1000)}s.`,
+      "app/verification-cooldown",
+    );
+  }
+
+  const promise = send(user, locale);
+  inFlight = { uid: user.uid, promise };
+  try {
+    await promise;
+  } finally {
+    if (inFlight?.promise === promise) inFlight = null;
+  }
+}
+
+/** The actual call, with one log line per attempt. */
+async function send(user: User, locale: Locale) {
+  const id = requestId();
+  const at = new Date().toISOString();
   const settings = {
     url: `${window.location.origin}/${locale}/account?verified=1`,
     handleCodeInApp: false,
   };
 
+  /*
+   * Every call is logged with an id and a timestamp, in production too.
+   *
+   * This is the line that answers "did the app send twice?" without anybody
+   * having to reason about React's lifecycle. It carries no address, no token
+   * and no personal data — just which account, when, and which attempt.
+   */
+  console.info(`[net sale] verification send ${id} at ${at} for ${user.uid}`);
+
   try {
     await sendEmailVerification(user, settings);
+    markVerificationSent(user.uid);
+    console.info(`[net sale] verification send ${id}: accepted by Firebase.`);
   } catch (error) {
     const code = rawCode(error);
+
+    /*
+     * The fallback fires only for a rejected continue URL — a case where
+     * Firebase refuses the request outright and sends nothing, so a second
+     * attempt cannot duplicate an email. Any other failure is reported, never
+     * retried: a retry after a timeout is exactly how one click becomes two
+     * emails and then `auth/too-many-requests`.
+     */
     if (code === "auth/unauthorized-domain" || code === "auth/invalid-continue-uri") {
       console.warn(
-        `[net sale] ${settings.url} is not an authorized domain — sending without a return link.`,
+        `[net sale] verification send ${id}: ${settings.url} is not authorized — retrying without a return link.`,
       );
-      try {
-        await sendEmailVerification(user);
-        return;
-      } catch (bare) {
-        throw toAuthError(bare);
-      }
+      await sendEmailVerification(user);
+      markVerificationSent(user.uid);
+      console.info(`[net sale] verification send ${id}: accepted without a return link.`);
+      return;
     }
+
+    console.error(`[net sale] verification send ${id} failed:`, code);
     throw toAuthError(error);
   }
 }

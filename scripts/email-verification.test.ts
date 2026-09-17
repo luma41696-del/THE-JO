@@ -1,6 +1,15 @@
 import { strict as assert } from "node:assert";
 import { describe, test } from "node:test";
 
+import {
+  RESEND_COOLDOWN_MS,
+  clearVerificationRecord,
+  cooldownRemaining,
+  hasSentVerification,
+  markVerificationSent,
+  requestId,
+} from "../src/lib/verification-throttle";
+
 /**
  * Email verification.
  *
@@ -201,5 +210,126 @@ describe("resending", () => {
       }),
       /Too many requests/,
     );
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/*  The cooldown, and the double-send it exists to stop                       */
+/* -------------------------------------------------------------------------- */
+
+describe("the resend cooldown", () => {
+  /*
+   * The bug in one test. Sign-up sent one automatically; the account page then
+   * offered a "Send the link" button with no sign that anything had gone. One
+   * click — the customer's first — was the second send in ten seconds, and
+   * Firebase answers that with `auth/too-many-requests`.
+   */
+  test("a send at sign-up blocks the immediate resend that follows it", () => {
+    const uid = `signup-${Math.random()}`;
+    const signedUpAt = 1_700_000_000_000;
+
+    markVerificationSent(uid, signedUpAt);
+
+    // Ten seconds later the customer lands on /account and presses the button.
+    assert.ok(cooldownRemaining(uid, signedUpAt + 10_000) > 0);
+    // And the page knows to say "we've sent you a link" rather than inviting it.
+    assert.equal(hasSentVerification(uid), true);
+  });
+
+  test("the cooldown expires, so a genuinely lost email can be re-sent", () => {
+    const uid = `expiry-${Math.random()}`;
+    const at = 1_700_000_000_000;
+    markVerificationSent(uid, at);
+
+    assert.ok(cooldownRemaining(uid, at + RESEND_COOLDOWN_MS - 1) > 0);
+    assert.equal(cooldownRemaining(uid, at + RESEND_COOLDOWN_MS), 0);
+  });
+
+  test("an account nobody has sent to is not throttled", () => {
+    assert.equal(cooldownRemaining(`fresh-${Math.random()}`), 0);
+  });
+
+  test("one account's cooldown does not bind another", () => {
+    const a = `a-${Math.random()}`;
+    const b = `b-${Math.random()}`;
+    const at = 1_700_000_000_000;
+
+    markVerificationSent(a, at);
+    assert.ok(cooldownRemaining(a, at + 1_000) > 0);
+    assert.equal(cooldownRemaining(b, at + 1_000), 0);
+  });
+
+  test("confirming the address forgets the record", () => {
+    const uid = `done-${Math.random()}`;
+    markVerificationSent(uid, 1_700_000_000_000);
+    assert.equal(hasSentVerification(uid), true);
+
+    clearVerificationRecord(uid);
+    assert.equal(hasSentVerification(uid), false);
+    assert.equal(cooldownRemaining(uid, 1_700_000_000_001), 0);
+  });
+});
+
+describe("request ids", () => {
+  /*
+   * These exist so a console line can be tied to one Firebase call, which is
+   * how "did the app send twice?" gets answered without reasoning about
+   * React's lifecycle.
+   */
+  test("are short, hex, and different every time", () => {
+    const ids = new Set(Array.from({ length: 200 }, requestId));
+    assert.equal(ids.size, 200, "collisions would make the log ambiguous");
+    for (const id of ids) assert.match(id, /^[0-9a-f]{8}$/);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The in-flight guard, as `requestEmailVerification` applies it.
+ *
+ * Two callers asking at the same instant — a double-clicked button, a
+ * component that mounted twice under Strict Mode — must produce one email.
+ */
+describe("concurrent asks", () => {
+  test("collapse into a single send", async () => {
+    let sends = 0;
+    let inFlight: { uid: string; promise: Promise<void> } | null = null;
+
+    const ask = async (uid: string) => {
+      if (inFlight && inFlight.uid === uid) return inFlight.promise;
+      const promise = (async () => {
+        sends += 1;
+        await new Promise((r) => setTimeout(r, 10));
+      })();
+      inFlight = { uid, promise };
+      try {
+        await promise;
+      } finally {
+        if (inFlight?.promise === promise) inFlight = null;
+      }
+    };
+
+    await Promise.all([ask("u1"), ask("u1"), ask("u1")]);
+    assert.equal(sends, 1, "three simultaneous asks, one email");
+  });
+
+  test("but two different accounts are not collapsed together", async () => {
+    let sends = 0;
+    let inFlight: { uid: string; promise: Promise<void> } | null = null;
+
+    const ask = async (uid: string) => {
+      if (inFlight && inFlight.uid === uid) return inFlight.promise;
+      const promise = (async () => {
+        sends += 1;
+      })();
+      inFlight = { uid, promise };
+      await promise;
+      if (inFlight?.promise === promise) inFlight = null;
+    };
+
+    await ask("u1");
+    await ask("u2");
+    assert.equal(sends, 2);
   });
 });

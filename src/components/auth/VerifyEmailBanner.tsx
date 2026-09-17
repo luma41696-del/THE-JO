@@ -5,6 +5,11 @@ import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { AuthError, refreshVerification, resendEmailVerification } from "@/lib/firebase/auth";
+import {
+  clearVerificationRecord,
+  cooldownRemaining,
+  hasSentVerification,
+} from "@/lib/verification-throttle";
 import type { Locale } from "@/types";
 
 /**
@@ -29,6 +34,18 @@ export function VerifyEmailBanner({ locale }: { locale: Locale }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [verified, setVerified] = useState(false);
+  const [waitSeconds, setWaitSeconds] = useState(0);
+
+  /*
+   * Whether sign-up already sent one.
+   *
+   * This is the whole reason the shop was hitting `auth/too-many-requests` on
+   * a single click: sign-up sent an email, then dropped the customer here in
+   * front of a "Send the link" button that said nothing about it. Pressing it
+   * was the obvious thing to do — and it was the second send in ten seconds,
+   * which Firebase refuses.
+   */
+  const alreadySent = Boolean(user && hasSentVerification(user.uid));
 
   const signedIn = status === "authenticated" && user;
 
@@ -42,22 +59,43 @@ export function VerifyEmailBanner({ locale }: { locale: Locale }) {
     signedIn && user?.email && !user.emailVerified && !verified && !federated,
   );
 
+  /*
+   * Re-reads whether the address has been confirmed. Reads only — this effect
+   * has never sent an email and must not start: mounting the account page is
+   * not a request for one.
+   */
   useEffect(() => {
     if (!needsConfirming) return;
+    let live = true;
 
     const recheck = async () => {
       try {
-        if (await refreshVerification()) setVerified(true);
+        if ((await refreshVerification()) && live) {
+          setVerified(true);
+          if (user) clearVerificationRecord(user.uid);
+        }
       } catch {
         // Offline, or the token could not refresh. The banner simply stays.
       }
     };
 
     window.addEventListener("focus", recheck);
-    // Also on mount: they may have confirmed in a previous session.
     void recheck();
-    return () => window.removeEventListener("focus", recheck);
-  }, [needsConfirming]);
+    return () => {
+      live = false;
+      window.removeEventListener("focus", recheck);
+    };
+  }, [needsConfirming, user]);
+
+  /* The countdown that replaces a button which would only fail. */
+  useEffect(() => {
+    if (!user || !needsConfirming) return;
+
+    const tick = () => setWaitSeconds(Math.ceil(cooldownRemaining(user.uid) / 1000));
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [user, needsConfirming, sent]);
 
   if (!needsConfirming) return null;
 
@@ -73,8 +111,12 @@ export function VerifyEmailBanner({ locale }: { locale: Locale }) {
        * reads as the first one not having worked.
        */
       const result = await resendEmailVerification(locale);
-      if (result.alreadyVerified) setVerified(true);
-      else setSent(true);
+      if (result.alreadyVerified) {
+        setVerified(true);
+        if (user) clearVerificationRecord(user.uid);
+      } else {
+        setSent(true);
+      }
     } catch (sendError) {
       // The real Firebase code, both on screen and in the log. A resend that
       // fails silently is what hid this problem in the first place.
@@ -101,16 +143,28 @@ export function VerifyEmailBanner({ locale }: { locale: Locale }) {
         "text-[0.8125rem]",
       )}
     >
+      {/*
+        The wording turns on whether one has already gone.
+        
+        Telling somebody to "confirm your email" next to a Send button, when a
+        link is already sitting in their inbox, is an instruction to send a
+        second — which Firebase refuses and blames them for.
+      */}
       <p className="text-ink">
-        {rtl
-          ? "أكّد بريدك الإلكتروني لتتمكّن من كتابة التقييمات وتلقّي تنبيهات التوفّر."
-          : "Confirm your email address to write reviews and get back-in-stock alerts."}
+        {sent || alreadySent
+          ? rtl
+            ? "أرسلنا رابط التأكيد. افتحه من بريدك لتتمكّن من كتابة التقييمات وتلقّي تنبيهات التوفّر."
+            : "We've sent you a confirmation link. Open it to write reviews and get back-in-stock alerts."
+          : rtl
+            ? "أكّد بريدك الإلكتروني لتتمكّن من كتابة التقييمات وتلقّي تنبيهات التوفّر."
+            : "Confirm your email address to write reviews and get back-in-stock alerts."}
         <span className="text-mist ms-1.5">{user?.email}</span>
       </p>
 
-      {sent ? (
-        <span className="text-mint ms-auto">
-          {rtl ? "أُرسل الرابط — تفقّد بريدك." : "Link sent — check your inbox."}
+      {waitSeconds > 0 ? (
+        /* A countdown rather than a button that Firebase is going to refuse. */
+        <span className="text-mist ms-auto tabular-nums">
+          {rtl ? `يمكنك الإرسال مجدداً بعد ${waitSeconds}ث` : `Send again in ${waitSeconds}s`}
         </span>
       ) : (
         <button
@@ -124,9 +178,13 @@ export function VerifyEmailBanner({ locale }: { locale: Locale }) {
             ? rtl
               ? "يُرسل…"
               : "Sending…"
-            : rtl
-              ? "أرسل الرابط"
-              : "Send the link"}
+            : alreadySent
+              ? rtl
+                ? "أرسله مجدداً"
+                : "Send it again"
+              : rtl
+                ? "أرسل الرابط"
+                : "Send the link"}
         </button>
       )}
 

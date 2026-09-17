@@ -45,6 +45,19 @@ const origins = (...values: string[]) =>
  */
 const devEval = process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : "";
 
+/*
+ * The Firebase emulators, in development only.
+ *
+ * They run on 127.0.0.1 over plain HTTP, which `connect-src 'self'` refuses —
+ * so without this the whole emulator suite is unreachable from the browser and
+ * anything that needs a throwaway account has to be tested against the live
+ * project instead. Shipped once already and found the hard way.
+ */
+const devEmulators =
+  process.env.NODE_ENV === "development"
+    ? " http://127.0.0.1:* http://localhost:* ws://127.0.0.1:* ws://localhost:*"
+    : "";
+
 const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${devEval} ${origins("apis.google.com", "www.gstatic.com", "www.google.com").join(" ")}`,
@@ -70,7 +83,7 @@ const csp = [
     "*.firebasestorage.app",
     authDomain,
     storageBucket,
-  ).join(" ")} wss://*.firebaseio.com wss://*.firebasestorage.app`,
+  ).join(" ")} wss://*.firebaseio.com wss://*.firebasestorage.app${devEmulators}`,
   // The Google sign-in popup and the reCAPTCHA that phone sign-in requires.
   `frame-src 'self' ${origins(authDomain, "accounts.google.com", "www.google.com").join(" ")}`,
   "worker-src 'self' blob:",
