@@ -19,6 +19,7 @@ import { Panel } from "./AdminUI";
 import { Button } from "@/components/ui/Button";
 import { VariantWorkbench } from "./VariantWorkbench";
 import { StockRulesEditor } from "./StockRulesEditor";
+import { DeleteProductButton } from "./DeleteProductButton";
 import { editableAxes, splitAxes } from "@/lib/variant-matrix";
 import type {
   Category,
@@ -159,10 +160,13 @@ export function ProductEditor({
   product,
   categories,
   shippingClasses = [],
+  canDelete = false,
 }: {
   product: Product | null;
   categories: Category[];
   shippingClasses?: ShippingClass[];
+  /** Deleting is an administrator's job; archiving is the reversible option. */
+  canDelete?: boolean;
 }) {
   const { t, locale } = useAdminLocale();
   const router = useLocalizedRouter();
@@ -852,6 +856,21 @@ export function ProductEditor({
                   {t("pe.viewLive")}
                 </Button>
               </Link>
+            )}
+            {/*
+              Deliberately a quiet text link, not a button.
+              
+              It sits beside Save, which is the one thing a merchant presses on
+              this screen all day — and the two must not look alike. Archiving
+              is the reversible option and lives in the status field; this is
+              the one that cannot be undone.
+            */}
+            {!isNew && canDelete && product && (
+              <DeleteProductButton
+                productId={product.id}
+                slug={product.slug}
+                title={draft.titleEn || product.slug}
+              />
             )}
             {/*
               The state of the work, next to the button that changes it. A

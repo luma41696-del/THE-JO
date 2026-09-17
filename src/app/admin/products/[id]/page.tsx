@@ -6,6 +6,7 @@ import {
   getAdminCategories,
   getAdminShippingClasses,
 } from "@/lib/admin/data";
+import { getAdminSession } from "@/lib/firebase/session";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -14,11 +15,18 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function AdminProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [products, categories, shippingClasses] = await Promise.all([
+  const [products, categories, shippingClasses, session] = await Promise.all([
     getAdminProducts(),
     getAdminCategories(),
     getAdminShippingClasses(),
+    getAdminSession(),
   ]);
+
+  /*
+   * Hiding the control is a courtesy; the route refuses a non-administrator
+   * regardless. A button that is merely absent is not a permission.
+   */
+  const canDelete = session?.role === "admin";
 
   if (id === "new") {
     return (
@@ -30,6 +38,11 @@ export default async function AdminProductPage({ params }: { params: Promise<{ i
   if (!product) notFound();
 
   return (
-    <ProductEditor product={product} categories={categories} shippingClasses={shippingClasses} />
+    <ProductEditor
+      product={product}
+      categories={categories}
+      shippingClasses={shippingClasses}
+      canDelete={canDelete}
+    />
   );
 }
