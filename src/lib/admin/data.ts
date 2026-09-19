@@ -290,6 +290,32 @@ export const getAdminCustomers = cache(async (): Promise<CustomerSummary[]> => {
    * one signing up to abuse reviews or burn the SMS budget, which has no
    * orders by definition.
    */
+  /*
+   * The addresses each account signed in from, read alongside the accounts.
+   * One collection read for the whole board rather than one per row.
+   */
+  const addresses = new Map<string, CustomerSummary["signInIps"]>();
+  try {
+    const { getAdminDb } = await import("@/lib/firebase/admin");
+    const snap = await getAdminDb().collection("users").limit(1000).get();
+    for (const doc of snap.docs) {
+      const seen = (doc.data().signInIps ?? []) as {
+        ip?: string;
+        last?: number;
+        count?: number;
+      }[];
+      const rows = seen
+        .filter((entry) => typeof entry.ip === "string" && entry.ip)
+        .map((entry) => ({ ip: entry.ip!, last: entry.last ?? 0, count: entry.count ?? 0 }))
+        .sort((a, b) => b.last - a.last);
+      if (rows.length > 0) addresses.set(doc.id, rows);
+    }
+  } catch (error) {
+    // The board is still worth showing without them; what is lost is the
+    // option to block an address from the block dialog.
+    console.warn("[net sale] Could not read sign-in addresses.", error);
+  }
+
   try {
     const { getAdminAuth } = await import("@/lib/firebase/admin");
     const auth = getAdminAuth();
@@ -306,6 +332,7 @@ export const getAdminCustomers = cache(async (): Promise<CustomerSummary[]> => {
       const existing = acc.get(user.uid);
       const account = {
         disabled: user.disabled,
+        signInIps: addresses.get(user.uid),
         createdAt: Date.parse(user.metadata.creationTime) || undefined,
         lastSignInAt: user.metadata.lastSignInTime
           ? Date.parse(user.metadata.lastSignInTime) || undefined

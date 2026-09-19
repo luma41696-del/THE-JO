@@ -128,6 +128,10 @@ export async function startPhoneSignIn(
         const credential = await confirmation.confirm(code.trim());
         const { ensureProfile } = await import("./profile");
         await ensureProfile(credential.user, locale);
+        // Same recorder as the other two doors, so none of them is the one
+        // that quietly logs nothing.
+        const { recordSignInAddress } = await import("./auth");
+        await recordSignInAddress(credential.user);
         return credential.user;
       } catch (error) {
         throw toPhoneError(error);
@@ -178,6 +182,8 @@ export async function signInWithPhoneCredential(verificationId: string, code: st
     );
     const { ensureProfile } = await import("./profile");
     await ensureProfile(credential.user);
+    const { recordSignInAddress } = await import("./auth");
+    await recordSignInAddress(credential.user);
     return credential.user;
   } catch (error) {
     throw toPhoneError(error);

@@ -488,6 +488,15 @@ export interface CustomerSummary {
   providers?: string[];
   /** True when the account exists but has never ordered. */
   neverOrdered?: boolean;
+  /**
+   * Addresses this account has signed in from, newest first.
+   *
+   * Only read by the block dialog, and only by an administrator — it is the
+   * one thing that lets "block this account" also be "block this connection".
+   * Bounded and stored on the account document, so deleting the account
+   * deletes it.
+   */
+  signInIps?: { ip: string; last: number; count: number }[];
 }
 
 /**

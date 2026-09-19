@@ -145,6 +145,39 @@ function logAuthState(where: string) {
 /*  Actions                                                                   */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Tell the server where this sign-in came from.
+ *
+ * Firebase authenticates entirely in the browser, so without this call a
+ * sign-in touches no server of ours and the shop never learns the address —
+ * which is what an account block needs in order to also be an address block.
+ *
+ * ## It is awaited, and it cannot fail the sign-in
+ *
+ * Awaited so the write is in flight before the page navigates away; wrapped so
+ * that nothing it does can throw into the caller. A customer must never be
+ * kept out of their account because a bookkeeping write went wrong, and the
+ * address is not worth one failed login.
+ *
+ * The failure is logged rather than swallowed. A `.catch(() => {})` here would
+ * make a broken endpoint invisible for months — which is exactly how the
+ * verification email went unnoticed.
+ */
+export async function recordSignInAddress(user: User): Promise<void> {
+  try {
+    const token = await user.getIdToken();
+    const response = await fetch("/api/auth/seen", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      console.warn(`[net sale] sign-in address not recorded (${response.status}).`);
+    }
+  } catch (error) {
+    console.warn("[net sale] sign-in address not recorded:", error);
+  }
+}
+
 export async function signIn(email: string, password: string) {
   try {
     const credential = await signInWithEmailAndPassword(getFirebaseAuth(), email, password);
@@ -153,6 +186,7 @@ export async function signIn(email: string, password: string) {
     // wants a token.
     const { ensureProfile } = await import("./profile");
     await ensureProfile(credential.user);
+    await recordSignInAddress(credential.user);
     return credential.user;
   } catch (error) {
     throw toAuthError(error);
@@ -249,6 +283,7 @@ export async function signInWithGoogle(locale: Locale = "en") {
     const credential = await signInWithPopup(getFirebaseAuth(), provider);
     const { ensureProfile } = await import("./profile");
     await ensureProfile(credential.user, locale);
+    await recordSignInAddress(credential.user);
     return credential.user;
   } catch (error) {
     throw toAuthError(error);

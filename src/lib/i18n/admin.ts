@@ -1511,6 +1511,19 @@ export const ADMIN_STRINGS = {
   "ipb.forAccount": { en: "With account", ar: "مع الحساب" },
   "ipb.delay": { en: "A change takes up to half a minute to reach every server.", ar: "يستغرق التغيير حتى نصف دقيقة ليصل إلى كل الخوادم." },
   "ipb.adminOnly": { en: "Only an administrator can block an address.", ar: "الأدمن فقط يمكنه حجب عنوان." },
+  /* ---- blocking a customer, and their connection ---- */
+  "customers.blockTitle": { en: "Block this account", ar: "حجب هذا الحساب" },
+  "customers.blockBody": { en: "They cannot sign in, and any session they have open ends now. This can be undone.", ar: "لن يستطيع تسجيل الدخول، وتنتهي أي جلسة مفتوحة لديه الآن. ويمكن التراجع عن هذا." },
+  "customers.alsoBlockIp": { en: "Also block the connection", ar: "احجب الاتصال أيضاً" },
+  "customers.alsoBlockIpHint": { en: "Blocking the account stops this account. It does not stop the person, who can register again. Blocking the address raises the cost — but a mobile network puts thousands of subscribers behind one address, so choose it deliberately.", ar: "حجب الحساب يوقف هذا الحساب. لا يوقف الشخص، الذي يمكنه التسجيل من جديد. حجب العنوان يرفع الكلفة عليه — لكن شبكة الجوال تضع آلاف المشتركين خلف عنوان واحد، فاخترها بوعي." },
+  "customers.noAddresses": { en: "No sign-in address has been recorded for this account yet.", ar: "لم يُسجَّل بعد أي عنوان دخول لهذا الحساب." },
+  "customers.lastSeen": { en: "last seen", ar: "آخر ظهور" },
+  "customers.signIns": { en: "sign-ins", ar: "مرات دخول" },
+  "customers.blockGo": { en: "Block", ar: "احجب" },
+  "customers.blocking": { en: "Blocking...", ar: "جارٍ الحجب…" },
+  "customers.cancel": { en: "Cancel", ar: "إلغاء" },
+  "customers.ipBlocked": { en: "{n} address blocked as well.", ar: "حُجب {n} عنوان أيضاً." },
+  "customers.ipFailed": { en: "The account is blocked. The address was not: {n}", ar: "الحساب محجوب. العنوان لم يُحجب: {n}" },
 } satisfies AdminDict;
 
 export type AdminKey = keyof typeof ADMIN_STRINGS;

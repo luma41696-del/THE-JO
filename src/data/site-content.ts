@@ -305,8 +305,8 @@ export function buildPolicyDocs(S: StoreSettings): PolicyDoc[] {
         heading: { en: "What we collect", ar: "ما الذي نجمعه" },
         body: [
           {
-            en: "To take an order we need a name, an address, a phone number and an email. If you create an account we keep your order history and any addresses you save. Nothing else is required to shop.",
-            ar: "لتنفيذ الطلب نحتاج الاسم والعنوان ورقم الهاتف والبريد الإلكتروني. وإن أنشأت حساباً نحتفظ بسجل طلباتك والعناوين التي تحفظها. ولا يلزم غير ذلك للتسوّق.",
+            en: "To take an order we need a name, an address, a phone number and an email. If you create an account we keep your order history, any addresses you save, and — to keep the shop safe — the internet addresses you sign in from, described below. Nothing else is required to shop.",
+            ar: "لتنفيذ الطلب نحتاج الاسم والعنوان ورقم الهاتف والبريد الإلكتروني. وإن أنشأت حساباً نحتفظ بسجل طلباتك والعناوين التي تحفظها، وكذلك — لحماية المتجر — عناوين الإنترنت التي تدخل منها، وهي موضّحة أدناه. ولا يلزم غير ذلك للتسوّق.",
           },
         ],
       },
@@ -316,6 +316,15 @@ export function buildPolicyDocs(S: StoreSettings): PolicyDoc[] {
           {
             en: "Body measurements you enter are stored against your account and used only to recommend a size. They are never used for advertising, never shared, and you can clear them from your account at any time.",
             ar: "تُحفظ القياسات التي تُدخلها في حسابك وتُستخدم فقط لاقتراح المقاس. ولا تُستخدم للإعلانات ولا تُشارك، ويمكنك مسحها من حسابك في أي وقت.",
+          },
+        ],
+      },
+      {
+        heading: { en: "Sign-in records", ar: "سجلّ تسجيل الدخول" },
+        body: [
+          {
+            en: "When you sign in we record the internet address you signed in from, together with the date. We keep only the last few addresses, and we use them for one thing: stopping abuse of the shop — fraudulent orders, attacks on other people's accounts, and the like. They are never used for advertising, never shared, and never linked to what you browse. Deleting your account deletes them with it.",
+            ar: "عند تسجيل دخولك نسجّل عنوان الإنترنت الذي دخلت منه مع التاريخ. نحتفظ بآخر عدد قليل من العناوين فقط، ونستخدمها لشيء واحد: منع إساءة استخدام المتجر — الطلبات الاحتيالية، ومحاولات اختراق حسابات الآخرين، وما شابه. ولا تُستخدم للإعلانات ولا تُشارك ولا تُربط بما تتصفّحه. وحذف حسابك يحذفها معه.",
           },
         ],
       },

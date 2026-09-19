@@ -146,6 +146,18 @@ export function CustomersBoard({
               unblock: t("customers.unblock"),
               delete: t("customers.delete"),
               blocked: t("customers.blocked"),
+              blockTitle: t("customers.blockTitle"),
+              blockBody: t("customers.blockBody"),
+              alsoBlockIp: t("customers.alsoBlockIp"),
+              alsoBlockIpHint: t("customers.alsoBlockIpHint"),
+              noAddresses: t("customers.noAddresses"),
+              lastSeen: t("customers.lastSeen"),
+              signIns: t("customers.signIns"),
+              blockGo: t("customers.blockGo"),
+              blocking: t("customers.blocking"),
+              cancel: t("customers.cancel"),
+              ipBlocked: t("customers.ipBlocked"),
+              ipFailed: t("customers.ipFailed"),
             }}
           />
         </span>

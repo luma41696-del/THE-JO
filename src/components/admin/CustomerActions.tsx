@@ -21,6 +21,18 @@ import type { CustomerSummary } from "@/lib/admin/data";
  * be discovered: the sign-in account and the personal details go, the orders
  * stay with the details redacted. An operator who expects "delete" to erase
  * the invoices too should find that out here, not from an accountant.
+ *
+ * ## Blocking the connection as well
+ *
+ * An administrator blocking an account is also offered the addresses it has
+ * signed in from. That is the whole reason those addresses are recorded:
+ * disabling a login stops that login, and the person registers again in a
+ * minute.
+ *
+ * The boxes are **unticked by default**, and not out of timidity. An address
+ * block reaches people who are not the target — a mobile carrier puts
+ * thousands of subscribers behind one — so it is a thing to choose each time
+ * rather than a thing that happens because a dialog was dismissed quickly.
  */
 export function CustomerActions({
   customer,
@@ -35,13 +47,30 @@ export function CustomerActions({
     unblock: string;
     delete: string;
     blocked: string;
+    blockTitle: string;
+    blockBody: string;
+    alsoBlockIp: string;
+    alsoBlockIpHint: string;
+    noAddresses: string;
+    lastSeen: string;
+    signIns: string;
+    blockGo: string;
+    blocking: string;
+    cancel: string;
+    ipBlocked: string;
+    ipFailed: string;
   };
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [blocking, setBlocking] = useState(false);
+  const [chosen, setChosen] = useState<string[]>([]);
+  const [notice, setNotice] = useState<string | null>(null);
   const [typed, setTyped] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  const addresses = customer.signInIps ?? [];
 
   async function run(action: "block" | "unblock" | "delete") {
     setBusy(true);
@@ -71,6 +100,70 @@ export function CustomerActions({
     }
   }
 
+  /**
+   * Block the account, then whichever addresses were ticked.
+   *
+   * In that order, and the order matters: the account block is the one that
+   * always works and always matters. If an address block fails - the range is
+   * reserved, it covers the operator's own connection, the write is refused -
+   * the account is still blocked and the message says which half happened.
+   * Doing the addresses first could leave customers locked out by a rule added
+   * for an account that then failed to block.
+   */
+  async function blockWithAddresses() {
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+
+    try {
+      const token = await getIdToken().catch(() => null);
+      const headers = {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+
+      const account = await fetch("/api/admin/customers", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ uid: customer.uid, action: "block" }),
+      });
+      const accountData = (await account.json()) as { ok?: boolean; error?: string };
+      if (!account.ok || !accountData.ok) {
+        throw new Error(accountData.error ?? "That did not work.");
+      }
+
+      const refused: string[] = [];
+      let blocked = 0;
+      for (const ip of chosen) {
+        const response = await fetch("/api/admin/ip-blocks", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            ip,
+            uid: customer.uid,
+            reason: `Blocked with the account ${customer.email || customer.uid}`,
+          }),
+        });
+        const data = (await response.json()) as { ok?: boolean; error?: string };
+        if (response.ok && data.ok) blocked += 1;
+        else refused.push(data.error ?? ip);
+      }
+
+      setBlocking(false);
+      setChosen([]);
+      if (refused.length > 0) {
+        setError(labels.ipFailed.replace("{n}", refused.join(" \u00b7 ")));
+      } else if (blocked > 0) {
+        setNotice(labels.ipBlocked.replace("{n}", String(blocked)));
+      }
+      router.refresh();
+    } catch (blockError) {
+      setError(blockError instanceof Error ? blockError.message : "That did not work.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <>
       <span className="flex items-center justify-end gap-2">
@@ -83,7 +176,23 @@ export function CustomerActions({
         <button
           type="button"
           disabled={busy}
-          onClick={() => void run(customer.disabled ? "unblock" : "block")}
+          onClick={() => {
+            /*
+             * Unblocking is one click, always - putting a dialog in front of
+             * undoing something is friction on the safe direction.
+             *
+             * Blocking gets the dialog only for an administrator, who is the
+             * only one the address route will accept. For staff it stays the
+             * single click it has always been.
+             */
+            if (customer.disabled) void run("unblock");
+            else if (canDelete) {
+              setChosen([]);
+              setNotice(null);
+              setError(null);
+              setBlocking(true);
+            } else void run("block");
+          }}
           className="text-mist hover:text-ink cursor-pointer text-[0.75rem] transition-colors disabled:opacity-40"
           data-cursor="hover"
         >
@@ -107,6 +216,91 @@ export function CustomerActions({
         <p role="alert" className="text-alert mt-1 text-end text-[0.6875rem]">
           {error}
         </p>
+      )}
+
+      {notice && !error && (
+        <p role="status" className="text-mint mt-1 text-end text-[0.6875rem]">
+          {notice}
+        </p>
+      )}
+
+      {blocking && (
+        <div className="fixed inset-0 z-[200] grid place-items-center p-4">
+          <button
+            type="button"
+            aria-label={labels.cancel}
+            onClick={() => !busy && setBlocking(false)}
+            className="bg-ink/40 absolute inset-0 cursor-default"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={labels.blockTitle}
+            className="bg-paper-raised border-line rounded-xl shadow-float relative w-full max-w-md border p-5"
+          >
+            <h3 className="font-display text-ink text-[0.9375rem] font-semibold">
+              {labels.blockTitle} — {customer.name}
+            </h3>
+            <p className="text-ink-muted mt-3 text-[0.8125rem] leading-relaxed">
+              {labels.blockBody}
+            </p>
+
+            <div className="border-line mt-4 border-t pt-4">
+              <p className="text-ink text-[0.8125rem] font-medium">{labels.alsoBlockIp}</p>
+              <p className="text-mist mt-1 text-[0.6875rem] leading-relaxed">
+                {labels.alsoBlockIpHint}
+              </p>
+
+              {addresses.length === 0 ? (
+                <p className="text-mist mt-3 text-[0.75rem]">{labels.noAddresses}</p>
+              ) : (
+                <ul className="mt-3 grid gap-1.5">
+                  {addresses.map((entry) => (
+                    <li key={entry.ip}>
+                      <label className="flex cursor-pointer items-center gap-2.5">
+                        <input
+                          type="checkbox"
+                          checked={chosen.includes(entry.ip)}
+                          onChange={(event) =>
+                            setChosen((current) =>
+                              event.target.checked
+                                ? [...current, entry.ip]
+                                : current.filter((x) => x !== entry.ip),
+                            )
+                          }
+                          className="accent-alert h-3.5 w-3.5"
+                        />
+                        <span className="text-ink font-mono text-[0.8125rem]" dir="ltr">
+                          {entry.ip}
+                        </span>
+                        <span className="text-mist text-[0.6875rem]">
+                          {entry.count} {labels.signIns}
+                          {entry.last
+                            ? ` \u00b7 ${labels.lastSeen} ${new Date(entry.last).toLocaleDateString()}`
+                            : ""}
+                        </span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <Button variant="ghost" size="sm" disabled={busy} onClick={() => setBlocking(false)}>
+                {labels.cancel}
+              </Button>
+              <Button
+                variant="brand"
+                size="sm"
+                loading={busy}
+                onClick={() => void blockWithAddresses()}
+              >
+                {busy ? labels.blocking : labels.blockGo}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {confirming && (
