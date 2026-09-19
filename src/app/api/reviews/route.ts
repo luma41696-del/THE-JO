@@ -170,6 +170,35 @@ export async function POST(request: Request) {
 
     await ref.set(payload, { merge: true });
 
+    /*
+     * Points, if it went straight to published.
+     *
+     * Keyed on the review id, so the edit path above cannot pay a second time
+     * for the same review however often somebody rewrites it — and a review
+     * that starts pending is paid by the moderator's approval instead, once,
+     * through the same key.
+     */
+    if (status === "published") {
+      const { getEarnRules, award } = await import("@/lib/loyalty-earning.server");
+      const { pointsForReview } = await import("@/lib/loyalty-earning");
+      const rules = await getEarnRules(db);
+      const points = pointsForReview(rules, {
+        rating,
+        body: payload.body,
+        status,
+        imageCount: images.length,
+      });
+      if (points > 0) {
+        await award(db, {
+          uid: caller.uid,
+          source: "review",
+          sourceId: id,
+          points,
+          now,
+        });
+      }
+    }
+
     await db.collection("auditLog").add({
       action: isEdit ? "review.update" : "review.create",
       reviewId: id,

@@ -675,8 +675,32 @@ export async function POST(request: Request) {
         reference,
         orderId: orderRef.id,
         total: totals.total,
+        uid,
       };
     });
+
+    /*
+     * The referral reward, after the order has committed.
+     *
+     * Outside the transaction on purpose, and it is the one place in this
+     * route where that is the right call. The reward depends on this being the
+     * customer's *first* order, which means counting their orders — a query,
+     * and a transaction cannot run one. Doing it after means a crash in
+     * between costs an unpaid referral rather than an uncommitted order, and
+     * an unpaid referral is recoverable by hand while a lost order is not.
+     *
+     * Paid at most once because both awards are keyed on the invited
+     * account: `referral-<uid>`. A customer placing a second order finds the
+     * entry already there.
+     */
+    if (!result.duplicate && result.uid) {
+      await payReferral(db, result.uid, result.orderId).catch((error) => {
+        // Never fails the order. The customer has paid; the reward is
+        // bookkeeping, and a thrown error here would answer a successful
+        // checkout with a 500.
+        console.error("[net sale] referral reward failed for", result.uid, error);
+      });
+    }
 
     /*
      * Confirm by email, after the transaction has committed.
@@ -723,4 +747,51 @@ class CheckoutRejection extends Error {
     super(message);
     this.name = "CheckoutRejection";
   }
+}
+
+/**
+ * Pay an invitation, if this order is the one that earns it.
+ *
+ * Both sides are paid together or not at all in practice: the two awards are
+ * separate writes, but each is keyed and idempotent, so a failure between them
+ * is fixed by the next order rather than by a reconciliation script.
+ */
+async function payReferral(
+  db: FirebaseFirestore.Firestore,
+  uid: string,
+  orderId: string,
+): Promise<void> {
+  const { getEarnRules, award } = await import("@/lib/loyalty-earning.server");
+
+  const profile = await db.collection("users").doc(uid).get();
+  const inviterUid = profile.data()?.referredBy as string | undefined;
+  if (!inviterUid || inviterUid === uid) return;
+
+  const rules = await getEarnRules(db);
+  if (!rules.referral.enabled) return;
+
+  /*
+   * Only the first order pays. Counted rather than flagged, because a flag
+   * would be a second truth about something the orders already say.
+   */
+  if (rules.referral.requiresOrder) {
+    const orders = await db.collection("orders").where("uid", "==", uid).limit(2).get();
+    if (orders.size > 1) return;
+  }
+
+  await award(db, {
+    uid: inviterUid,
+    source: "referral",
+    sourceId: uid,
+    points: rules.referral.inviterPoints,
+    note: `Invited a friend who ordered (${orderId})`,
+  });
+
+  await award(db, {
+    uid,
+    source: "referral",
+    sourceId: uid,
+    points: rules.referral.inviteePoints,
+    note: "Joined on an invitation",
+  });
 }

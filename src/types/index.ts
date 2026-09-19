@@ -1191,7 +1191,11 @@ export interface GiftPrize {
    * where every spin wins is a discount, not a game, and hiding the losing
    * slice would make the wheel a lie.
    */
-  reward: "percentage" | "fixed" | "free-shipping" | "none";
+  reward: "percentage" | "fixed" | "free-shipping" | "points" | "none";
+  /**
+   * The size of the reward: a percentage, an amount, or — for `points` — the
+   * number of points. Ignored by `free-shipping` and `none`.
+   */
   value: number;
   /** Cap on a percentage reward, in store currency. */
   maxDiscount?: number;

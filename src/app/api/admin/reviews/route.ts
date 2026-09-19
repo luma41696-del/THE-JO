@@ -120,6 +120,41 @@ export async function PATCH(request: Request) {
       updatedAt: now,
     });
 
+    /*
+     * Approving a review pays for it, once.
+     *
+     * Keyed on the review id, so a moderator toggling a review between
+     * published and hidden and back pays the first time and never again. The
+     * customer keeps the points through a later hide: they wrote the review,
+     * and taking the payment back for a moderation decision they cannot see is
+     * how a programme loses trust.
+     *
+     * `before.status` is checked so re-saving a reply on an already-published
+     * review is not treated as an approval — the key would refuse the second
+     * payment anyway, and relying on that alone would mean the intent lived
+     * only in a database constraint.
+     */
+    if (status === "published" && before.status !== "published" && before.uid) {
+      const { getEarnRules, award } = await import("@/lib/loyalty-earning.server");
+      const { pointsForReview } = await import("@/lib/loyalty-earning");
+      const rules = await getEarnRules(db);
+      const points = pointsForReview(rules, {
+        rating: Number(before.rating) || 0,
+        body: String(before.body ?? ""),
+        status: "published",
+        imageCount: Array.isArray(before.images) ? before.images.length : 0,
+      });
+      if (points > 0) {
+        await award(db, {
+          uid: String(before.uid),
+          source: "review",
+          sourceId: id,
+          points,
+          now,
+        });
+      }
+    }
+
     await db.collection("auditLog").add({
       action: "review.moderate",
       reviewId: id,

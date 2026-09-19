@@ -127,7 +127,21 @@ export async function POST(request: Request) {
       let code: string | undefined;
       let expiresAt: number | undefined;
 
-      if (prize.reward !== "none") {
+      /*
+       * Points are not a coupon.
+       *
+       * Every other prize is spent at checkout and so is issued as an offer.
+       * Points go straight onto the balance instead, keyed on the play, which
+       * is what stops a retried request paying twice — the play document and
+       * the ledger entry share the same id.
+       *
+       * Awarded after the transaction commits, for the same reason the
+       * referral is: the balance is a different collection and a failure there
+       * must not roll back a play the customer has already seen spin.
+       */
+      if (prize.reward === "points") {
+        // Nothing to issue here; see `pointsWon` below.
+      } else if (prize.reward !== "none") {
         expiresAt = now + Math.max(1, prize.validForDays) * 86_400_000;
         code = giftCode(`${playRef.id}:${caller.uid}`);
         const offerRef = db.collection("offers").doc();
@@ -184,10 +198,36 @@ export async function POST(request: Request) {
         prize,
         code,
         expiresAt,
+        playId: playRef.id,
         cooldownHours: campaign.cooldownHours,
         remaining: availablePrizes({ ...campaign, prizes }).length,
       };
     });
+
+    /*
+     * A points prize lands on the balance once the play has committed.
+     *
+     * Keyed on the play, so a retried request finds the entry already written
+     * and pays nothing more. Failing here costs the customer their points and
+     * not their spin, which is recoverable; failing inside the transaction
+     * would have cost them the spin as well.
+     */
+    let pointsWon = 0;
+    if (result.ok && result.prize.reward === "points") {
+      const points = Math.max(0, Math.round(result.prize.value));
+      const { getEarnRules, award } = await import("@/lib/loyalty-earning.server");
+      const rules = await getEarnRules(db);
+      if (rules.wheel.enabled && points > 0) {
+        await award(db, {
+          uid: caller.uid,
+          source: "wheel",
+          sourceId: result.playId,
+          points,
+          note: "Lucky wheel",
+        });
+        pointsWon = points;
+      }
+    }
 
     if (!result.ok) {
       return NextResponse.json(
@@ -215,6 +255,9 @@ export async function POST(request: Request) {
       },
       ...(result.code ? { code: result.code } : {}),
       ...(result.expiresAt ? { expiresAt: result.expiresAt } : {}),
+      // Reported only when it actually landed, so the wheel never shows a
+      // number the balance did not receive.
+      ...(pointsWon > 0 ? { pointsWon } : {}),
       nextPlayAt: Date.now() + result.cooldownHours * 3_600_000,
     });
   } catch (error) {

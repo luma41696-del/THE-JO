@@ -105,6 +105,16 @@ export interface LedgerEntry {
   /** Why, for an `adjust` made by a person. */
   note?: string;
   actorUid?: string;
+  /**
+   * Where the points came from.
+   *
+   * Absent on entries written before there was anywhere but a purchase to
+   * earn from, so a reader treats a missing value as `order` rather than as
+   * unknown.
+   */
+  source?: import("@/lib/loyalty-earning").EarnSource;
+  /** The review, referred account or wheel play this paid for. */
+  sourceId?: string;
 }
 
 export interface Balance {

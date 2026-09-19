@@ -17,7 +17,7 @@
     "grant-admin": "tsx scripts/grant-admin.ts",
     "migrate:schedule": "tsx scripts/migrate-schedule-keys.ts",
     "test:offers": "tsx --test scripts/offers.test.ts",
-    "test": "npm run test:offers && npm run test:visibility && npm run test:phase3 && npm run test:phase4 && npm run test:designs && npm run test:zones && npm run test:invoice && npm run test:notify && npm run test:payments && npm run test:errors && npm run test:site && npm run test:monitoring && npm run test:privacy && npm run test:support && npm run test:team && npm run test:vto && npm run test:product-state && npm run test:product-options && npm run test:variant-matrix && npm run test:variant-import && npm run test:media && npm run test:bulk-edit && npm run test:import && npm run test:search && npm run test:visual-search && npm run test:category-images && npm run test:filters && npm run test:seo && npm run test:loyalty && npm run test:retention && npm run test:fitting-quota && npm run test:firebase-runtime && npm run test:product-save && npm run test:sheets-import && npm run test:storefront-attributes && npm run test:shipping-methods && npm run test:receipt && npm run test:qr && npm run test:orders-filter && npm run test:rate-limit && npm run test:phone-auth && npm run test:email-verification && npm run test:customer-admin && npm run test:verification-email && npm run test:verify-email-route && npm run test:product-delete && npm run test:campaign-email && npm run test:unsubscribe-token && npm run test:bimi-logo && npm run test:ip-block && npm run test:sign-in-log",
+    "test": "npm run test:offers && npm run test:visibility && npm run test:phase3 && npm run test:phase4 && npm run test:designs && npm run test:zones && npm run test:invoice && npm run test:notify && npm run test:payments && npm run test:errors && npm run test:site && npm run test:monitoring && npm run test:privacy && npm run test:support && npm run test:team && npm run test:vto && npm run test:product-state && npm run test:product-options && npm run test:variant-matrix && npm run test:variant-import && npm run test:media && npm run test:bulk-edit && npm run test:import && npm run test:search && npm run test:visual-search && npm run test:category-images && npm run test:filters && npm run test:seo && npm run test:loyalty && npm run test:retention && npm run test:fitting-quota && npm run test:firebase-runtime && npm run test:product-save && npm run test:sheets-import && npm run test:storefront-attributes && npm run test:shipping-methods && npm run test:receipt && npm run test:qr && npm run test:orders-filter && npm run test:rate-limit && npm run test:phone-auth && npm run test:email-verification && npm run test:customer-admin && npm run test:verification-email && npm run test:verify-email-route && npm run test:product-delete && npm run test:campaign-email && npm run test:unsubscribe-token && npm run test:bimi-logo && npm run test:ip-block && npm run test:sign-in-log && npm run test:points-earning",
     "test:support": "tsx --test scripts/support.test.ts",
     "test:team": "tsx --test scripts/team.test.ts",
     "test:vto": "tsx --conditions=react-server --test scripts/vto.test.ts",
@@ -73,7 +73,8 @@
     "preview:emails": "tsx scripts/email-preview.ts",
     "test:bimi-logo": "tsx --test scripts/bimi-logo.test.ts",
     "test:ip-block": "tsx --test scripts/ip-block.test.ts",
-    "test:sign-in-log": "tsx --test scripts/sign-in-log.test.ts"
+    "test:sign-in-log": "tsx --test scripts/sign-in-log.test.ts",
+    "test:points-earning": "tsx --test scripts/points-earning.test.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",

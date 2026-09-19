@@ -17,6 +17,7 @@ import {
 } from "@/lib/loyalty";
 import { Button } from "@/components/ui/Button";
 import type { Locale } from "@/types";
+import { PointsCoin } from "@/components/ui/PointsCoin";
 
 /**
  * Points, and spending them.
@@ -167,7 +168,16 @@ export function LoyaltyPanel({ locale = "en" }: { locale?: Locale }) {
         </span>
       </div>
 
-      <p className="text-ink font-display mt-4 text-4xl font-semibold tabular-nums">
+      {/*
+        The coin beside the figure, not instead of it. `dir="ltr"` keeps the
+        two together in the right order inside Arabic copy, where bidi would
+        otherwise put the coin on the far side of the number.
+      */}
+      <p
+        className="text-ink font-display mt-4 flex items-center gap-2.5 text-4xl font-semibold tabular-nums"
+        dir="ltr"
+      >
+        <PointsCoin size={34} />
         {available.toLocaleString(rtl ? "ar-JO" : "en-GB")}
       </p>
       <p className="text-smoke text-[0.8125rem]">
