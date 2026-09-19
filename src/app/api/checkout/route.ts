@@ -120,6 +120,26 @@ export async function POST(request: Request) {
   }
 
   /*
+   * Is the shop taking orders?
+   *
+   * Checked here rather than in the middleware because this is the only place
+   * that knows a POST to this path is a purchase. `browse-only` leaves the
+   * catalogue and the basket working and stops exactly this — and a fully
+   * closed shop is stopped here too, for the tab that was already open when
+   * the switch was thrown.
+   */
+  {
+    const { getStorefront } = await import("@/lib/storefront-state.server");
+    const { currentState, closureCopy } = await import("@/lib/storefront-state");
+    const storefront = await getStorefront();
+    const state = currentState(storefront);
+    if (state !== "open") {
+      const locale = body?.locale === "en" ? "en" : "ar";
+      return bad(closureCopy(storefront, locale).body, 503);
+    }
+  }
+
+  /*
    * The method must be one the shop can actually take money with — checked
    * against the same list the checkout renders from, not against NODE_ENV.
    *

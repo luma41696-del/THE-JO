@@ -12,6 +12,7 @@ import { signOut } from "@/lib/firebase/auth";
 import { NetSaleMark } from "@/components/brand/NetSaleMark";
 import { useAdminLocale } from "./AdminLocale";
 import type { AdminKey } from "@/lib/i18n/admin";
+import { ShopClosedBanner } from "./ShopClosedBanner";
 
 /**
  * Admin chrome.
@@ -292,6 +293,11 @@ export function AdminShell({
       {/* `data-admin-surface` is the hook for the min-width reset in
           globals.css — see the rule there for why it exists. */}
       <main data-admin-surface className="lg:ps-64">
+        {/*
+          Outside the animated wrapper, so it does not fade in and out on every
+          navigation. A shut shop is not a page transition.
+        */}
+        <ShopClosedBanner />
         <motion.div
           key={pathname}
           initial={{ opacity: 0, y: 8 }}

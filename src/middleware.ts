@@ -9,6 +9,14 @@ import {
 } from "@/lib/i18n/config";
 import { clientIp } from "@/lib/security/ip";
 import { blockFor } from "@/lib/security/ip-blocks";
+import { ADMIN_SESSION_COOKIE } from "@/lib/firebase/session";
+import {
+  closureCopy,
+  currentState,
+  isAlwaysOpen,
+  retryAfterSeconds,
+} from "@/lib/storefront-state";
+import { getStorefront } from "@/lib/storefront-state.server";
 
 /**
  * Blocked addresses, then locale routing.
@@ -54,6 +62,56 @@ function blockedPage(): string {
 </div></body></html>`;
 }
 
+
+/**
+ * The page a visitor sees while the shop is shut.
+ *
+ * A string rather than a React route, for the same reason the blocked page is:
+ * a closure exists partly to shed load, and rendering a page per request is
+ * not shedding it. It also means the notice still works when whatever is being
+ * fixed is the thing that renders pages.
+ */
+function closedPage(heading: string, body: string, reopensAt?: number): string {
+  const when = reopensAt
+    ? new Date(reopensAt).toLocaleString("en-GB", {
+        day: "numeric",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
+
+  const escape = (value: string) =>
+    value
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+
+  return `<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escape(heading)}</title>
+<style>
+  body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f5f1e6;
+       font:16px/1.75 'Segoe UI',Tahoma,Arial,sans-serif;color:#14110f;padding:24px}
+  .card{max-width:460px;text-align:center}
+  .mark{font-weight:700;letter-spacing:.02em;font-size:15px;margin:0 0 26px}
+  h1{font-size:21px;line-height:1.4;margin:0 0 12px}
+  p{color:#6f6862;font-size:15px;margin:0 0 8px}
+  .when{margin-top:22px;font-size:13px;color:#6f6862}
+  time{color:#14110f;font-weight:600}
+  a{color:#d21f26;text-decoration:none}
+</style></head>
+<body><div class="card">
+<p class="mark">Net Sale</p>
+<h1>${escape(heading)}</h1>
+<p>${escape(body)}</p>
+${when ? `<p class="when">\u0646\u0639\u0648\u062f \u0641\u064a <time dir="ltr">${escape(when)}</time></p>` : ""}
+<p class="when"><a href="mailto:hello@netsale.shop" dir="ltr">hello@netsale.shop</a></p>
+</div></body></html>`;
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
@@ -76,6 +134,55 @@ export async function middleware(request: NextRequest) {
           status: 403,
           headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
         });
+  }
+
+  /*
+   * Is the shop open?
+   *
+   * After the address block and before everything else. Three things this must
+   * get right, and the first is the one that matters:
+   *
+   *  1. **The admin is never closed.** `isAlwaysOpen` covers `/admin`, the
+   *     admin API and the auth routes. A closure that takes those with it
+   *     cannot be lifted, because lifting it is done from the admin.
+   *  2. **503, not 200.** A maintenance page served with 200 tells a crawler
+   *     that this is now what the page says, and a shop can be de-indexed for
+   *     a day of it. 503 with `Retry-After` says "come back", which is true.
+   *  3. **Staff still see the shop.** Presence of the admin session cookie is
+   *     enough to pass here — it is not verified, deliberately: the only thing
+   *     a forged cookie buys is a look at a closed shop, and every write
+   *     behind it is still verified properly. Checking it for real would mean
+   *     a token verification on every request of every visitor.
+   */
+  if (!isAlwaysOpen(pathname) && !request.cookies.get(ADMIN_SESSION_COOKIE)) {
+    const storefront = await getStorefront();
+    if (currentState(storefront) === "closed") {
+      const retryAfter = String(retryAfterSeconds(storefront));
+
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json(
+          { ok: false, error: "The shop is closed.", reason: storefront.reason },
+          { status: 503, headers: { "retry-after": retryAfter } },
+        );
+      }
+
+      // The notice is bilingual by locale; the path is the only hint available
+      // this early, and it falls back to Arabic, which is most of the traffic.
+      const locale = pathname.split("/")[1] === "en" ? "en" : "ar";
+      const copy = closureCopy(storefront, locale);
+
+      return new NextResponse(
+        closedPage(copy.heading, copy.body, storefront.reopensAt),
+        {
+          status: 503,
+          headers: {
+            "content-type": "text/html; charset=utf-8",
+            "cache-control": "no-store",
+            "retry-after": retryAfter,
+          },
+        },
+      );
+    }
   }
 
   // Never touch Next internals, static files, or anything outside the

@@ -1,5 +1,6 @@
 import { SettingsBoard } from "@/components/admin/SettingsBoard";
 import { PointsSettings } from "@/components/admin/PointsSettings";
+import { ShopSwitch } from "@/components/admin/ShopSwitch";
 import { getStoreSettings } from "@/lib/settings";
 
 export const metadata = { title: "Settings" };
@@ -20,6 +21,8 @@ export default async function AdminSettingsPage() {
    */
   return (
     <div className="space-y-4">
+      {/* First, because it is the one control here that stops the shop. */}
+      <ShopSwitch />
       <SettingsBoard settings={settings} />
       <PointsSettings />
     </div>
