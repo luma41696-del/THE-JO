@@ -1,4 +1,5 @@
 import { TeamBoard } from "@/components/admin/TeamBoard";
+import { IpBlocklist } from "@/components/admin/IpBlocklist";
 
 export const metadata = { title: "Access" };
 
@@ -12,5 +13,16 @@ export const metadata = { title: "Access" };
  * rules about who may do it.
  */
 export default function AdminTeamPage() {
-  return <TeamBoard />;
+  /*
+   * The blocklist lives here rather than with the customers, because it is
+   * access control and not a customer record: most of what it keeps out has no
+   * account at all. The customer screen blocks the person; this blocks the
+   * door.
+   */
+  return (
+    <div className="space-y-4">
+      <TeamBoard />
+      <IpBlocklist />
+    </div>
+  );
 }

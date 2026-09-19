@@ -1493,6 +1493,24 @@ export const ADMIN_STRINGS = {
   "cmp.cancel": { en: "Cancel", ar: "إلغاء" },
   "cmp.close": { en: "Close", ar: "إغلاق" },
   "cmp.needSubject": { en: "A subject and a heading are needed.", ar: "العنوان والعنوان الرئيسي مطلوبان." },
+  /* ---- blocked addresses ---- */
+  "ipb.title": { en: "Blocked addresses", ar: "العناوين المحجوبة" },
+  "ipb.hint": { en: "Refuses every request from an address or range, before the page is built.", ar: "ترفض كل طلب من عنوان أو نطاق، قبل بناء الصفحة." },
+  "ipb.warning": { en: "An IP block is weaker than it looks. Phones change address constantly, mobile networks put thousands of subscribers behind one address, and a VPN costs nothing. Block the account first — this is for stopping a script or buying time.", ar: "حجب الـ IP أضعف مما يبدو. الهواتف تغيّر عناوينها باستمرار، وشبكات الجوال تضع آلاف المشتركين خلف عنوان واحد، والـ VPN مجاني. احجب الحساب أولاً — هذا لإيقاف سكربت أو كسب وقت." },
+  "ipb.address": { en: "Address or range", ar: "عنوان أو نطاق" },
+  "ipb.addressHint": { en: "One address, or a range like 203.0.113.0/24. A bare IPv6 address is widened to its /64.", ar: "عنوان واحد، أو نطاق مثل 203.0.113.0/24. عنوان IPv6 المفرد يُوسَّع إلى /64 الخاص به." },
+  "ipb.reason": { en: "Reason", ar: "السبب" },
+  "ipb.reasonHint": { en: "For whoever reads this list in six months.", ar: "لمن سيقرأ هذه القائمة بعد ستة أشهر." },
+  "ipb.add": { en: "Block it", ar: "احجبه" },
+  "ipb.adding": { en: "Blocking...", ar: "جارٍ الحجب…" },
+  "ipb.remove": { en: "Unblock", ar: "ألغِ الحجب" },
+  "ipb.empty": { en: "Nothing is blocked.", ar: "لا شيء محجوب." },
+  "ipb.yours": { en: "You are connecting from", ar: "أنت متصل من" },
+  "ipb.yoursHint": { en: "This address cannot be blocked from here — it would lock you out.", ar: "لا يمكن حجب هذا العنوان من هنا — سيقفل عليك اللوحة." },
+  "ipb.addedBy": { en: "Added by", ar: "أضافه" },
+  "ipb.forAccount": { en: "With account", ar: "مع الحساب" },
+  "ipb.delay": { en: "A change takes up to half a minute to reach every server.", ar: "يستغرق التغيير حتى نصف دقيقة ليصل إلى كل الخوادم." },
+  "ipb.adminOnly": { en: "Only an administrator can block an address.", ar: "الأدمن فقط يمكنه حجب عنوان." },
 } satisfies AdminDict;
 
 export type AdminKey = keyof typeof ADMIN_STRINGS;
